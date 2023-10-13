@@ -1,0 +1,2 @@
+# nygdevweb
+Simple static website
