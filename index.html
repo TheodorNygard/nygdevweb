@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html>
-    <head>
+
+<head>
     <!--Security Headers
     X-Frame-Options "SAMEORIGIN" always;
     Content-Security-Policy "default-src https: data: 'unsafe-inline' 'unsafe-eval'" always;
     Permissions-Policy: geolocation=()
     -->
-        
+
     <title>NygDev</title>
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/site.webmanifest">
-        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#9f00a7">
-        <meta name="theme-color" content="#d5d5d5">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#9f00a7">
+    <meta name="theme-color" content="#d5d5d5">
     <style>
         body {
             display: flex;
@@ -57,10 +58,12 @@
             text-decoration: none;
             border-radius: 5px;
             margin-top: 20px;
+            cursor: pointer;
         }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
+</head>
+
 <body>
     <div class="container">
         <h1>NygDev</h1>
@@ -70,6 +73,29 @@
         <br>
         <a href="https://www.linkedin.com/in/theodor-nyg%C3%A5rd-17218a79/" class="button">LinkedIn</a>
         <br>
+        <button class="button" onclick="postWebhook()">Trigger Webhook</button>
     </div>
+
+    <script>
+        function postWebhook() {
+            fetch('https://c894bd89-fc85-40ea-870b-6cee477a8b5d.webhook.noe.azure-automation.net/webhooks?token=JoA%2bVD0IcKpDpvfK3Z0FVLsA8pS4oJLHAXFin8R%2fiV0%3d', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: 'Webhook triggered' }),
+                mode: 'no-cors'
+            })
+                .then(() => {
+                    console.log('Request sent.');
+                    alert('Webhook triggered successfully!');
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('Error triggering webhook.');
+                });
+        }
+    </script>
 </body>
+
 </html>
