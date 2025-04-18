@@ -1,13 +1,11 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <!--Security Headers
-    X-Frame-Options "SAMEORIGIN" always;
-    Content-Security-Policy "default-src https: data: 'unsafe-inline' 'unsafe-eval'" always;
-    Permissions-Policy: geolocation=()
-    -->
-
+    <!--Security Headers-->
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <meta http-equiv="Content-Security-Policy" content="default-src https: data: 'unsafe-inline' 'unsafe-eval'">
+    <meta http-equiv="Permissions-Policy" content="geolocation=()">
+    
     <title>NygDev</title>
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -16,68 +14,309 @@
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
     <meta name="msapplication-TileColor" content="#9f00a7">
     <meta name="theme-color" content="#d5d5d5">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #7209b7;
+            --text: #2b2d42;
+            --light-text: #555;
+            --background: #f8f9fa;
+            --card-bg: #ffffff;
+            --success: #38b000;
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+            --shadow: 0 8px 30px rgba(0,0,0,0.05);
+            --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        [data-theme="dark"] {
+            --primary: #4cc9f0;
+            --primary-dark: #4361ee;
+            --secondary: #f72585;
+            --text: #f8f9fa;
+            --light-text: #d9d9d9;
+            --background: #121212;
+            --card-bg: #1e1e1e;
+            --success: #52b788;
+            --shadow: 0 8px 30px rgba(0,0,0,0.2);
+            --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
+            min-height: 100vh;
+            background-color: var(--background);
+            font-family: 'Poppins', sans-serif;
+            color: var(--text);
+            transition: var(--transition);
+            line-height: 1.6;
+            padding: 20px;
         }
-
+        
         .container {
+            max-width: 500px;
+            width: 100%;
             text-align: center;
-            font-family: Arial, sans-serif;
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
         }
-
-        h1 {
-            color: #333;
-            font-size: 3em;
+        
+        .logo-container {
             margin-bottom: 20px;
         }
-
+        
+        h1 {
+            color: var(--text);
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+        
+        .tag-line {
+            font-weight: 300;
+            color: var(--light-text);
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        
         .underline {
-            display: inline-block;
-            background-color: #007bff;
-            height: 3px;
-            width: 100px;
+            display: block;
+            height: 4px;
+            width: 80px;
+            margin: 10px auto 25px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 2px;
         }
-
+        
         p {
-            color: #555;
-            font-size: 1.2em;
+            color: var(--light-text);
+            font-size: 1rem;
+            margin-bottom: 5px;
+            font-weight: 500;
         }
-
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            font-size: 1em;
-            background-color: #007bff;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 5px;
+        
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
             margin-top: 20px;
+        }
+        
+        .button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: 500;
+            background-color: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: var(--border-radius);
             cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            width: 100%;
+        }
+        
+        .button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+        
+        .button:active {
+            transform: translateY(0);
+        }
+        
+        .button i {
+            font-size: 1.1rem;
+        }
+        
+        .theme-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .theme-switch:hover {
+            transform: rotate(30deg);
+        }
+        
+        .status {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            height: 20px;
+            transition: var(--transition);
+        }
+        
+        .success {
+            color: var(--success);
+        }
+        
+        .error {
+            color: #e63946;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: var(--light-text);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            display: none;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .button.loading .spinner {
+            display: inline-block;
+        }
+        
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .container {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
         }
     </style>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
 <body>
+    <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode">
+        <i class="fas fa-moon"></i>
+    </button>
+    
     <div class="container">
-        <h1>NygDev</h1>
-        <div class="underline"></div>
-        <p>Related Links </p>
-        <a href="https://www.linkedin.com/in/theodor-nyg%C3%A5rd-17218a79/" class="button">LinkedIn</a>
-         <br>
-        <a href="https://rpg.nygard.dev" class="button">Foundry RPG</a>
-        <br>
-        <button class="button" onclick="postWebhook()">Start Foundry</button>
+        <div class="logo-container">
+            <h1>NygDev</h1>
+            <div class="underline"></div>
+        </div>
+        
+        <div class="links">
+            <a href="https://www.linkedin.com/in/theodor-nyg%C3%A5rd-17218a79/" class="button" target="_blank" rel="noopener noreferrer">
+                <i class="fab fa-linkedin"></i>
+                LinkedIn
+            </a>
+            
+            <a href="https://rpg.nygard.dev" class="button" target="_blank" rel="noopener noreferrer">
+                <i class="fas fa-dice-d20"></i>
+                Foundry RPG
+            </a>
+            
+            <button class="button" id="startFoundry" onclick="postWebhook()">
+                <div class="spinner"></div>
+                <i class="fas fa-server"></i>
+                Start Foundry Server
+            </button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="footer">
+            &copy; <span id="year"></span> Theodor Nygård
+        </div>
     </div>
-
+    
     <script>
+        // Set current year
+        document.getElementById('year').textContent = new Date().getFullYear();
+        
+        // Theme switcher
+        const themeToggle = document.getElementById('themeToggle');
+        const icon = themeToggle.querySelector('i');
+        
+        // Check for saved theme preference or use system preference
+        const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+        const currentTheme = localStorage.getItem('theme');
+        
+        if (currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches)) {
+            document.body.setAttribute('data-theme', 'dark');
+            icon.classList.replace('fa-moon', 'fa-sun');
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            let theme;
+            
+            if (document.body.getAttribute('data-theme') === 'dark') {
+                document.body.removeAttribute('data-theme');
+                icon.classList.replace('fa-sun', 'fa-moon');
+                theme = 'light';
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                icon.classList.replace('fa-moon', 'fa-sun');
+                theme = 'dark';
+            }
+            
+            localStorage.setItem('theme', theme);
+        });
+        
+        // Webhook functionality
         function postWebhook() {
+            const button = document.getElementById('startFoundry');
+            const statusDiv = document.getElementById('status');
+            
+            // Add loading state
+            button.classList.add('loading');
+            button.disabled = true;
+            statusDiv.textContent = 'Starting server...';
+            statusDiv.className = 'status';
+            
             fetch('https://c894bd89-fc85-40ea-870b-6cee477a8b5d.webhook.noe.azure-automation.net/webhooks?token=JoA%2bVD0IcKpDpvfK3Z0FVLsA8pS4oJLHAXFin8R%2fiV0%3d', {
                 method: 'POST',
                 headers: {
@@ -86,16 +325,25 @@
                 body: JSON.stringify({ message: 'Webhook triggered' }),
                 mode: 'no-cors'
             })
-                .then(() => {
-                    console.log('Request sent.');
-                    alert('Webhook triggered successfully!');
-                })
-                .catch((error) => {
-                    console.error('Error:', error);
-                    alert('Error triggering webhook.');
-                });
+            .then(() => {
+                console.log('Request sent.');
+                statusDiv.textContent = 'Server starting! It will be ready in a few minutes.';
+                statusDiv.classList.add('success');
+                
+                // Reset button after some time
+                setTimeout(() => {
+                    button.classList.remove('loading');
+                    button.disabled = false;
+                }, 3000);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                statusDiv.textContent = 'Error starting server. Please try again.';
+                statusDiv.classList.add('error');
+                button.classList.remove('loading');
+                button.disabled = false;
+            });
         }
     </script>
 </body>
-
 </html>
