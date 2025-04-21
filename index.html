@@ -225,6 +225,37 @@
             animation: fadeIn 0.5s ease-out;
         }
         
+        /* Status indicator styles */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background-color: var(--success);
+            box-shadow: 0 0 5px var(--success);
+        }
+        
+        .status-offline {
+            background-color: #e63946;
+            box-shadow: 0 0 5px #e63946;
+        }
+        
+        .status-checking {
+            background-color: #ffb703;
+            box-shadow: 0 0 5px #ffb703;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
         /* Responsive */
         @media (max-width: 600px) {
             .container {
@@ -254,15 +285,12 @@
                 LinkedIn
             </a>
             
-            <a href="https://rpg.nygard.dev" class="button" target="_blank" rel="noopener noreferrer">
-                <i class="fas fa-dice-d20"></i>
-                Foundry RPG
-            </a>
-            
-            <button class="button" id="startFoundry" onclick="postWebhook()">
+            <!-- Replace the two Foundry buttons with a single dynamic button -->
+            <button class="button" id="foundryButton">
                 <div class="spinner"></div>
-                <i class="fas fa-server"></i>
-                Start Foundry Server
+                <span class="status-indicator"></span>
+                <i class="fas fa-dice-d20"></i>
+                <span id="buttonText">Checking Foundry Status...</span>
             </button>
         </div>
         
@@ -306,18 +334,73 @@
             localStorage.setItem('theme', theme);
         });
         
-        // Webhook functionality
-        function postWebhook() {
-            const button = document.getElementById('startFoundry');
-            const statusDiv = document.getElementById('status');
+        // Dynamic Foundry button functionality
+        const foundryButton = document.getElementById('foundryButton');
+        const buttonText = document.getElementById('buttonText');
+        const statusIndicator = document.querySelector('.status-indicator');
+        const statusDiv = document.getElementById('status');
+        const foundryUrl = 'https://rpg.nygard.dev';
+        const webhookUrl = 'https://c894bd89-fc85-40ea-870b-6cee477a8b5d.webhook.noe.azure-automation.net/webhooks?token=JoA%2bVD0IcKpDpvfK3Z0FVLsA8pS4oJLHAXFin8R%2fiV0%3d';
+        
+        // Function to check if Foundry server is online
+        async function checkFoundryStatus() {
+            statusIndicator.className = 'status-indicator status-checking';
+            buttonText.textContent = 'Checking status...';
             
-            // Add loading state
-            button.classList.add('loading');
-            button.disabled = true;
+            try {
+                // Use fetch with a timeout to check if the server is responsive
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
+                const response = await fetch(foundryUrl, {
+                    method: 'HEAD', // Just check headers, don't need body
+                    mode: 'no-cors', // Important for cross-origin requests
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                // If we get here, the server responded (although with no-cors we can't check status)
+                // We'll consider this as the server being online
+                setFoundryOnline();
+            } catch (error) {
+                // If fetch throws an error or times out, the server is likely offline
+                setFoundryOffline();
+            }
+        }
+        
+        // Set button to "online" state
+        function setFoundryOnline() {
+            statusIndicator.className = 'status-indicator status-online';
+            buttonText.textContent = 'Go to Foundry RPG';
+            foundryButton.onclick = () => {
+                window.open(foundryUrl, '_blank');
+            };
+            statusDiv.textContent = 'Foundry server is online';
+            statusDiv.className = 'status success';
+            foundryButton.classList.remove('loading');
+            foundryButton.disabled = false;
+        }
+        
+        // Set button to "offline" state
+        function setFoundryOffline() {
+            statusIndicator.className = 'status-indicator status-offline';
+            buttonText.textContent = 'Start Foundry Server';
+            foundryButton.onclick = startFoundryServer;
+            statusDiv.textContent = 'Foundry server is offline';
+            statusDiv.className = 'status';
+            foundryButton.classList.remove('loading');
+            foundryButton.disabled = false;
+        }
+        
+        // Function to start the Foundry server via webhook
+        function startFoundryServer() {
+            foundryButton.classList.add('loading');
+            foundryButton.disabled = true;
             statusDiv.textContent = 'Starting server...';
             statusDiv.className = 'status';
             
-            fetch('https://c894bd89-fc85-40ea-870b-6cee477a8b5d.webhook.noe.azure-automation.net/webhooks?token=JoA%2bVD0IcKpDpvfK3Z0FVLsA8pS4oJLHAXFin8R%2fiV0%3d', {
+            fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -330,20 +413,67 @@
                 statusDiv.textContent = 'Server starting! It will be ready in a few minutes.';
                 statusDiv.classList.add('success');
                 
-                // Reset button after some time
-                setTimeout(() => {
-                    button.classList.remove('loading');
-                    button.disabled = false;
-                }, 3000);
+                // After triggering the webhook, start periodic checks to detect when the server comes online
+                startPollingForServerStart();
             })
             .catch((error) => {
                 console.error('Error:', error);
                 statusDiv.textContent = 'Error starting server. Please try again.';
                 statusDiv.classList.add('error');
-                button.classList.remove('loading');
-                button.disabled = false;
+                foundryButton.classList.remove('loading');
+                foundryButton.disabled = false;
             });
         }
+        
+        // After starting the server, periodically check if it's up yet
+        function startPollingForServerStart() {
+            statusIndicator.className = 'status-indicator status-checking';
+            buttonText.textContent = 'Server starting...';
+            
+            // Check every 30 seconds
+            const pollingInterval = setInterval(() => {
+                fetch(foundryUrl, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    timeout: 5000
+                })
+                .then(() => {
+                    // Server is up!
+                    clearInterval(pollingInterval);
+                    setFoundryOnline();
+                })
+                .catch(() => {
+                    // Server still starting, continue polling
+                    console.log('Server still starting...');
+                });
+            }, 30000); // Check every 30 seconds
+            
+            // Stop polling after 10 minutes (20 checks at 30-second intervals) if server hasn't started
+            setTimeout(() => {
+                clearInterval(pollingInterval);
+                if (statusIndicator.className.includes('checking')) {
+                    statusDiv.textContent = 'Server might be taking longer than expected. Try refreshing.';
+                    setFoundryOffline();
+                }
+            }, 600000); // 10 minutes
+            
+            // Reset button after some time, but keep "Starting..." text
+            setTimeout(() => {
+                foundryButton.classList.remove('loading');
+                foundryButton.disabled = false;
+            }, 3000);
+        }
+        
+        // Check status periodically (every 5 minutes)
+        function startPeriodicChecks() {
+            checkFoundryStatus(); // Initial check
+            
+            // Recheck every 5 minutes
+            setInterval(checkFoundryStatus, 300000);
+        }
+        
+        // Start checking when page loads
+        window.addEventListener('load', startPeriodicChecks);
     </script>
 </body>
 </html>
