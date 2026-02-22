@@ -168,10 +168,20 @@ function startPollingForServerStart() {
             mode: 'no-cors'
         })
         .then(() => {
-            // Server is up!
+            // Got a response - but nginx can reply before Foundry is ready.
+            // Confirm with a second check before declaring online.
             clearInterval(activePollingInterval);
             activePollingInterval = null;
-            setFoundryOnline();
+            statusIndicator.className = 'status-indicator status-checking';
+            buttonText.textContent = 'Almost ready...';
+            setTimeout(() => {
+                fetchWithTimeout(FOUNDRY_URL, { method: 'HEAD', mode: 'no-cors' })
+                    .then(() => setFoundryOnline())
+                    .catch(() => {
+                        // Still not truly ready - resume polling
+                        startPollingForServerStart();
+                    });
+            }, 8000);
         })
         .catch(() => {
             // Server still starting
