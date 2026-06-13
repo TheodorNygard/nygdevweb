@@ -1,12 +1,10 @@
 name: Azure Static Web Apps CI/CD
+
+# Manual-only for now: deploy on demand from the Actions tab ("Run workflow").
+# Auto-deploy on push/PR is intentionally disabled. To restore it, re-add the
+# push/pull_request triggers and the close_pull_request_job (see git history).
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - master
+  workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
 # This matches the NygDev/NygDevAzure standard: azure/login@v2 with a
@@ -17,7 +15,6 @@ permissions:
 
 jobs:
   build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
@@ -57,32 +54,3 @@ jobs:
           api_location: ""
           output_location: "."
           skip_app_build: true
-
-  close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request Job
-    steps:
-      - name: Az CLI login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Retrieve Static Web Apps deployment token
-        run: |
-          TOKEN=$(az staticwebapp secrets list \
-            --name ${{ vars.AZURE_SWA_NAME }} \
-            --resource-group ${{ vars.AZURE_SWA_RESOURCE_GROUP }} \
-            --query "properties.apiKey" \
-            --output tsv)
-          echo "::add-mask::$TOKEN"
-          echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
-          action: "close"
