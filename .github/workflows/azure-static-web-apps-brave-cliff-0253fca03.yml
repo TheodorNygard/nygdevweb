@@ -18,13 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
           lfs: false
 
       - name: Az CLI login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -50,7 +50,7 @@ jobs:
         # content server authorizes deploys using this workflow's GitHub OIDC token
         # (the deployment token alone is rejected). Mint it here and hand it to the
         # deploy action below as github_id_token. Requires permissions.id-token: write.
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: return await core.getIDToken()
           result-encoding: string
