@@ -19,6 +19,7 @@
 
     <style>
         :root {
+            color-scheme: light;
             --primary: #4361ee;
             --primary-dark: #3a56d4;
             --secondary: #7209b7;
@@ -35,7 +36,8 @@
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
         }
         
-        [data-theme="dark"] {
+        :root[data-theme="dark"] {
+            color-scheme: dark;
             --primary: #4cc9f0;
             --primary-dark: #4361ee;
             --secondary: #f72585;
@@ -155,6 +157,12 @@
         }
         
         .button:active {transform: translateY(0);}
+
+        .button:focus-visible,
+        .theme-switch:focus-visible {
+            outline: 3px solid var(--secondary);
+            outline-offset: 3px;
+        }
         
         .theme-switch {
             position: absolute;
@@ -272,7 +280,7 @@
         </symbol>
     </svg>
     
-    <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode">
+    <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">
         <svg class="icon"><use href="#moon-icon"></use></svg>
     </button>
     
@@ -308,6 +316,6 @@
         </div>
     </div>
     
-    <script src="main.js"></script>
+    <script src="main.js" defer></script>
 </body>
 </html>
