@@ -22,21 +22,11 @@ let activePollingInterval = null;
 document.getElementById('year').textContent = new Date().getFullYear();
 
 // Fetch with timeout
-async function fetchWithTimeout(url, options = {}, timeout = CHECK_TIMEOUT) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
-    }
+function fetchWithTimeout(url, options = {}, timeout = CHECK_TIMEOUT) {
+    return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(timeout)
+    });
 }
 
 // Theme switcher
@@ -44,33 +34,31 @@ function setThemeColor(dark) {
     themeColorMeta.setAttribute('content', dark ? '#121212' : '#f8f9fa');
 }
 
-function initTheme() {
-    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-    const currentTheme = localStorage.getItem('theme');
-    const dark = currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches);
-
+// data-theme lives on <html> so `color-scheme` reaches the page canvas,
+// which is what themes the scrollbars and native form controls.
+function applyTheme(dark) {
     if (dark) {
-        document.body.setAttribute('data-theme', 'dark');
-        themeIcon.setAttribute('href', '#sun-icon');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
     }
+    themeIcon.setAttribute('href', dark ? '#sun-icon' : '#moon-icon');
+    themeToggle.setAttribute('aria-pressed', String(dark));
     setThemeColor(dark);
 }
 
+function initTheme() {
+    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const currentTheme = localStorage.getItem('theme');
+
+    applyTheme(currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches));
+}
+
 themeToggle.addEventListener('click', () => {
-    let theme;
+    const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
 
-    if (document.body.getAttribute('data-theme') === 'dark') {
-        document.body.removeAttribute('data-theme');
-        themeIcon.setAttribute('href', '#moon-icon');
-        theme = 'light';
-    } else {
-        document.body.setAttribute('data-theme', 'dark');
-        themeIcon.setAttribute('href', '#sun-icon');
-        theme = 'dark';
-    }
-
-    setThemeColor(theme === 'dark');
-    localStorage.setItem('theme', theme);
+    applyTheme(dark);
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
 }, {passive: true});
 
 // Check if Foundry server is online
@@ -202,4 +190,6 @@ function init() {
     setInterval(checkFoundryStatus, PERIODIC_CHECK);
 }
 
-window.addEventListener('load', init, {passive: true});
+// The script is deferred, so the DOM is ready and the theme can be applied
+// before first paint instead of after every image has finished loading.
+init();
