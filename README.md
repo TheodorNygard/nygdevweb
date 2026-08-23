@@ -1,8 +1,9 @@
 # nygdevweb
 
 The source for [nygdev.dev](https://nygdev.dev) — a one-page personal site: a
-couple of profile links, plus a live status button for my self-hosted Foundry
-VTT server that can start the server when it's down.
+couple of profile links, a link to my LikeC4 architecture model, plus a live
+status button for my self-hosted Foundry VTT server that can start the server
+when it's down.
 
 No framework, no build step, no dependencies. One HTML file with its styles and
 SVG icons inlined, one script, some favicons. Hosted as an Azure Static Web App
