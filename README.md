@@ -1,7 +1,7 @@
 # nygdevweb
 
 The source for [nygdev.dev](https://nygdev.dev) — a one-page personal site: a
-couple of profile links, a link to my LikeC4 architecture model, plus a live
+couple of profile links, a link to my LikeC4 architecture diagram, plus a live
 status button for my self-hosted Foundry VTT server that can start the server
 when it's down.
 
