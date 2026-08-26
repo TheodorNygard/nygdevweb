@@ -13,7 +13,7 @@ on the free tier.
 | --- | --- |
 | `index.html` | The page — markup, styles, inline SVG icon sprites |
 | `main.js` | Light/dark theme toggle, Foundry status polling, start-server webhook |
-| `staticwebapp.config.json` | Security headers (CSP, frame options, referrer policy) |
+| `staticwebapp.config.json` | Security headers (CSP, HSTS, frame options, referrer policy, cross-origin isolation) |
 | `.github/workflows/` | Azure Static Web Apps deploy |
 
 ## Deployment
