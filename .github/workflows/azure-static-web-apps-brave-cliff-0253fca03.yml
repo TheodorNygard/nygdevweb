@@ -1,5 +1,13 @@
 name: Deploy nygdev.dev
 
+# DO NOT RENAME THIS FILE.
+# This app's deployment authorization policy is "GitHub", so the content server
+# identifies the Static Web App by the workflow filename carried in the GitHub
+# OIDC token. Azure registered the generated name when the app was provisioned
+# (portal: Static Web App -> Overview -> "Edit workflow"), and a rename makes
+# deploys fail with "Could not determine the Static Web App from the GitHub OIDC
+# workflow reference". The `name:` above is free to change; the filename is not.
+#
 # Manual-only for now: deploy on demand from the Actions tab ("Run workflow").
 # Auto-deploy on push/PR is intentionally disabled. To restore it, re-add the
 # push/pull_request triggers and the close_pull_request_job (see git history).

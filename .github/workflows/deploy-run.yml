@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
-# Reuses the federated credential already scoped to this repo; only the target
-# Static Web App differs from the nygdev.dev deploy.
+# Reuses the federated credential already scoped to this repo. id-token: write
+# is for azure/login only; unlike the nygdev.dev workflow this one does not hand
+# an OIDC token to the deploy action (see the Build And Deploy step).
 permissions:
   id-token: write
   contents: read
@@ -71,24 +72,20 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
-      - name: Mint GitHub OIDC id token
-        id: idtoken
-        # The Static Web App's deployment authorization policy is "GitHub", so the
-        # content server authorizes deploys using this workflow's GitHub OIDC token
-        # (the deployment token alone is rejected). Mint it here and hand it to the
-        # deploy action below as github_id_token. Requires permissions.id-token: write.
-        uses: actions/github-script@v9
-        with:
-          script: return await core.getIDToken()
-          result-encoding: string
-
+      # No github_id_token here, unlike the nygdev.dev workflow. Passing one puts
+      # the content server on the GitHub OIDC path, where it resolves the target
+      # app from the workflow filename Azure registered at provisioning time.
+      # This app was created without GitHub integration, so no such filename
+      # exists and that lookup can only fail. Authorizing with the deployment
+      # token instead leaves the filename free to describe what it deploys.
+      # Requires the app's deployment authorization policy to be "Deployment
+      # token" (portal: Static Web App -> Settings -> Deployment configuration).
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          github_id_token: ${{ steps.idtoken.outputs.result }}
           action: "upload"
           app_location: "sites/run"
           api_location: ""
