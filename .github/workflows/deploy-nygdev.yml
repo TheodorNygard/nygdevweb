@@ -1,0 +1,71 @@
+name: Deploy nygdev.dev
+
+# Manual-only for now: deploy on demand from the Actions tab ("Run workflow").
+# Auto-deploy on push/PR is intentionally disabled. To restore it, re-add the
+# push/pull_request triggers and the close_pull_request_job (see git history).
+on:
+  workflow_dispatch:
+
+# OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
+# This matches the NygDev/NygDevAzure standard: azure/login@v2 with a
+# federated credential, then the Az CLI is used for everything that needs auth.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Az CLI login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Retrieve Static Web Apps deployment token
+        run: |
+          # Fetch the deployment token just-in-time over the federated identity
+          # instead of storing it as a long-lived GitHub secret. The deploy
+          # identity needs a role on the Static Web App that grants
+          # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
+          TOKEN=$(az staticwebapp secrets list \
+            --name ${{ vars.AZURE_SWA_NAME }} \
+            --resource-group ${{ vars.AZURE_SWA_RESOURCE_GROUP }} \
+            --query "properties.apiKey" \
+            --output tsv)
+          echo "::add-mask::$TOKEN"
+          echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Mint GitHub OIDC id token
+        id: idtoken
+        # The Static Web App's deployment authorization policy is "GitHub", so the
+        # content server authorizes deploys using this workflow's GitHub OIDC token
+        # (the deployment token alone is rejected). Mint it here and hand it to the
+        # deploy action below as github_id_token. Requires permissions.id-token: write.
+        uses: actions/github-script@v9
+        with:
+          script: return await core.getIDToken()
+          result-encoding: string
+
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          github_id_token: ${{ steps.idtoken.outputs.result }}
+          action: "upload"
+          # Each site lives in its own folder; SWA serves app_location as the
+          # site root, so nygdev.dev's public paths are unchanged by the split.
+          app_location: "sites/nygdev"
+          api_location: ""
+          output_location: "."
+          skip_app_build: true

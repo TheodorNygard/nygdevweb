@@ -1,14 +1,13 @@
-name: Azure Static Web Apps CI/CD
+name: Deploy run.nygard.dev
 
-# Manual-only for now: deploy on demand from the Actions tab ("Run workflow").
-# Auto-deploy on push/PR is intentionally disabled. To restore it, re-add the
-# push/pull_request triggers and the close_pull_request_job (see git history).
+# Manual-only, matching the nygdev.dev workflow: deploy on demand from the
+# Actions tab ("Run workflow"). Auto-deploy on push/PR is intentionally off.
 on:
   workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
-# This matches the NygDev/NygDevAzure standard: azure/login@v2 with a
-# federated credential, then the Az CLI is used for everything that needs auth.
+# Reuses the federated credential already scoped to this repo; only the target
+# Static Web App differs from the nygdev.dev deploy.
 permissions:
   id-token: write
   contents: read
@@ -37,8 +36,8 @@ jobs:
           # identity needs a role on the Static Web App that grants
           # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
           TOKEN=$(az staticwebapp secrets list \
-            --name ${{ vars.AZURE_SWA_NAME }} \
-            --resource-group ${{ vars.AZURE_SWA_RESOURCE_GROUP }} \
+            --name ${{ vars.AZURE_SWA_NAME_RUN }} \
+            --resource-group ${{ vars.AZURE_SWA_RESOURCE_GROUP_RUN }} \
             --query "properties.apiKey" \
             --output tsv)
           echo "::add-mask::$TOKEN"
@@ -63,7 +62,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           github_id_token: ${{ steps.idtoken.outputs.result }}
           action: "upload"
-          app_location: "/"
+          app_location: "sites/run"
           api_location: ""
           output_location: "."
           skip_app_build: true
