@@ -30,9 +30,9 @@
             --success: #38b000;
             --error: #e63946;
             --warning: #ffb703;
-            /* Brighter than --success/--error so the die stays legible on the button fill */
-            --dice-online: #22c55e;
-            --dice-offline: #ef4444;
+            /* Muted sage/clay - reads green vs. red without shouting, on both button fills */
+            --dice-online: #6fae87;
+            --dice-offline: #c9736e;
             --border-radius: 12px;
             --transition: all 0.3s ease;
             --shadow: 0 8px 30px rgba(0,0,0,0.05);
@@ -246,9 +246,8 @@
         /* The die itself carries the server state: it tumbles while we check,
            then settles on green (online) or red (offline). */
         .dice {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             transition: color 0.3s ease;
-            filter: drop-shadow(0 0 1px rgba(0,0,0,0.45));
         }
 
         .is-checking .dice {animation: roll 0.9s ease-in-out infinite;}
