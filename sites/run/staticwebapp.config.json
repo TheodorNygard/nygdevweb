@@ -9,5 +9,10 @@
         "Cross-Origin-Opener-Policy": "same-origin",
         "Cross-Origin-Embedder-Policy": "credentialless",
         "Cross-Origin-Resource-Policy": "same-origin"
+    },
+    "responseOverrides": {
+        "404": {
+            "rewrite": "/404.html"
+        }
     }
 }
