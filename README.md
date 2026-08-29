@@ -24,10 +24,23 @@ root, so a site's public paths match its folder contents.
 Deploys are **manual** — pick the workflow in the Actions tab and run it. Auto-deploy
 on push and PR is intentionally off.
 
-| Workflow | Deploys | `app_location` |
-| --- | --- | --- |
-| `.github/workflows/deploy-nygdev.yml` | nygdev.dev | `sites/nygdev` |
-| `.github/workflows/deploy-run.yml` | run.nygard.dev | `sites/run` |
+| Workflow | Deploys | `app_location` | Authorized by |
+| --- | --- | --- | --- |
+| `.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml` | nygdev.dev | `sites/nygdev` | GitHub OIDC |
+| `.github/workflows/deploy-run.yml` | run.nygard.dev | `sites/run` | deployment token |
+
+**The nygdev.dev workflow file must keep its generated name.** That app's
+deployment authorization policy is "GitHub", so the content server identifies
+the app by the workflow filename carried in the OIDC token — Azure registered it
+at provisioning time (portal: Overview → "Edit workflow"). Renaming the file
+breaks deploys with *"Could not determine the Static Web App from the GitHub
+OIDC workflow reference"*. The `name:` inside the file is free to change.
+
+run.nygard.dev has no such constraint because it authorizes with the deployment
+token instead, which is why its file can be named for what it deploys. That
+requires its deployment authorization policy to be **Deployment token** (portal:
+Settings → Deployment configuration). Both approaches still keep the token out
+of GitHub — it is fetched at runtime over the federated identity either way.
 
 Azure auth uses OIDC federated credentials, so no long-lived deployment token
 lives in GitHub; each workflow signs in with `azure/login` and fetches its
