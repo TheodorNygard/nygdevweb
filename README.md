@@ -35,10 +35,16 @@ Static Web Apps token just-in-time. Both read the `AZURE_CLIENT_ID`,
 `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` secrets, and each reads its own
 resource-name variables:
 
-| Variable | Used by |
-| --- | --- |
-| `AZURE_SWA_NAME`, `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev |
-| `AZURE_SWA_NAME_RUN`, `AZURE_SWA_RESOURCE_GROUP_RUN` | run.nygard.dev |
+| Variable | Used by | Required |
+| --- | --- | --- |
+| `AZURE_SWA_NAME` | nygdev.dev | yes |
+| `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev, and run.nygard.dev when no `_RUN` override is set | yes |
+| `AZURE_SWA_NAME_RUN` | run.nygard.dev | yes |
+| `AZURE_SWA_RESOURCE_GROUP_RUN` | run.nygard.dev | only if the two apps are in different resource groups |
+
+An unset variable expands to an empty string, which the Az CLI reports as a bare
+`expected one argument` usage error. Both workflows check first and fail naming
+the variable instead.
 
 The deploy identity needs a role granting `Microsoft.Web/staticSites/listSecrets`
 (e.g. Contributor) on **each** Static Web App. Setting that up from scratch

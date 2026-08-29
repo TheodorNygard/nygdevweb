@@ -30,6 +30,23 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Resolve target Static Web App
+        env:
+          SWA_NAME: ${{ vars.AZURE_SWA_NAME }}
+          SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
+        run: |
+          # An unset repository variable expands to an empty string, which the
+          # Az CLI reports as a bare "expected one argument" usage error. Fail
+          # here instead, naming the variable that needs setting.
+          if [ -z "$SWA_NAME" ] || [ -z "$SWA_RG" ]; then
+            echo "::error::AZURE_SWA_NAME and AZURE_SWA_RESOURCE_GROUP must both be set (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
+
+          echo "Deploying to Static Web App '$SWA_NAME' in resource group '$SWA_RG'"
+          echo "SWA_NAME=$SWA_NAME" >> "$GITHUB_ENV"
+          echo "SWA_RG=$SWA_RG" >> "$GITHUB_ENV"
+
       - name: Retrieve Static Web Apps deployment token
         run: |
           # Fetch the deployment token just-in-time over the federated identity
@@ -37,8 +54,8 @@ jobs:
           # identity needs a role on the Static Web App that grants
           # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
           TOKEN=$(az staticwebapp secrets list \
-            --name ${{ vars.AZURE_SWA_NAME }} \
-            --resource-group ${{ vars.AZURE_SWA_RESOURCE_GROUP }} \
+            --name "$SWA_NAME" \
+            --resource-group "$SWA_RG" \
             --query "properties.apiKey" \
             --output tsv)
           echo "::add-mask::$TOKEN"
