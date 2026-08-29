@@ -1,6 +1,6 @@
 {
     "globalHeaders": {
-        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; connect-src https://REPLACE-ME.azurewebsites.net; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; connect-src https://func-nygdev-api.azurewebsites.net; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
         "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff",

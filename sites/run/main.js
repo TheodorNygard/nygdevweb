@@ -4,7 +4,7 @@
 //   1. this constant
 //   2. connect-src in staticwebapp.config.json (else the CSP blocks it)
 //   3. the function app's CORS allowed origins (must list https://run.nygard.dev)
-const SPOT_URL = 'https://REPLACE-ME.azurewebsites.net/api/spot';
+const SPOT_URL = 'https://func-nygdev-api.azurewebsites.net/api/spotread';
 const REQUEST_TIMEOUT = 10000;  // 10 seconds
 
 // DOM elements
