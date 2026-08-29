@@ -12,7 +12,6 @@ const themeIcon = themeToggle.querySelector('use');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const foundryButton = document.getElementById('foundryButton');
 const buttonText = document.getElementById('buttonText');
-const statusIndicator = document.querySelector('.status-indicator');
 const statusDiv = document.getElementById('status');
 
 // Track active startup polling interval to prevent duplicates
@@ -61,9 +60,21 @@ themeToggle.addEventListener('click', () => {
     localStorage.setItem('theme', dark ? 'dark' : 'light');
 }, {passive: true});
 
+// The die is the status light: rolling while checking, green online, red offline
+function setDiceState(state) {
+    foundryButton.classList.remove('is-checking', 'is-online', 'is-offline');
+    foundryButton.classList.add(state);
+}
+
+// Clear the message line (start/error messages are the only thing it carries)
+function clearStatusMessage() {
+    statusDiv.textContent = '';
+    statusDiv.className = 'status';
+}
+
 // Check if Foundry server is online
 async function checkFoundryStatus() {
-    statusIndicator.className = 'status-indicator status-checking';
+    setDiceState('is-checking');
     buttonText.textContent = 'Checking status...';
 
     try {
@@ -82,22 +93,20 @@ async function checkFoundryStatus() {
 
 // Set button to "online" state
 function setFoundryOnline() {
-    statusIndicator.className = 'status-indicator status-online';
+    setDiceState('is-online');
     buttonText.textContent = 'Go to Foundry RPG';
     foundryButton.onclick = () => window.open(FOUNDRY_URL, '_blank');
-    statusDiv.textContent = 'Foundry server is online';
-    statusDiv.className = 'status success';
+    clearStatusMessage();
     foundryButton.classList.remove('loading');
     foundryButton.disabled = false;
 }
 
 // Set button to "offline" state
 function setFoundryOffline() {
-    statusIndicator.className = 'status-indicator status-offline';
+    setDiceState('is-offline');
     buttonText.textContent = 'Start Foundry Server';
     foundryButton.onclick = startFoundryServer;
-    statusDiv.textContent = 'Foundry server is offline';
-    statusDiv.className = 'status error';
+    clearStatusMessage();
     foundryButton.classList.remove('loading');
     foundryButton.disabled = false;
 }
@@ -130,7 +139,7 @@ function startFoundryServer() {
 
 // Poll to check if server is up
 function startPollingForServerStart() {
-    statusIndicator.className = 'status-indicator status-checking';
+    setDiceState('is-checking');
     buttonText.textContent = 'Server starting...';
 
     let pollingCount = 0;
@@ -160,7 +169,7 @@ function startPollingForServerStart() {
             // Confirm with a second check before declaring online.
             clearInterval(activePollingInterval);
             activePollingInterval = null;
-            statusIndicator.className = 'status-indicator status-checking';
+            setDiceState('is-checking');
             buttonText.textContent = 'Almost ready...';
             setTimeout(() => {
                 fetchWithTimeout(FOUNDRY_URL, { method: 'HEAD', mode: 'no-cors' })
@@ -176,8 +185,9 @@ function startPollingForServerStart() {
             if (pollingCount >= maxPolls) {
                 clearInterval(activePollingInterval);
                 activePollingInterval = null;
-                statusDiv.textContent = 'Server might be taking longer than expected. Try refreshing.';
                 setFoundryOffline();
+                statusDiv.textContent = 'Server might be taking longer than expected. Try refreshing.';
+                statusDiv.className = 'status error';
             }
         });
     }, POLLING_INTERVAL);
