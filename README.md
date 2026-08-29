@@ -74,8 +74,24 @@ things must name the same origin:
 2. `connect-src` in `sites/run/staticwebapp.config.json` — otherwise the CSP blocks it
 3. the function app's CORS allowed origins, which must list `https://run.nygard.dev`
 
-All three currently say `https://REPLACE-ME.azurewebsites.net` and need the real
-hostname once the function app exists.
+All three currently say `https://func-nygdev-api.azurewebsites.net`.
 
 Use anonymous auth level on the function and rely on CORS. A function key put in
 `main.js` is served to every visitor in plain text, so it authenticates nobody.
+
+## Inline scripts and the CSP
+
+Neither site has ever had an inline `<script>`; each loads one `main.js` from
+its own origin, which is all `script-src 'self'` needs. A browser reporting an
+inline script blocked on one of these pages, with a hash to add, is reporting
+something that is not served from here — almost always an extension injecting
+into the page. Reproduce in a clean profile (Firefox: Help → Troubleshoot Mode)
+before touching the policy. Never paste a suggested hash into the CSP without
+knowing which script it belongs to: a hash is a permanent allow for whatever
+code produces it.
+
+The one inline script Azure did serve on these domains was its stock 404 page,
+which comes from Microsoft's edge without the headers in
+`staticwebapp.config.json`. `sites/run/` now ships its own `404.html`, wired up
+through `responseOverrides`, so 404s are first-party and carry the same
+policy as the rest of the site.
