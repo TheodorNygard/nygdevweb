@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Run</title>
-    <meta name="description" content="Spot read from the NygDev function app.">
+    <title>Marathon prep</title>
+    <meta name="description" content="Training dashboard built from the marathon prep feed on blob storage.">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -12,6 +12,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
+        /* Two palettes live here and they are not the same thing:
+           the site chrome (brand blue/purple, card surfaces) and the chart
+           slots (--series-N, --status-N). The chart slots are a validated
+           categorical palette — the slot order is the colour-blind-safety
+           mechanism, so do not reorder or add to them without re-validating
+           against both card surfaces. */
         :root {
             color-scheme: light;
             --primary: #4361ee;
@@ -25,10 +31,55 @@
             --border: #e3e6ea;
             --success: #38b000;
             --error: #e63946;
+
+            /* Chart ink and chrome */
+            --muted: #898781;
+            --grid: #e1e0d9;
+            --axis: #c3c2b7;
+
+            /* Categorical slots, light steps */
+            --series-1: #2a78d6;
+            --series-2: #eb6834;
+            --series-3: #1baf7a;
+
             --border-radius: 12px;
             --transition: all 0.3s ease;
             --shadow: 0 8px 30px rgba(0,0,0,0.05);
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        /* Status colours are fixed in both modes and never themed: they mean
+           state, not identity. They always ship with an icon and a word, so
+           the two that sit below 3:1 on white never carry meaning alone. */
+        :root {
+            --status-good: #0ca30c;
+            --status-warning: #fab219;
+            --status-serious: #ec835a;
+            --status-critical: #d03b3b;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --primary: #4cc9f0;
+                --primary-dark: #4361ee;
+                --secondary: #f72585;
+                --text: #f8f9fa;
+                --light-text: #d9d9d9;
+                --background: #121212;
+                --card-bg: #1e1e1e;
+                --code-bg: #161616;
+                --border: #333;
+                --success: #52b788;
+                --muted: #898781;
+                --grid: #2c2c2a;
+                --axis: #383835;
+                --series-1: #3987e5;
+                --series-2: #d95926;
+                --series-3: #199e70;
+                --shadow: 0 8px 30px rgba(0,0,0,0.2);
+                --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
+            }
         }
 
         :root[data-theme="dark"] {
@@ -43,6 +94,12 @@
             --code-bg: #161616;
             --border: #333;
             --success: #52b788;
+            --muted: #898781;
+            --grid: #2c2c2a;
+            --axis: #383835;
+            --series-1: #3987e5;
+            --series-2: #d95926;
+            --series-3: #199e70;
             --shadow: 0 8px 30px rgba(0,0,0,0.2);
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
         }
@@ -54,16 +111,17 @@
         }
 
         body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             background-color: var(--background);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
             color: var(--text);
             transition: background-color 0.3s ease, color 0.3s ease;
             line-height: 1.6;
-            padding: 20px;
+            padding: 24px 20px 40px;
+        }
+
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
         }
 
         .icon {
@@ -74,47 +132,55 @@
             stroke: currentColor;
             fill: currentColor;
             font-size: 1.1rem;
+            flex: none;
         }
 
-        .container {
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-            background-color: var(--card-bg);
-            padding: 40px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-            animation: fadeIn 0.5s ease-out;
+        /* Header */
+        .masthead {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
         }
-
-        .logo-container {margin-bottom: 20px;}
 
         h1 {
-            color: var(--text);
-            font-size: 2.5rem;
+            font-size: 2.25rem;
             font-weight: 700;
-            margin-bottom: 5px;
             letter-spacing: -0.5px;
+            line-height: 1.2;
         }
 
         .underline {
             display: block;
             height: 4px;
             width: 80px;
-            margin: 10px auto 25px;
+            margin: 8px 0 10px;
             background: linear-gradient(90deg, var(--primary), var(--secondary));
             border-radius: 2px;
         }
 
-        .button {
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+
+        .controls {
             display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .button {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            padding: 12px 20px;
-            font-size: 1rem;
+            padding: 10px 18px;
+            font-size: 0.95rem;
             font-weight: 700;
+            font-family: inherit;
             background-color: var(--primary);
             color: white;
             text-decoration: none;
@@ -122,7 +188,12 @@
             cursor: pointer;
             transition: var(--transition);
             border: none;
-            width: 100%;
+        }
+
+        :root[data-theme="dark"] .button {color: #10202a;}
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .button {color: #10202a;}
         }
 
         .button:hover {
@@ -141,64 +212,404 @@
         }
 
         .button:focus-visible,
-        .theme-switch:focus-visible {
+        .theme-switch:focus-visible,
+        .view-toggle:focus-visible,
+        .mark:focus-visible {
             outline: 3px solid var(--secondary);
             outline-offset: 3px;
         }
 
         .theme-switch {
-            position: absolute;
-            top: 20px;
-            right: 20px;
             background: none;
             border: none;
             color: var(--text);
             font-size: 1.5rem;
             cursor: pointer;
+            padding: 6px;
+            line-height: 0;
             transition: var(--transition);
         }
 
         .theme-switch:hover {transform: rotate(30deg);}
 
         .status {
-            margin-top: 20px;
             font-size: 0.9rem;
-            min-height: 20px;
+            min-height: 24px;
+            margin-bottom: 16px;
+        }
+
+        .status.error {color: var(--error);}
+        .status.success {color: var(--light-text);}
+
+        /* A failed load explains itself in place of the dashboard rather than
+           leaving stale numbers on screen with an error line above them. */
+        .load-error {
+            display: none;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--error);
+            border-radius: var(--border-radius);
+            padding: 20px 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .load-error h2 {font-size: 1.1rem; margin-bottom: 8px;}
+        .load-error p {font-size: 0.9rem; color: var(--light-text); margin-bottom: 8px;}
+        .load-error code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+            font-size: 0.85em;
+            background-color: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        /* Refetch holds the previous render at reduced opacity — no skeleton,
+           no layout jump. */
+        .dashboard {
+            display: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .dashboard.loaded {display: block;}
+        .dashboard.stale {opacity: 0.45;}
+
+        /* Stat tiles */
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .tile {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--border-radius);
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .tile-label {
+            font-size: 0.78rem;
+            color: var(--light-text);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .tile-value {
+            font-size: 1.75rem;
+            font-weight: 600;
+            line-height: 1.25;
+            margin-top: 6px;
+        }
+
+        .tile-value .unit {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--light-text);
+            margin-left: 3px;
+        }
+
+        .tile-note {
+            font-size: 0.8rem;
+            color: var(--light-text);
+            margin-top: 2px;
+        }
+
+        /* Cards */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            align-items: start;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--border-radius);
+            padding: 20px 22px 22px;
+            box-shadow: var(--shadow);
+            min-width: 0;
+        }
+
+        .card.wide {grid-column: 1 / -1;}
+
+        .card-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px 16px;
+            margin-bottom: 4px;
+        }
+
+        .card h2 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .card-sub {
+            font-size: 0.85rem;
+            color: var(--light-text);
+            margin-bottom: 14px;
+        }
+
+        .view-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--light-text);
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            cursor: pointer;
             transition: var(--transition);
         }
 
-        .success {color: var(--success);}
-        .error {color: var(--error);}
-
-        /* The payload shape is not fixed yet, so the read is shown verbatim as
-           formatted JSON rather than mapped onto named fields. */
-        .result {
-            display: none;
-            margin-top: 20px;
-            padding: 16px;
-            background-color: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: var(--border-radius);
-            text-align: left;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: var(--text);
-            white-space: pre;
-            overflow-x: auto;
-            max-height: 45vh;
-            overflow-y: auto;
-            tab-size: 2;
+        .view-toggle:hover {
+            color: var(--primary);
+            border-color: var(--primary);
         }
 
-        .result:not(:empty) {display: block;}
+        /* Hero figure — exactly one on the page. */
+        .hero {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 8px 18px;
+            margin-bottom: 6px;
+        }
+
+        .hero-value {
+            font-size: 3.5rem;
+            font-weight: 600;
+            line-height: 1.05;
+            letter-spacing: -1.5px;
+        }
+
+        .hero-unit {
+            font-size: 0.9rem;
+            color: var(--light-text);
+        }
+
+        /* Status chip: colour plus an icon plus a word, never colour alone. */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 999px;
+            border: 1px solid currentColor;
+            line-height: 1.4;
+        }
+
+        .chip .icon {font-size: 0.95rem;}
+        .chip.good {color: #006300;}
+        .chip.warning {color: #7a5200;}
+        .chip.serious {color: #9c4110;}
+        .chip.critical {color: #a32424;}
+
+        :root[data-theme="dark"] .chip.good {color: var(--status-good);}
+        :root[data-theme="dark"] .chip.warning {color: var(--status-warning);}
+        :root[data-theme="dark"] .chip.serious {color: var(--status-serious);}
+        :root[data-theme="dark"] .chip.critical {color: var(--status-critical);}
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .chip.good {color: var(--status-good);}
+            :root:not([data-theme="light"]) .chip.warning {color: var(--status-warning);}
+            :root:not([data-theme="light"]) .chip.serious {color: var(--status-serious);}
+            :root:not([data-theme="light"]) .chip.critical {color: var(--status-critical);}
+        }
+
+        .reading {
+            font-size: 0.88rem;
+            color: var(--light-text);
+            margin-top: 12px;
+        }
+
+        /* Legend — always present for two or more series. */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 18px;
+            margin-bottom: 10px;
+            font-size: 0.82rem;
+            color: var(--light-text);
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            flex: none;
+            border-radius: 2px;
+        }
+
+        .legend-key.rect {width: 12px; height: 12px;}
+        .legend-key.line {width: 16px; height: 3px; border-radius: 2px;}
+
+        /* Charts */
+        /* Charts are drawn at the measured pixel width, so they normally need no
+           scaling at all. max-width with height:auto only matters if a
+           measurement is stale — then the whole drawing scales down together
+           instead of being letterboxed inside a fixed-height box. */
+        .chart {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .chart text {
+            font-family: inherit;
+            fill: var(--muted);
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .chart text.value-label {
+            fill: var(--text);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .chart text.panel-title {
+            fill: var(--text);
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: normal;
+        }
+
+        .chart .gridline {stroke: var(--grid); stroke-width: 1;}
+        .chart .axisline {stroke: var(--axis); stroke-width: 1;}
+        .mark {cursor: default;}
+        .mark:focus {outline: none;}
+
+        .panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .panel {min-width: 0;}
+
+        /* Empty state — the shape of the card survives, the numbers are just
+           not there yet. Sparse data is the normal case early in a block. */
+        .empty {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 22px 18px;
+            border: 1px dashed var(--border);
+            border-radius: var(--border-radius);
+            color: var(--light-text);
+            font-size: 0.88rem;
+        }
+
+        /* Table view — the WCAG-clean twin of every chart. */
+        .table-wrap {
+            display: none;
+            overflow-x: auto;
+            margin-top: 4px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.85rem;
+        }
+
+        caption {
+            text-align: left;
+            color: var(--light-text);
+            font-size: 0.82rem;
+            padding-bottom: 8px;
+        }
+
+        th, td {
+            text-align: right;
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        th:first-child, td:first-child {
+            text-align: left;
+            font-variant-numeric: normal;
+        }
+
+        thead th {
+            color: var(--light-text);
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        tbody tr:last-child td,
+        tbody tr:last-child th {border-bottom: none;}
+
+        /* Tooltip. Enhances, never gates: every value it shows is also in the
+           table view. */
+        .tooltip {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.12s ease;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow-hover);
+            padding: 9px 12px;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            max-width: 260px;
+        }
+
+        .tooltip.visible {opacity: 1;}
+        .tooltip-title {font-weight: 700; margin-bottom: 4px;}
+
+        .tooltip-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .tooltip-key {
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            flex: none;
+            transform: translateY(-3px);
+        }
+
+        /* Values lead, labels follow. */
+        .tooltip-value {font-weight: 700; font-variant-numeric: tabular-nums;}
+        .tooltip-name {color: var(--light-text);}
 
         .footer {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            margin-top: 30px;
+            gap: 8px 16px;
+            margin-top: 32px;
             font-size: 0.8rem;
             color: var(--light-text);
         }
@@ -208,6 +619,7 @@
             text-decoration: none;
             opacity: 0.8;
             transition: var(--transition);
+            overflow-wrap: anywhere;
         }
 
         .footer a:hover {
@@ -217,11 +629,11 @@
 
         .spinner {
             display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255,255,255,.35);
             border-radius: 50%;
-            border-top-color: white;
+            border-top-color: currentColor;
             animation: spin 1s ease-in-out infinite;
         }
 
@@ -230,18 +642,16 @@
 
         @keyframes spin {to {transform: rotate(360deg);}}
 
-        @keyframes fadeIn {
-            from {opacity: 0; transform: translateY(20px);}
-            to {opacity: 1; transform: translateY(0);}
-        }
-
         @media (max-width: 600px) {
-            .container {padding: 30px 20px;}
-            h1 {font-size: 2rem;}
+            body {padding: 20px 14px 32px;}
+            .card {padding: 18px 16px;}
+            h1 {font-size: 1.9rem;}
+            .hero-value {font-size: 2.75rem;}
+            .masthead {align-items: flex-start;}
         }
 
         @media (prefers-reduced-motion: reduce) {
-            *, .container, .spinner {
+            *, .spinner {
                 animation: none !important;
                 transition: none !important;
             }
@@ -249,7 +659,7 @@
     </style>
 </head>
 <body>
-    <svg style="display: none;">
+    <svg style="display: none;" aria-hidden="true">
         <symbol id="moon-icon" viewBox="0 0 512 512">
             <path d="M283.211 512c78.962 0 151.079-35.925 198.857-94.792 7.068-8.708-.639-21.43-11.562-19.35-124.203 23.654-238.262-71.576-238.262-196.954 0-72.222 38.662-138.635 101.498-174.394 9.686-5.512 7.25-20.197-3.756-22.23A258.156 258.156 0 0 0 283.211 0c-141.309 0-256 114.511-256 256 0 141.309 114.511 256 256 256z"/>
         </symbol>
@@ -258,36 +668,66 @@
             <path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm246.4 80.5l-94.7-47.3 33.5-100.4c4.5-13.6-8.4-26.5-21.9-21.9l-100.4 33.5-47.4-94.8c-6.4-12.8-24.6-12.8-31 0l-47.3 94.7L92.7 70.8c-13.6-4.5-26.5 8.4-21.9 21.9l33.5 100.4-94.7 47.4c-12.8 6.4-12.8 24.6 0 31l94.7 47.3-33.5 100.5c-4.5 13.6 8.4 26.5 21.9 21.9l100.4-33.5 47.3 94.7c6.4 12.8 24.6 12.8 31 0l47.3-94.7 100.4 33.5c13.6 4.5 26.5-8.4 21.9-21.9l-33.5-100.4 94.7-47.3c13-6.5 13-24.7.2-31.1zm-155.9 106c-49.9 49.9-131.1 49.9-181 0-49.9-49.9-49.9-131.1 0-181 49.9-49.9 131.1-49.9 181 0 49.9 49.9 49.9 131.1 0 181z"/>
         </symbol>
 
-        <symbol id="bolt-icon" viewBox="0 0 320 512">
-            <path d="M296 160H180.6l42.6-129.8C227.2 15 215.7 0 200 0H56C44 0 33.8 8.9 32.2 20.8l-32 240C-1.7 275.2 9.5 288 24 288h118.7L96.6 482.5c-3.6 15.2 8 29.5 23.3 29.5 8.4 0 16.4-4.4 20.8-12l176-304c9.3-15.9-2.2-36-20.7-36z"/>
+        <symbol id="refresh-icon" viewBox="0 0 512 512">
+            <path d="M370.7 133.3C339.5 104 297 86 250.3 86c-77.9 0-144 50.5-167.4 120.6L36.9 191.2C69.3 96.3 155.8 28 258.3 28c66.2 0 126 26.4 169.9 69.2L480 45v154H326l44.7-65.7zM141.3 378.7c31.2 29.3 73.7 47.3 120.4 47.3 77.9 0 144-50.5 167.4-120.6l46 15.4C442.7 415.7 356.2 484 253.7 484c-66.2 0-126-26.4-169.9-69.2L32 467V313h154l-44.7 65.7z"/>
+        </symbol>
+
+        <symbol id="check-icon" viewBox="0 0 512 512">
+            <path d="M173.9 439.4l-166.4-166.4c-10-10-10-26.2 0-36.2l36.2-36.2c10-10 26.2-10 36.2 0L192 312.7 432.1 72.6c10-10 26.2-10 36.2 0l36.2 36.2c10 10 10 26.2 0 36.2l-294.4 294.4c-10 10-26.2 10-36.2 0z"/>
+        </symbol>
+
+        <symbol id="alert-icon" viewBox="0 0 576 512">
+            <path d="M569.5 440C588 472 564.8 512 527.9 512H48.1c-36.9 0-60-40.1-41.6-72L246.4 24c18.5-32 64.7-32 83.2 0l240 416zM288 354c-25.4 0-46 20.6-46 46s20.6 46 46 46 46-20.6 46-46-20.6-46-46-46zm-43.7-165.3l7.4 136c.3 6.4 5.6 11.3 12 11.3h48.6c6.4 0 11.7-4.9 12-11.3l7.4-136c.4-6.9-5.1-12.7-12-12.7h-63.4c-6.9 0-12.4 5.8-12 12.7z"/>
+        </symbol>
+
+        <symbol id="info-icon" viewBox="0 0 512 512">
+            <path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm0 110c23.2 0 42 18.8 42 42s-18.8 42-42 42-42-18.8-42-42 18.8-42 42-42zm56 254c0 6.6-5.4 12-12 12h-88c-6.6 0-12-5.4-12-12v-24c0-6.6 5.4-12 12-12h12v-64h-12c-6.6 0-12-5.4-12-12v-24c0-6.6 5.4-12 12-12h64c6.6 0 12 5.4 12 12v100h12c6.6 0 12 5.4 12 12v24z"/>
         </symbol>
     </svg>
 
-    <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">
-        <svg class="icon"><use href="#moon-icon"></use></svg>
-    </button>
+    <div class="page">
+        <header class="masthead">
+            <div>
+                <h1>Marathon prep</h1>
+                <span class="underline"></span>
+                <p class="subtitle" id="asOf">Loading the training feed…</p>
+            </div>
 
-    <div class="container">
-        <div class="logo-container">
-            <h1>Run</h1>
-            <div class="underline"></div>
-        </div>
+            <div class="controls">
+                <button class="button" id="refreshButton">
+                    <span class="spinner"></span>
+                    <svg class="icon" aria-hidden="true"><use href="#refresh-icon"></use></svg>
+                    <span id="refreshText">Refresh</span>
+                </button>
 
-        <button class="button" id="spotButton">
-            <div class="spinner"></div>
-            <svg class="icon"><use href="#bolt-icon"></use></svg>
-            <span id="buttonText">Get spot read</span>
-        </button>
+                <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">
+                    <svg class="icon" aria-hidden="true"><use href="#moon-icon"></use></svg>
+                </button>
+            </div>
+        </header>
 
-        <div id="status" class="status" aria-live="polite"></div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
 
-        <pre id="result" class="result" tabindex="0" aria-label="Spot read response"></pre>
+        <section class="load-error" id="loadError">
+            <h2 id="loadErrorTitle">Could not load the training feed</h2>
+            <p id="loadErrorDetail"></p>
+            <p>Feed: <code id="loadErrorUrl"></code></p>
+        </section>
 
-        <div class="footer">
+        <main class="dashboard" id="dashboard">
+            <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+            <div class="grid" id="cards"></div>
+        </main>
+
+        <footer class="footer">
             <span><span id="year"></span> Theodor</span>
             <a href="https://nygard.dev">nygard.dev</a>
-        </div>
+            <a id="feedLink" href="#">Raw feed</a>
+        </footer>
     </div>
+
+    <div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
 
     <script src="main.js" defer></script>
 </body>
