@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 
 import { ClaimsTable } from './ClaimsTable';
 import { CopyButton } from './CopyButton';
@@ -11,8 +11,8 @@ import { decodeJwt } from '../lib/jwt';
 interface TokenCardProps {
     title: string;
 
-    // null while there is no token to show. The access token card spends most
-    // of its life in that state; the ID token card is simply not rendered.
+    // null while there is no token. The access token card spends most of its
+    // life that way; the ID token card is simply not rendered.
     token: string | null;
 
     tabsLabel: string;
@@ -29,14 +29,12 @@ interface TokenCardProps {
     extraTabs?: TabItem[];
 
     // Only an access token can legitimately be unreadable, and only its card
-    // passes this. Without it an undecodable token is reported as the bug it
-    // is, which is the right answer for an ID token: it means something
-    // upstream handed back a value that is not a JWS at all.
+    // passes this. Without it an undecodable token is reported as the bug it is
+    // — the right answer for an ID token.
     opaqueNote?: string;
 
-    // Where the expiry comes from when the token will not decode. MSAL's
-    // AuthenticationResult knows when an opaque token expires even though the
-    // token itself will not say.
+    // Where the expiry comes from when the token will not decode: MSAL's
+    // AuthenticationResult knows when an opaque token expires.
     fallbackExp?: number;
 }
 
@@ -44,7 +42,9 @@ export function TokenCard(props: TokenCardProps) {
     const { title, token, tabsLabel, children, emptyMessage, extraTabs = [], opaqueNote, fallbackExp } = props;
 
     const rawRef = useRef<HTMLPreElement>(null);
-    const decoded = token ? decodeJwt(token) : null;
+    // The pill next to this ticks on its own timer; without the memo every tick
+    // would base64-decode and re-parse the whole token.
+    const decoded = useMemo(() => (token ? decodeJwt(token) : null), [token]);
 
     const decodedExp = decoded ? Number(decoded.payload['exp']) : NaN;
     const exp = Number.isFinite(decodedExp) ? decodedExp : (fallbackExp ?? NaN);

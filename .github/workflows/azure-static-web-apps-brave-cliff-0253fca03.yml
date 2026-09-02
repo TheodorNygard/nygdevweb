@@ -1,22 +1,19 @@
 name: Deploy nygdev.dev
 
-# DO NOT RENAME THIS FILE.
-# This app's deployment authorization policy is "GitHub", so the content server
-# identifies the Static Web App by the workflow filename carried in the GitHub
-# OIDC token. Azure registered the generated name when the app was provisioned
-# (portal: Static Web App -> Overview -> "Edit workflow"), and a rename makes
-# deploys fail with "Could not determine the Static Web App from the GitHub OIDC
-# workflow reference". The `name:` above is free to change; the filename is not.
+# DO NOT RENAME THIS FILE. This app's deployment authorization policy is
+# "GitHub", so the content server identifies the Static Web App by the workflow
+# filename in the OIDC token — the generated name Azure registered at
+# provisioning. A rename fails with "Could not determine the Static Web App from
+# the GitHub OIDC workflow reference". The `name:` above is free to change.
 #
-# Manual-only for now: deploy on demand from the Actions tab ("Run workflow").
-# Auto-deploy on push/PR is intentionally disabled. To restore it, re-add the
-# push/pull_request triggers and the close_pull_request_job (see git history).
+# Manual-only: deploy on demand from the Actions tab. To restore auto-deploy,
+# re-add the push/pull_request triggers and close_pull_request_job (git history).
 on:
   workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
-# This matches the NygDev/NygDevAzure standard: azure/login@v2 with a
-# federated credential, then the Az CLI is used for everything that needs auth.
+# azure/login with a federated credential, then the Az CLI for anything that
+# needs auth.
 permissions:
   id-token: write
   contents: read
@@ -43,9 +40,9 @@ jobs:
           SWA_NAME: ${{ vars.AZURE_SWA_NAME }}
           SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
         run: |
-          # An unset repository variable expands to an empty string, which the
-          # Az CLI reports as a bare "expected one argument" usage error. Fail
-          # here instead, naming the variable that needs setting.
+          # An unset repository variable expands to an empty string, which the Az
+          # CLI reports as a bare "expected one argument" usage error. Fail here
+          # instead, naming the variable that needs setting.
           if [ -z "$SWA_NAME" ] || [ -z "$SWA_RG" ]; then
             echo "::error::AZURE_SWA_NAME and AZURE_SWA_RESOURCE_GROUP must both be set (Settings -> Secrets and variables -> Actions -> Variables)."
             exit 1
@@ -57,9 +54,8 @@ jobs:
 
       - name: Retrieve Static Web Apps deployment token
         run: |
-          # Fetch the deployment token just-in-time over the federated identity
-          # instead of storing it as a long-lived GitHub secret. The deploy
-          # identity needs a role on the Static Web App that grants
+          # Fetched just-in-time over the federated identity rather than kept as
+          # a long-lived GitHub secret. The deploy identity needs a role granting
           # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
           TOKEN=$(az staticwebapp secrets list \
             --name "$SWA_NAME" \
@@ -71,10 +67,9 @@ jobs:
 
       - name: Mint GitHub OIDC id token
         id: idtoken
-        # The Static Web App's deployment authorization policy is "GitHub", so the
-        # content server authorizes deploys using this workflow's GitHub OIDC token
-        # (the deployment token alone is rejected). Mint it here and hand it to the
-        # deploy action below as github_id_token. Requires permissions.id-token: write.
+        # The app's deployment authorization policy is "GitHub", so the content
+        # server wants this workflow's OIDC token (the deployment token alone is
+        # rejected). Handed to the deploy step below as github_id_token.
         uses: actions/github-script@v9
         with:
           script: return await core.getIDToken()
@@ -88,8 +83,8 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           github_id_token: ${{ steps.idtoken.outputs.result }}
           action: "upload"
-          # Each site lives in its own folder; SWA serves app_location as the
-          # site root, so nygdev.dev's public paths are unchanged by the split.
+          # SWA serves app_location as the site root, so nygdev.dev's public
+          # paths are unchanged by the per-site folder split.
           app_location: "sites/nygdev"
           api_location: ""
           output_location: "."

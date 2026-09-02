@@ -6,10 +6,9 @@ import { DEFAULTS, REDIRECT_URI, clearConfig, saveConfig, type InspectorConfig, 
 interface SettingsPanelProps {
     config: InspectorConfig;
 
-    // The resource-scope box lives on the access token card, not in this
-    // panel, but it is part of the same saved object. Taking its live value as
-    // a prop is what keeps "Save and reload" from discarding a scope the
-    // reader typed but has not pressed Get token on yet.
+    // The resource-scope box lives on the access token card, not here, but it
+    // is part of the same saved object. Taking its live value as a prop keeps
+    // "Save and reload" from discarding a scope typed but not yet requested.
     apiScope: string;
 
     onSaveFailed: (message: string) => void;
@@ -37,12 +36,10 @@ export function SettingsPanel({ config, apiScope, onSaveFailed }: SettingsPanelP
             return;
         }
 
-        // A reload rather than a live rebuild. MSAL reads clientId and
-        // authority once, at construction, and a PublicClientApplication
-        // cannot be reconfigured afterwards; recreating it while a cached
-        // account from the previous client id is still in sessionStorage is
-        // how you get errors that name neither configuration. Starting over is
-        // the honest way to apply it.
+        // A reload rather than a live rebuild. MSAL reads clientId and authority
+        // once, at construction, and recreating the instance while a cached
+        // account from the previous client id is still in sessionStorage gives
+        // errors that name neither configuration.
         window.location.reload();
     }
 

@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
-# Reuses the federated credential already scoped to this repo. id-token: write
-# is for azure/login only; unlike the nygdev.dev workflow this one does not hand
-# an OIDC token to the deploy action (see the Build And Deploy step).
+# id-token: write is for azure/login only; unlike the nygdev.dev workflow this
+# one hands no OIDC token to the deploy action (see Build And Deploy).
 permissions:
   id-token: write
   contents: read
@@ -36,16 +35,16 @@ jobs:
           SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP_RUN }}
           SWA_RG_SHARED: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
         run: |
-          # An unset repository variable expands to an empty string, which the
-          # Az CLI reports as a bare "expected one argument" usage error. Fail
-          # here instead, naming the variable that needs setting.
+          # An unset repository variable expands to an empty string, which the Az
+          # CLI reports as a bare "expected one argument" usage error. Fail here
+          # instead, naming the variable that needs setting.
           if [ -z "$SWA_NAME" ]; then
             echo "::error::Repository variable AZURE_SWA_NAME_RUN is not set (Settings -> Secrets and variables -> Actions -> Variables). It must hold the Azure resource name of the run.nygard.dev Static Web App."
             exit 1
           fi
 
-          # The resource group is usually shared with the nygdev.dev app, so
-          # fall back to AZURE_SWA_RESOURCE_GROUP when no _RUN override is set.
+          # Usually shared with the nygdev.dev app, so fall back to
+          # AZURE_SWA_RESOURCE_GROUP when no _RUN override is set.
           if [ -z "$SWA_RG" ]; then
             SWA_RG="$SWA_RG_SHARED"
           fi
@@ -60,9 +59,8 @@ jobs:
 
       - name: Retrieve Static Web Apps deployment token
         run: |
-          # Fetch the deployment token just-in-time over the federated identity
-          # instead of storing it as a long-lived GitHub secret. The deploy
-          # identity needs a role on the Static Web App that grants
+          # Fetched just-in-time over the federated identity rather than kept as
+          # a long-lived GitHub secret. The deploy identity needs a role granting
           # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
           TOKEN=$(az staticwebapp secrets list \
             --name "$SWA_NAME" \
@@ -72,13 +70,12 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
-      # No github_id_token here, unlike the nygdev.dev workflow. Passing one puts
-      # the content server on the GitHub OIDC path, where it resolves the target
-      # app from the workflow filename Azure registered at provisioning time.
-      # This app was created without GitHub integration, so no such filename
-      # exists and that lookup can only fail. Authorizing with the deployment
-      # token instead leaves the filename free to describe what it deploys.
-      # Requires the app's deployment authorization policy to be "Deployment
+      # No github_id_token, unlike the nygdev.dev workflow: passing one puts the
+      # content server on the OIDC path, where it resolves the target app from a
+      # workflow filename registered at provisioning time. This app was created
+      # without GitHub integration, so that lookup can only fail. The deployment
+      # token authorizes instead, which also leaves the filename free to describe
+      # what it deploys. Needs the app's authorization policy set to "Deployment
       # token" (portal: Static Web App -> Settings -> Deployment configuration).
       - name: Build And Deploy
         id: builddeploy

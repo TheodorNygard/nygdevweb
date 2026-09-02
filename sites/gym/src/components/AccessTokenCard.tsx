@@ -19,10 +19,9 @@ interface AccessTokenCardProps {
 }
 
 export function AccessTokenCard({ result, scope, acquiring, onScopeChange, onAcquire }: AccessTokenCardProps) {
-    // The AuthenticationResult, minus the tokens themselves — they are already
-    // on screen in full, and repeating them here would only make the panel
-    // harder to read. `fromCache` is the interesting field: a token MSAL served
-    // from its own cache never touched the network on this click.
+    // The AuthenticationResult minus the tokens, which are already on screen in
+    // full. `fromCache` is the field worth reading: a token MSAL served from its
+    // own cache never touched the network on this click.
     const summary = result
         ? {
             scopes: result.scopes,

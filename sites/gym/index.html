@@ -14,10 +14,9 @@
 </head>
 <body>
     <!-- Vite rewrites this to the hashed, same-origin bundle at build time, so
-         `script-src 'self'` covers it as it covered the hand-written main.js.
-         MSAL is inside that bundle now rather than vendored next to it: npm is
-         the source either way, and bundling it means the CSP does not have to
-         admit a third-party origin to the page that handles access tokens. -->
+         `script-src 'self'` covers it. MSAL is bundled in rather than loaded
+         from a CDN, so the CSP never has to admit a third-party origin to the
+         page that handles access tokens. -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 </body>

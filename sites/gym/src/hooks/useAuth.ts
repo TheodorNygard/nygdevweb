@@ -8,7 +8,7 @@ import {
 
 import { describeAuthError, type AuthErrorDetail } from '../lib/errors';
 import { REDIRECT_HANDLING, getMsalInstance } from '../lib/msal';
-import { saveConfig, scopeList, type InspectorConfig } from '../lib/config';
+import { scopeList, type InspectorConfig } from '../lib/config';
 
 export type StatusKind = 'working' | 'success' | 'error';
 
@@ -44,14 +44,13 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
     const [signingIn, setSigningIn] = useState(false);
     const [acquiring, setAcquiring] = useState(false);
 
-    // The instance itself is not state: it never changes for the life of the
-    // page (saving the configuration reloads instead), and putting it in state
-    // would re-render every consumer the moment it resolved.
+    // Not state: it never changes for the life of the page (saving the
+    // configuration reloads instead), and state would re-render every consumer
+    // the moment it resolved.
     const pcaRef = useRef<IPublicClientApplication | null>(null);
 
     // One place that turns an AuthenticationResult into what is on screen, so
-    // a result arriving from a redirect and one arriving from a popup are
-    // rendered by the same code rather than by two that drift.
+    // the redirect and popup paths cannot drift apart.
     const handleResult = useCallback((pca: IPublicClientApplication, result: AuthenticationResult) => {
         if (result.account) {
             pca.setActiveAccount(result.account);
@@ -61,9 +60,8 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
         if (result.idToken) setIdToken(result.idToken);
 
         // A login response carries an access token too, but for the sign-in
-        // scopes rather than for an API. Only render it when the scopes asked
-        // for are the resource scopes, or the ID token panel and the access
-        // token panel end up showing two views of the same uninteresting thing.
+        // scopes rather than for an API. Rendering it would make both token
+        // panels two views of the same uninteresting thing.
         const scopes = result.scopes ?? [];
         const isResourceToken = scopes.some((scope) => scope.includes('/') || scope.startsWith('api://'));
 
@@ -87,11 +85,10 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
                 pcaRef.current = pca;
                 setReady(true);
 
-                // Must run before anything reads the account list. Coming back
-                // from a redirect, this is the call that consumes the response
-                // in the URL fragment and turns it into an
-                // AuthenticationResult; skipping it leaves the token in the
-                // address bar and the page looking signed out.
+                // Must run before anything reads the account list: coming back
+                // from a redirect, this is what consumes the response in the
+                // URL fragment. Skipping it leaves the token in the address bar
+                // and the page looking signed out.
                 const redirectResult = await pca.handleRedirectPromise(REDIRECT_HANDLING);
 
                 if (cancelled) return;
@@ -111,10 +108,9 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
                 pca.setActiveAccount(restored);
                 setAccount(restored);
 
-                // The ID token is not on the account object, only its claims
-                // are. Re-deriving the raw JWT would mean a network call, so
-                // the panel stays closed until a sign-in produces one — which
-                // is the honest state: this is the token from *this* session.
+                // Only the claims are on the account object, not the raw JWT,
+                // and re-deriving it would mean a network call. The panel stays
+                // closed until a sign-in produces one from *this* session.
                 setStatus({
                     message: 'Restored a session from this tab. Sign in again to see a fresh ID token.',
                     kind: 'success',
@@ -144,10 +140,9 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
         const request = {
             scopes: scopeList(config.loginScopes),
 
-            // Always show the account picker. On a page whose job is comparing
-            // tokens, being silently reattached to the account from an hour
-            // ago is the wrong default — "Switch account" has to actually
-            // switch.
+            // Always show the picker: on a page for comparing tokens, silently
+            // reattaching to an hour-old account is the wrong default, and
+            // "Switch account" has to actually switch.
             prompt: 'select_account',
         };
 
@@ -156,8 +151,8 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
                 handleResult(pca, await pca.loginPopup(request));
                 setStatus({ message: 'Signed in.', kind: 'success' });
             } else {
-                // Does not return: the browser navigates away. Anything after
-                // this line runs only if the redirect failed to start.
+                // Does not return: the browser navigates away. Anything below
+                // runs only if the redirect failed to start.
                 await pca.loginRedirect(request);
             }
         } catch (cause) {
@@ -214,11 +209,10 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
                 kind: 'success',
             });
         } catch (cause) {
-            // InteractionRequiredAuthError is the expected failure, not an
-            // exceptional one: it is how Entra says "ask the user something".
-            // Any other error is a real problem and is reported rather than
-            // retried, because retrying interactively would just show the same
-            // failure with a login screen in front of it.
+            // InteractionRequiredAuthError is expected: it is how Entra says
+            // "ask the user something". Anything else is a real failure, and
+            // retrying it interactively would only put a login screen in front
+            // of the same error.
             if (!(cause instanceof InteractionRequiredAuthError)) {
                 fail(cause, 'Could not get a token.');
                 setAcquiring(false);
@@ -256,11 +250,4 @@ export function useAuth(config: InspectorConfig): AuthState & AuthActions {
         signOut,
         acquireToken,
     };
-}
-
-// The scope the page last asked for is remembered so a reload lands on the
-// same request. It is the one setting the page writes outside the settings
-// form, which is why it is here rather than in the form's own handler.
-export function rememberScope(config: InspectorConfig, scope: string): void {
-    saveConfig({ ...config, apiScope: scope });
 }

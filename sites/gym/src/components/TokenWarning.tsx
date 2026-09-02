@@ -1,8 +1,7 @@
 import { Icon } from './Icons';
 
-// The page prints bearer tokens in full. That is the entire point of it, and
-// it is also the one thing a visitor should be told without having to think
-// about it.
+// The page prints bearer tokens in full. That is the point of it, and also the
+// one thing a visitor should be told without having to ask.
 export function TokenWarning() {
     return (
         <div className="warning">

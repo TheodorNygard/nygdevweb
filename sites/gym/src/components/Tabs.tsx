@@ -11,11 +11,9 @@ interface TabsProps {
     items: TabItem[];
 }
 
-// Selection is the only state, and it lives in one place so the thing screen
-// readers are told (aria-selected) and the thing the CSS styles cannot
-// disagree. Arrow keys move between tabs, which is what the tablist role
-// promises a keyboard user — without it the role is a lie and Tab is the only
-// way in.
+// Selection is the only state, held in one place so what screen readers are
+// told (aria-selected) and what the CSS styles cannot disagree. Arrow keys move
+// between tabs: that is what the tablist role promises a keyboard user.
 export function Tabs({ label, items }: TabsProps) {
     const [selected, setSelected] = useState(0);
     const base = useId();

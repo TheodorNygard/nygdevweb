@@ -29,8 +29,7 @@
             --card-bg: #ffffff;
             --success: #38b000;
             --error: #e63946;
-            --warning: #ffb703;
-            /* Muted sage/clay - reads green vs. red without shouting, on both button fills */
+            /* Muted sage/clay — reads green vs. red without shouting, on both fills */
             --dice-online: #6fae87;
             --dice-offline: #c9736e;
             --border-radius: 12px;
@@ -38,7 +37,7 @@
             --shadow: 0 8px 30px rgba(0,0,0,0.05);
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
         }
-        
+
         :root[data-theme="dark"] {
             color-scheme: dark;
             --primary: #4cc9f0;
@@ -52,13 +51,13 @@
             --shadow: 0 8px 30px rgba(0,0,0,0.2);
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             display: flex;
             justify-content: center;
@@ -71,7 +70,7 @@
             line-height: 1.6;
             padding: 20px;
         }
-        
+
         .icon {
             display: inline-block;
             width: 1em;
@@ -81,7 +80,7 @@
             fill: currentColor;
             font-size: 1.1rem;
         }
-        
+
         .container {
             max-width: 500px;
             width: 100%;
@@ -93,9 +92,9 @@
             transition: var(--transition);
             animation: fadeIn 0.5s ease-out;
         }
-        
+
         .logo-container {margin-bottom: 20px;}
-        
+
         h1 {
             color: var(--text);
             font-size: 2.5rem;
@@ -103,14 +102,14 @@
             margin-bottom: 5px;
             letter-spacing: -0.5px;
         }
-        
+
         .tag-line {
             font-weight: 400;
             color: var(--light-text);
             margin-bottom: 30px;
             font-size: 1.1rem;
         }
-        
+
         .underline {
             display: block;
             height: 4px;
@@ -119,21 +118,21 @@
             background: linear-gradient(90deg, var(--primary), var(--secondary));
             border-radius: 2px;
         }
-        
+
         p {
             color: var(--light-text);
             font-size: 1rem;
             margin-bottom: 5px;
             font-weight: 400;
         }
-        
+
         .links {
             display: flex;
             flex-direction: column;
             gap: 12px;
             margin-top: 20px;
         }
-        
+
         .button {
             display: flex;
             align-items: center;
@@ -151,14 +150,14 @@
             border: none;
             width: 100%;
         }
-        
+
         .button:hover {
             background-color: var(--primary-dark);
             transform: translateY(-2px);
             box-shadow: var(--shadow-hover);
-            
+
         }
-        
+
         .button:active {transform: translateY(0);}
 
         .button:focus-visible,
@@ -166,7 +165,7 @@
             outline: 3px solid var(--secondary);
             outline-offset: 3px;
         }
-        
+
         .theme-switch {
             position: absolute;
             top: 20px;
@@ -178,19 +177,19 @@
             cursor: pointer;
             transition: var(--transition);
         }
-        
+
         .theme-switch:hover {transform: rotate(30deg);}
-        
+
         .status {
             margin-top: 20px;
             font-size: 0.9rem;
             height: 20px;
             transition: var(--transition);
         }
-        
+
         .success {color: var(--success);}
         .error {color: var(--error);}
-        
+
         .footer {
             display: flex;
             align-items: center;
@@ -240,9 +239,9 @@
             animation: spin 1s ease-in-out infinite;
             margin-right: 10px;
         }
-        
+
         .button.loading .spinner {display: inline-block;}
-        
+
         /* The die itself carries the server state: it tumbles while we check,
            then settles on green (online) or red (offline). */
         .dice {
@@ -266,7 +265,7 @@
             from {opacity: 0; transform: translateY(20px);}
             to {opacity: 1; transform: translateY(0);}
         }
-        
+
         @media (max-width: 600px) {
             .container {padding: 30px 20px;}
             h1 {font-size: 2rem;}
@@ -285,11 +284,11 @@
         <symbol id="moon-icon" viewBox="0 0 512 512">
             <path d="M283.211 512c78.962 0 151.079-35.925 198.857-94.792 7.068-8.708-.639-21.43-11.562-19.35-124.203 23.654-238.262-71.576-238.262-196.954 0-72.222 38.662-138.635 101.498-174.394 9.686-5.512 7.25-20.197-3.756-22.23A258.156 258.156 0 0 0 283.211 0c-141.309 0-256 114.511-256 256 0 141.309 114.511 256 256 256z"/>
         </symbol>
-        
+
         <symbol id="sun-icon" viewBox="0 0 512 512">
             <path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm246.4 80.5l-94.7-47.3 33.5-100.4c4.5-13.6-8.4-26.5-21.9-21.9l-100.4 33.5-47.4-94.8c-6.4-12.8-24.6-12.8-31 0l-47.3 94.7L92.7 70.8c-13.6-4.5-26.5 8.4-21.9 21.9l33.5 100.4-94.7 47.4c-12.8 6.4-12.8 24.6 0 31l94.7 47.3-33.5 100.5c-4.5 13.6 8.4 26.5 21.9 21.9l100.4-33.5 47.3 94.7c6.4 12.8 24.6 12.8 31 0l47.3-94.7 100.4 33.5c13.6 4.5 26.5-8.4 21.9-21.9l-33.5-100.4 94.7-47.3c13-6.5 13-24.7.2-31.1zm-155.9 106c-49.9 49.9-131.1 49.9-181 0-49.9-49.9-49.9-131.1 0-181 49.9-49.9 131.1-49.9 181 0 49.9 49.9 49.9 131.1 0 181z"/>
         </symbol>
-        
+
         <symbol id="github-icon" viewBox="0 0 496 512">
             <path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 389.5 8 244.8 8z"/>
         </symbol>
@@ -297,7 +296,7 @@
         <symbol id="linkedin-icon" viewBox="0 0 448 512">
             <path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"/>
         </symbol>
-        
+
         <symbol id="dice-d20-icon" viewBox="0 0 512 512">
             <path d="M106.75 215.06L1.2 370.95c-3.08 5 .1 11.5 5.93 12.14l208.26 22.07-108.64-190.1zM7.41 315.43L82.7 193.08 6.06 147.1c-2.67-1.6-6.06.32-6.06 3.43v162.81c0 4.03 5.29 5.53 7.41 2.09zM18.25 423.6l194.4 87.66c5.3 2.45 11.35-1.43 11.35-7.26v-65.67l-203.55-22.3c-4.45-.5-6.23 5.59-2.2 7.57zm81.22-257.78L179.4 22.88c4.34-7.06-3.59-15.25-10.78-11.14L17.81 110.35c-2.47 1.62-2.39 5.26.13 6.78l81.53 48.69zM240 176h109.21L253.63 7.62C250.5 2.54 245.25 0 240 0s-10.5 2.54-13.63 7.62L130.79 176H240zm233.94-28.9l-76.64 45.99 75.29 122.35c2.11 3.44 7.41 1.94 7.41-2.1V150.53c0-3.11-3.39-5.03-6.06-3.43zm-93.41 18.72l81.53-48.7c2.53-1.52 2.6-5.16.13-6.78l-150.81-98.6c-7.19-4.11-15.12 4.08-10.78 11.14l79.93 142.94zm79.02 250.21L256 438.32v65.67c0 5.84 6.05 9.71 11.35 7.26l194.4-87.66c4.03-1.97 2.25-8.06-2.2-7.56zm-86.3-200.97l-108.63 190.1 208.26-22.07c5.83-.65 9.01-7.14 5.93-12.14L373.25 215.06zM240 208H139.57L240 383.75 340.43 208H240z"/>
         </symbol>
@@ -316,17 +315,17 @@
             <rect x="384" y="272" width="32" height="80"/>
         </symbol>
     </svg>
-    
+
     <button class="theme-switch" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">
         <svg class="icon"><use href="#moon-icon"></use></svg>
     </button>
-    
+
     <div class="container">
         <div class="logo-container">
             <h1>NygDev</h1>
             <div class="underline"></div>
         </div>
-        
+
         <div class="links">
             <a href="https://nygdevcdn.z1.web.core.windows.net/view/index/?relationships=user" class="button" target="_blank" rel="noopener noreferrer">
                 <svg class="icon"><use href="#diagram-icon"></use></svg>
@@ -344,9 +343,9 @@
                 <span id="buttonText">Checking status...</span>
             </button>
         </div>
-        
+
         <div id="status" class="status" aria-live="polite"></div>
-        
+
         <div class="footer">
             <span><span id="year"></span> Theodor</span>
             <a href="https://github.com/TheodorNygard" class="icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub profile" title="GitHub">
@@ -357,7 +356,7 @@
             </a>
         </div>
     </div>
-    
+
     <script src="main.js" defer></script>
 </body>
 </html>

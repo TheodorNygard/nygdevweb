@@ -3,8 +3,7 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
     timeStyle: 'medium',
 });
 
-// Intl.RelativeTimeFormat is what makes "in 42 minutes" say it in the reader's
-// locale rather than in English with the rest of the page translated around it.
+// Says "in 42 minutes" in the reader's locale rather than in English.
 const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
 const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -33,9 +32,8 @@ export interface Moment {
 }
 
 // A JWT time claim is seconds since the epoch; Date wants milliseconds. Getting
-// that wrong puts every timestamp in 1970 and is the single most common way to
-// misread one of these tokens, which is why the raw number stays on screen next
-// to the formatted date rather than being replaced by it.
+// that wrong puts every timestamp in 1970, which is why the raw number stays on
+// screen next to the formatted date rather than being replaced by it.
 export function formatEpoch(value: unknown, now: number = Date.now()): Moment | null {
     const seconds = Number(value);
 

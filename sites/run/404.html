@@ -11,11 +11,10 @@
     <meta name="theme-color" content="#f8f9fa">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- This page exists to keep Azure's stock 404 off the domain: that one is
-         served from Microsoft's edge, carries an inline script and none of
-         the security headers in staticwebapp.config.json. Deliberately
-         script-free — the theme follows the OS instead of a toggle, so there
-         is nothing here for `script-src 'self'` to have an opinion about. -->
+    <!-- Keeps Azure's stock 404 off the domain: that one is served from
+         Microsoft's edge with an inline script and none of the headers in
+         staticwebapp.config.json. Script-free on purpose — the theme follows
+         the OS, so `script-src 'self'` has nothing to object to. -->
     <style>
         :root {
             color-scheme: light;

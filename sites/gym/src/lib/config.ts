@@ -1,8 +1,6 @@
-// Where the page's identity settings live, and what they mean.
-//
-// Everything here is deliberately public. A SPA client id travels in the
-// browser on every sign-in by design; what protects the flow is PKCE plus the
-// registered redirect URI, not the secrecy of the id.
+// The page's identity settings. Everything here is deliberately public: a SPA
+// client id travels in the browser on every sign-in by design, and what
+// protects the flow is PKCE plus the registered redirect URI, not secrecy.
 
 export interface InspectorConfig {
     clientId: string;
@@ -14,23 +12,21 @@ export interface InspectorConfig {
 
 export type Interaction = 'redirect' | 'popup';
 
-// The GymLog registration. It is the *front end* here — the app the page signs
-// in as — so its id lands in the token's `appid`/`azp` claim, not in `aud`.
-// The API that func-nygdev-api validates gets its own registration, and its
-// App ID URI is what goes in the resource-scope box on the page.
+// The GymLog registration: the *front end*, the app the page signs in as, so
+// its id lands in `appid`/`azp` and never in `aud`. The API has its own
+// registration, whose App ID URI goes in the resource-scope box.
 export const DEFAULTS: InspectorConfig = {
     clientId: 'f6922f08-71f3-492d-953d-a294fb5acf16',
 
-    // `organizations` rather than a tenant GUID, because the GUID is not
-    // public and this file is. It resolves to whichever work/school tenant the
-    // signing-in account belongs to, which for a single-tenant registration
-    // can only be the one the app lives in — Entra rejects the rest. Put the
-    // GUID in the box if you want the authority pinned.
+    // Not a tenant GUID, because the GUID is not public and this file is. It
+    // resolves to the signing-in account's work/school tenant, which for a
+    // single-tenant registration can only be the app's own — Entra rejects the
+    // rest. Put the GUID in the box to pin the authority.
     tenant: 'organizations',
 
     // offline_access is what makes Entra issue a refresh token, which is what
-    // lets acquireTokenSilent renew without an iframe. Worth keeping: the
-    // iframe path needs third-party cookies and fails quietly without them.
+    // lets acquireTokenSilent renew without an iframe — and the iframe path
+    // needs third-party cookies and fails quietly without them.
     loginScopes: 'openid profile offline_access',
 
     interaction: 'redirect',
@@ -39,34 +35,29 @@ export const DEFAULTS: InspectorConfig = {
 
 const STORAGE_KEY = 'gym.inspector.config';
 
-// Exactly what MSAL will send as redirect_uri, so the value shown on the page
-// is the value to paste into the portal rather than an approximation of it.
-//
-// Pinned to the origin root rather than built from location.pathname. Entra
-// matches the registered URI as a string, and a page reached at /index.html
-// rather than / would otherwise send a redirect_uri that differs from the one
-// registered — the same site, one registration, and AADSTS50011 depending on
-// how you happened to navigate to it. There is one page here, it lives at the
-// root, and there is exactly one string to register.
+// Exactly what MSAL sends as redirect_uri, so the value shown on the page is
+// the one to paste into the portal. Pinned to the origin root rather than built
+// from location.pathname: Entra matches the registered URI as a string, so a
+// page reached at /index.html would send a different one and fail with
+// AADSTS50011 depending on how you navigated to it.
 export const REDIRECT_URI = `${window.location.origin}/`;
 
 function isInteraction(value: unknown): value is Interaction {
     return value === 'redirect' || value === 'popup';
 }
 
-// Stored config is untrusted input: it is whatever is in this browser's
-// localStorage, which a previous version of the page — or a typo in devtools —
-// may have left in any shape at all. Each field is taken only when it is the
-// type the rest of the code assumes, so a bad entry degrades to the default
-// instead of reaching MSAL as, say, an object where a string belongs.
+// Stored config is untrusted input: an older version of the page, or a typo in
+// devtools, may have left any shape at all in localStorage. Each field is taken
+// only at the type the rest of the code assumes, so a bad entry degrades to the
+// default instead of reaching MSAL as an object where a string belongs.
 export function loadConfig(): InspectorConfig {
     let stored: unknown;
 
     try {
         stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     } catch {
-        // Corrupt or unreadable (private mode, storage disabled). Defaults are
-        // a working configuration on their own, so this is not worth reporting.
+        // Corrupt or unreadable (private mode, storage disabled). The defaults
+        // are a working configuration, so this is not worth reporting.
         stored = null;
     }
 

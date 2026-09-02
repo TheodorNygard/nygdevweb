@@ -12,12 +12,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
-        /* Two palettes live here and they are not the same thing:
-           the site chrome (brand blue/purple, card surfaces) and the chart
-           slots (--series-N, --status-N). The chart slots are a validated
-           categorical palette — the slot order is the colour-blind-safety
-           mechanism, so do not reorder or add to them without re-validating
-           against both card surfaces. */
+        /* Two palettes, and they are not the same thing: the site chrome
+           (brand blue/purple, card surfaces) and the chart slots (--series-N,
+           --status-N). The slot order is the colour-blind-safety mechanism, so
+           do not reorder or extend it without re-validating on both surfaces. */
         :root {
             color-scheme: light;
             --primary: #4361ee;
@@ -29,7 +27,6 @@
             --card-bg: #ffffff;
             --code-bg: #f1f3f5;
             --border: #e3e6ea;
-            --success: #38b000;
             --error: #e63946;
 
             /* Chart ink and chrome */
@@ -48,9 +45,9 @@
             --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
         }
 
-        /* Status colours are fixed in both modes and never themed: they mean
-           state, not identity. They always ship with an icon and a word, so
-           the two that sit below 3:1 on white never carry meaning alone. */
+        /* Fixed in both modes and never themed: these mean state, not identity.
+           Always shipped with an icon and a word, so the two that sit below
+           3:1 on white never carry meaning alone. */
         :root {
             --status-good: #0ca30c;
             --status-warning: #fab219;
@@ -70,8 +67,7 @@
                 --card-bg: #1e1e1e;
                 --code-bg: #161616;
                 --border: #333;
-                --success: #52b788;
-                --muted: #898781;
+                    --muted: #898781;
                 --grid: #2c2c2a;
                 --axis: #383835;
                 --series-1: #3987e5;
@@ -93,7 +89,6 @@
             --card-bg: #1e1e1e;
             --code-bg: #161616;
             --border: #333;
-            --success: #52b788;
             --muted: #898781;
             --grid: #2c2c2a;
             --axis: #383835;
@@ -242,7 +237,7 @@
         .status.success {color: var(--light-text);}
 
         /* A failed load explains itself in place of the dashboard rather than
-           leaving stale numbers on screen with an error line above them. */
+           leaving stale numbers under an error line. */
         .load-error {
             display: none;
             background-color: var(--card-bg);
@@ -265,8 +260,7 @@
             overflow-wrap: anywhere;
         }
 
-        /* Refetch holds the previous render at reduced opacity — no skeleton,
-           no layout jump. */
+        /* A refetch dims the previous render: no skeleton, no layout jump. */
         .dashboard {
             display: none;
             transition: opacity 0.2s ease;
@@ -461,11 +455,10 @@
         .legend-key.rect {width: 12px; height: 12px;}
         .legend-key.line {width: 16px; height: 3px; border-radius: 2px;}
 
-        /* Charts */
-        /* Charts are drawn at the measured pixel width, so they normally need no
-           scaling at all. max-width with height:auto only matters if a
-           measurement is stale — then the whole drawing scales down together
-           instead of being letterboxed inside a fixed-height box. */
+        /* Drawn at the measured pixel width, so normally no scaling happens at
+           all. max-width with height:auto only matters when a measurement is
+           stale: the drawing then scales down whole rather than being
+           letterboxed in a fixed-height box. */
         .chart {
             display: block;
             max-width: 100%;
@@ -506,8 +499,8 @@
 
         .panel {min-width: 0;}
 
-        /* Empty state — the shape of the card survives, the numbers are just
-           not there yet. Sparse data is the normal case early in a block. */
+        /* The shape of the card survives; the numbers are just not there yet.
+           Sparse data is normal early in a block. */
         .empty {
             display: flex;
             align-items: center;
@@ -563,8 +556,7 @@
         tbody tr:last-child td,
         tbody tr:last-child th {border-bottom: none;}
 
-        /* Tooltip. Enhances, never gates: every value it shows is also in the
-           table view. */
+        /* Enhances, never gates: every value it shows is also in the table. */
         .tooltip {
             position: fixed;
             z-index: 10;
