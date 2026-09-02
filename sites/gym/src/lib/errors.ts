@@ -1,15 +1,15 @@
-// The AADSTS code is the part worth acting on, and it is buried in the middle
-// of a paragraph of prose that also contains a trace ID and a timestamp. Pull
-// it out so it can be shown on its own and matched against the table below.
-export function extractAadsts(message: string): string | null {
+// The AADSTS code is the part worth acting on, and it arrives buried in prose
+// alongside a trace ID and a timestamp. Pulled out so it can be shown on its
+// own and matched against the table below.
+function extractAadsts(message: string): string | null {
     const match = /AADSTS\d+/.exec(message);
 
     return match ? match[0] : null;
 }
 
 // Failures that mean something specific about *this* setup, with the fix
-// rather than a restatement of the error. Everything unlisted falls through to
-// the raw message, which is better than a wrong guess.
+// rather than a restatement. Anything unlisted falls through to the raw
+// message, which beats a wrong guess.
 export const ERROR_FIXES: Record<string, string> = {
     AADSTS50011: 'The redirect URI this page sent is not registered on the app. Copy the value from the Configuration panel above and add it under App registrations → Authentication → Add a platform → Single-page application. It has to match as a string, trailing slash included.',
     AADSTS9002326: 'The redirect URI is registered under the "Web" platform instead of "Single-page application". A SPA uses PKCE and sends no client secret, and Entra refuses that combination on a Web redirect URI. Move the URI to the SPA platform — the same string, a different platform block.',
@@ -34,8 +34,8 @@ export interface AuthErrorDetail {
 }
 
 // MSAL throws AuthError, but a failure can also arrive as a DOMException or a
-// plain Error, so this reads the fields defensively rather than narrowing to a
-// class it cannot guarantee.
+// plain Error, so the fields are read defensively rather than narrowed to a
+// class that cannot be guaranteed.
 export function describeAuthError(error: unknown): AuthErrorDetail {
     const source = (typeof error === 'object' && error !== null
         ? (error as Record<string, unknown>)

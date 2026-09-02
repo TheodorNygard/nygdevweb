@@ -1,14 +1,13 @@
 name: Deploy gym.nygard.dev
 
-# Manual-only, matching the other two site workflows: deploy on demand from the
-# Actions tab ("Run workflow"). Auto-deploy on push/PR is intentionally off.
+# Manual-only, like the other two site workflows: deploy on demand from the
+# Actions tab. Auto-deploy on push/PR is intentionally off.
 on:
   workflow_dispatch:
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
-# Reuses the federated credential already scoped to this repo. id-token: write
-# is for azure/login only; like the run.nygard.dev workflow this one does not
-# hand an OIDC token to the deploy action (see the Build And Deploy step).
+# id-token: write is for azure/login only; like the run.nygard.dev workflow this
+# one hands no OIDC token to the deploy action (see Build And Deploy).
 permissions:
   id-token: write
   contents: read
@@ -23,11 +22,9 @@ jobs:
           submodules: true
           lfs: false
 
-      # The site is a Vite build now, so the artifact that gets uploaded is
-      # produced here rather than being the checked-in files. Node 22 is what
-      # Vite 8 asks for (^20.19 || >=22.12); pinning it here rather than
-      # relying on the runner's default keeps a runner image bump from
-      # silently changing the toolchain the bundle is built with.
+      # The uploaded artifact is produced here rather than checked in. Node 22
+      # is what Vite 8 asks for (^20.19 || >=22.12); pinning it keeps a runner
+      # image bump from silently changing the toolchain.
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
@@ -35,16 +32,14 @@ jobs:
           cache: npm
           cache-dependency-path: sites/gym/package-lock.json
 
-      # `npm ci` rather than `npm install`: it installs exactly what the
-      # lockfile pins and fails if package.json and the lockfile disagree,
-      # which is the property that makes a deploy reproducible.
+      # `npm ci`, not `npm install`: it installs exactly what the lockfile pins
+      # and fails if package.json disagrees, which is what makes it reproducible.
       - name: Install dependencies
         working-directory: sites/gym
         run: npm ci
 
-      # Type errors fail the build here rather than reaching the browser as a
-      # runtime surprise. `npm run build` runs tsc before vite, so this is the
-      # gate as well as the bundle.
+      # `npm run build` runs tsc before vite, so this is the type gate as well
+      # as the bundle: type errors fail here rather than in the browser.
       - name: Build
         working-directory: sites/gym
         run: npm run build
@@ -62,16 +57,16 @@ jobs:
           SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP_GYM }}
           SWA_RG_SHARED: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
         run: |
-          # An unset repository variable expands to an empty string, which the
-          # Az CLI reports as a bare "expected one argument" usage error. Fail
-          # here instead, naming the variable that needs setting.
+          # An unset repository variable expands to an empty string, which the Az
+          # CLI reports as a bare "expected one argument" usage error. Fail here
+          # instead, naming the variable that needs setting.
           if [ -z "$SWA_NAME" ]; then
             echo "::error::Repository variable AZURE_SWA_NAME_GYM is not set (Settings -> Secrets and variables -> Actions -> Variables). It must hold the Azure resource name of the gym.nygard.dev Static Web App."
             exit 1
           fi
 
-          # The resource group is usually shared with the other two apps, so
-          # fall back to AZURE_SWA_RESOURCE_GROUP when no _GYM override is set.
+          # Usually shared with the other two apps, so fall back to
+          # AZURE_SWA_RESOURCE_GROUP when no _GYM override is set.
           if [ -z "$SWA_RG" ]; then
             SWA_RG="$SWA_RG_SHARED"
           fi
@@ -86,9 +81,8 @@ jobs:
 
       - name: Retrieve Static Web Apps deployment token
         run: |
-          # Fetch the deployment token just-in-time over the federated identity
-          # instead of storing it as a long-lived GitHub secret. The deploy
-          # identity needs a role on the Static Web App that grants
+          # Fetched just-in-time over the federated identity rather than kept as
+          # a long-lived GitHub secret. The deploy identity needs a role granting
           # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
           TOKEN=$(az staticwebapp secrets list \
             --name "$SWA_NAME" \
@@ -98,18 +92,16 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
-      # The build already ran, above, on a Node version this repo chose. Azure's
-      # Oryx builder is kept out of the way with skip_app_build so that
-      # app_location is uploaded exactly as built: sites/gym/dist, which
-      # already contains index.html, the hashed assets, the favicons, the
+      # skip_app_build keeps Azure's Oryx builder out of the way, so sites/gym/dist
+      # uploads exactly as built above — index.html, hashed assets, favicons, the
       # first-party 404 page and staticwebapp.config.json. Letting Oryx build
-      # instead would mean a second, unpinned toolchain deciding what ships.
+      # would put a second, unpinned toolchain in charge of what ships.
       #
       # No github_id_token, for the same reason as the run.nygard.dev workflow:
-      # that path resolves the target app from the workflow filename Azure
-      # registered at provisioning time, and this app has no such registration.
-      # Requires the app's deployment authorization policy to be "Deployment
-      # token" (portal: Static Web App -> Settings -> Deployment configuration).
+      # that path resolves the target app from a workflow filename registered at
+      # provisioning time, and this app has no such registration. Needs the app's
+      # authorization policy set to "Deployment token" (portal: Static Web App ->
+      # Settings -> Deployment configuration).
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1

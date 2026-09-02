@@ -1,9 +1,8 @@
 import { CLAIM_ABOUT, TIME_CLAIMS, orderClaims } from '../lib/claims';
 import { formatClaimValue, formatEpoch } from '../lib/format';
 
-// The timestamps here are resolved once, when the table renders. They are
-// absolute facts about the token ("issued at 14:02") rather than a countdown,
-// so unlike the expiry pill there is nothing for them to tick towards.
+// Timestamps resolve once, at render. They are absolute facts about the token
+// ("issued at 14:02"), not a countdown, so nothing here ticks.
 export function ClaimsTable({ payload }: { payload: Record<string, unknown> }) {
     return (
         <div className="table-wrap">

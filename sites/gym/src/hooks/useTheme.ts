@@ -24,8 +24,8 @@ function initialTheme(): Theme {
 }
 
 // Same mechanism as sites/run: data-theme on <html> so `color-scheme` reaches
-// the page canvas, and both values stamped explicitly so a reader who picked
-// light is not overridden by a dark OS.
+// the page canvas, both values stamped so a dark OS cannot override a reader
+// who picked light.
 export function useTheme(): [Theme, () => void] {
     const [theme, setTheme] = useState<Theme>(initialTheme);
 
@@ -34,9 +34,8 @@ export function useTheme(): [Theme, () => void] {
 
         document.documentElement.setAttribute('data-theme', theme);
 
-        // The address-bar tint follows the page canvas. It is a <meta> in
-        // index.html rather than something React owns, so it is written here
-        // by hand.
+        // The address-bar tint follows the page canvas. The <meta> lives in
+        // index.html rather than in the tree React owns, so it is set by hand.
         document.querySelector('meta[name="theme-color"]')
             ?.setAttribute('content', dark ? '#121212' : '#f8f9fa');
     }, [theme]);

@@ -26,8 +26,8 @@ function selectContents(node: HTMLElement): void {
 }
 
 // The clipboard API needs a secure context and a user gesture; both hold here.
-// The fallback is a selection rather than document.execCommand, which is
-// deprecated and, on a token this long, was never reliable anyway.
+// The fallback selects rather than calling the deprecated document.execCommand,
+// which on a token this long was never reliable anyway.
 export function CopyButton({ label = 'Copy', value, fallbackTarget }: CopyButtonProps) {
     const [feedback, setFeedback] = useState<string | null>(null);
     const timer = useRef<number | null>(null);

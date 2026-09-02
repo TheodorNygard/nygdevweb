@@ -1,20 +1,14 @@
-// run.nygard.dev — marathon prep dashboard.
+// run.nygard.dev — marathon prep dashboard. Draws one precomputed JSON blob
+// fetched cross-origin from public blob storage.
 //
-// The page reads one precomputed JSON blob and draws it. There is no function
-// app in the path any more: the build job writes the feed to public blob
-// storage and this is a plain cross-origin GET of a static file.
-//
-// Two places have to agree on the feed's origin, or the browser blocks it:
-//   1. FEED_URL below
-//   2. connect-src in staticwebapp.config.json
-// and the storage account needs a CORS rule allowing https://run.nygard.dev,
-// because a blob without one returns no Access-Control-Allow-Origin and the
-// browser drops the response. See the README.
+// FEED_URL and connect-src in staticwebapp.config.json must name the same
+// origin, and the storage account needs a CORS rule for https://run.nygard.dev
+// — without one the browser drops the response. See the README.
 const FEED_URL = 'https://nygdevcdn.blob.core.windows.net/data/marathonprep.json';
 const REQUEST_TIMEOUT = 10000;  // 10 seconds
 
-// Reference marks. These are conventions, not data — they are always shown
-// next to the number they qualify so nothing reads as a measured value.
+// Reference marks: conventions, not data. Always shown next to the number they
+// qualify so nothing reads as a measured value.
 const MARATHON_KM = 42.195;
 const EASY_SHARE_TARGET = 0.8;   // the 80/20 split easy training aims at
 const ACWR_SWEET_LOW = 0.8;
@@ -43,34 +37,30 @@ document.getElementById('year').textContent = new Date().getFullYear();
 loadErrorUrl.textContent = FEED_URL;
 feedLink.href = FEED_URL;
 
-// Last payload rendered, kept so a resize can redraw without refetching.
+// Last payload rendered, so a resize can redraw without refetching.
 let currentData = null;
-// Cards the reader switched to the table view, by card id, so a redraw keeps it.
+// Card ids switched to the table view, so a redraw keeps that choice.
 const tableViews = new Set();
 
 
 /* ---------------------------------------------------------------- theme -- */
 
-function setThemeColor(dark) {
-    themeColorMeta.setAttribute('content', dark ? '#121212' : '#f8f9fa');
-}
-
 // data-theme lives on <html> so `color-scheme` reaches the page canvas, which
-// is what themes the scrollbars and native form controls. Both values are
-// stamped explicitly — the chart palette has a `prefers-color-scheme` block, so
-// "no attribute" would let the OS override a reader who picked light.
+// themes the scrollbars and native controls. Both values are stamped
+// explicitly: the chart palette has a `prefers-color-scheme` block, so "no
+// attribute" would let the OS override a reader who picked light.
 function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     themeIcon.setAttribute('href', dark ? '#sun-icon' : '#moon-icon');
     themeToggle.setAttribute('aria-pressed', String(dark));
-    setThemeColor(dark);
+    themeColorMeta.setAttribute('content', dark ? '#121212' : '#f8f9fa');
 }
 
 function initTheme() {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     const stored = localStorage.getItem('theme');
 
-    applyTheme(stored === 'dark' || (!stored && prefersDark.matches));
+    applyTheme(stored === 'dark'
+        || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches));
 }
 
 themeToggle.addEventListener('click', () => {
@@ -78,17 +68,16 @@ themeToggle.addEventListener('click', () => {
 
     applyTheme(dark);
     localStorage.setItem('theme', dark ? 'dark' : 'light');
-    // Series colours are CSS variables, but they are read into SVG attributes
-    // at draw time, so the charts have to be drawn again.
+    // Series colours are CSS variables read into SVG attributes at draw time,
+    // so the charts have to be drawn again.
     if (currentData) render(currentData);
 }, {passive: true});
 
 
 /* ----------------------------------------------------------- formatting -- */
 
-// Anything that is not a finite number is missing, whatever shape it arrived
-// in. The feed uses null for "not computable yet" and omits keys outright when
-// a section has no data.
+// Anything not a finite number is missing: the feed uses null for "not
+// computable yet" and omits keys outright when a section has no data.
 function num(value) {
     return typeof value === 'number' && isFinite(value) ? value : null;
 }
@@ -117,8 +106,8 @@ function fmtPercent(fraction, dp = 0) {
     return `${(fraction * 100).toFixed(dp)}%`;
 }
 
-// The feed's dates are calendar days with no zone. Parsing them as UTC keeps a
-// run on the day it was logged for readers west of Greenwich.
+// Feed dates are calendar days with no zone. Parsing as UTC keeps a run on the
+// day it was logged for readers west of Greenwich.
 function parseDay(text) {
     const date = new Date(`${text}T00:00:00Z`);
 
@@ -145,11 +134,24 @@ function plural(count, one, many) {
     return `${count} ${count === 1 ? one : many}`;
 }
 
-// Read a themed colour out of the stylesheet. Charts are drawn with SVG
-// presentation attributes, so the value has to be resolved rather than
-// inherited — which is why a theme change redraws.
-function token(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+// Themed colours resolved out of the stylesheet. Charts are drawn with SVG
+// presentation attributes, so the values have to be read rather than inherited
+// — which is why a theme change redraws. Resolving one forces a style
+// recalculation, so the whole set is read once per render and cached here.
+let colors = null;
+
+function readPalette() {
+    const style = getComputedStyle(document.documentElement);
+    const token = name => style.getPropertyValue(name).trim();
+
+    colors = {
+        s1: token('--series-1'),
+        s2: token('--series-2'),
+        s3: token('--series-3'),
+        surface: token('--card-bg'),
+        good: token('--status-good'),
+        critical: token('--status-critical')
+    };
 }
 
 
@@ -190,10 +192,7 @@ function html(tag, attrs = {}, parent = null) {
 }
 
 function svgText(parent, x, y, content, attrs = {}) {
-    const node = svg('text', Object.assign({x, y}, attrs), parent);
-
-    node.textContent = content;
-    return node;
+    svg('text', Object.assign({x, y}, attrs), parent).textContent = content;
 }
 
 
@@ -241,6 +240,10 @@ function linePath(points) {
 /* -------------------------------------------------------------- tooltip -- */
 
 let tooltipAnchor = null;
+// The tooltip's size only changes when its content does, and pointermove fires
+// far more often than that. Measuring here rather than in positionTooltip keeps
+// a synchronous layout off the move handler.
+let tooltipBox = {width: 0, height: 0};
 
 function showTooltip(rows, title, anchor) {
     tooltipEl.replaceChildren();
@@ -261,11 +264,15 @@ function showTooltip(rows, title, anchor) {
     tooltipEl.classList.add('visible');
     tooltipEl.setAttribute('aria-hidden', 'false');
     tooltipAnchor = anchor;
+    // Measured from the left edge so the shrink-to-fit width is the one the
+    // content wants, not one squeezed by wherever the last tooltip sat.
+    tooltipEl.style.left = '0px';
+    tooltipBox = tooltipEl.getBoundingClientRect();
     positionTooltip(anchor);
 }
 
 function positionTooltip(anchor) {
-    const box = tooltipEl.getBoundingClientRect();
+    const box = tooltipBox;
     const margin = 12;
     let left = anchor.x + 14;
     let top = anchor.y - box.height - 14;
@@ -296,8 +303,7 @@ window.addEventListener('scroll', () => {
 }, {passive: true});
 
 // Wire a mark to the hover layer. The hit target is the mark plus its surface
-// gap and then some, never only the painted pixels; keyboard focus shows
-// exactly what hover shows.
+// gap, never only the painted pixels; focus shows exactly what hover shows.
 function attachTooltip(node, title, rows, {focusable = true} = {}) {
     const label = `${title}. ${rows.map(row => `${row.name}: ${row.value}`).join('. ')}`;
 
@@ -324,8 +330,7 @@ function attachTooltip(node, title, rows, {focusable = true} = {}) {
 /* ---------------------------------------------------------- card shells -- */
 
 // Every chart ships with a table twin. The toggle is the keyboard and
-// screen-reader path to the same numbers, so it is a real button, not a
-// decoration.
+// screen-reader path to the same numbers, so it is a real button.
 function makeCard(id, {title, subtitle, wide = true}) {
     const card = html('section', {class: wide ? 'card wide' : 'card'}, cardsEl);
     const head = html('div', {class: 'card-head'}, card);
@@ -361,8 +366,7 @@ function makeCard(id, {title, subtitle, wide = true}) {
         }
         hideTooltip();
         // Redraw rather than just unhide: a chart drawn into a hidden element
-        // measures zero width, so the chart body stays visible until its
-        // drawing is done and only then is hidden by applyView().
+        // measures zero width, so the body stays visible until applyView().
         render(currentData);
     });
 
@@ -394,7 +398,6 @@ function makeTable(parent, caption, headers, rows) {
             html(index === 0 ? 'th' : 'td', index === 0 ? {scope: 'row', text: cell} : {text: cell}, tr);
         });
     }
-    return table;
 }
 
 function makeLegend(parent, entries) {
@@ -409,7 +412,6 @@ function makeLegend(parent, entries) {
         }, item);
         html('span', {text: entry.name}, item);
     }
-    return legend;
 }
 
 function makeEmpty(parent, message) {
@@ -418,11 +420,10 @@ function makeEmpty(parent, message) {
 
     svg('use', {href: '#info-icon'}, icon);
     html('span', {text: message}, box);
-    return box;
 }
 
-// Charts are drawn at device pixels rather than scaled from a fixed viewBox,
-// so axis text stays the size it was designed at on every screen width.
+// Drawn at device pixels rather than scaled from a fixed viewBox, so axis text
+// stays the size it was designed at on every screen width.
 function makeSvg(parent, height, label) {
     const measured = parent.clientWidth || parent.getBoundingClientRect().width;
     const width = Math.max(260, Math.floor(measured || 640));
@@ -441,9 +442,8 @@ function makeSvg(parent, height, label) {
 
 /* ------------------------------------------------------------- statuses -- */
 
-// Status is a word plus an icon plus a colour, in that order of importance.
-// Two of the four status steps sit below 3:1 on white, so the colour never
-// carries the meaning on its own.
+// A word plus an icon plus a colour, in that order of importance: two of the
+// four steps sit below 3:1 on white, so colour never carries meaning alone.
 function acwrStatus(ratio, threshold) {
     if (num(ratio) === null) {
         return {tone: 'warning', icon: '#info-icon', word: 'No reading'};
@@ -479,7 +479,6 @@ function makeChip(parent, status) {
 
     svg('use', {href: status.icon}, icon);
     html('span', {text: status.word}, chip);
-    return chip;
 }
 
 
@@ -492,7 +491,6 @@ function makeTile(label, value, unit, note, status) {
 
     const valueEl = html('div', {class: 'tile-value'}, tile);
 
-    // Proportional figures, not tabular: at this size tabular digits read loose.
     html('span', {text: value}, valueEl);
     if (unit) {
         html('span', {class: 'unit', text: unit}, valueEl);
@@ -503,7 +501,6 @@ function makeTile(label, value, unit, note, status) {
     if (note) {
         html('div', {class: 'tile-note', text: note}, tile);
     }
-    return tile;
 }
 
 function renderTiles(data) {
@@ -514,8 +511,8 @@ function renderTiles(data) {
     const current = (data.acwr && data.acwr.current) || {};
     const source = data.source || {};
 
-    // Last 7 days is the acute window the ACWR is already built on, so the two
-    // numbers on the page cannot disagree.
+    // The acute window the ACWR is already built on, so the two numbers on the
+    // page cannot disagree.
     makeTile('Last 7 days', fmt(current.acuteKm), 'km',
         current.date ? `to ${fmtDayYear(current.date)}` : '');
 
@@ -549,19 +546,6 @@ function renderTiles(data) {
 }
 
 
-/* ------------------------------------------------------- chart palette --- */
-
-function palette() {
-    return {
-        s1: token('--series-1'),
-        s2: token('--series-2'),
-        s3: token('--series-3'),
-        surface: token('--card-bg'),
-        good: token('--status-good'),
-        critical: token('--status-critical')
-    };
-}
-
 // Draw a horizontal grid and its y-axis labels, and hand back the y scale.
 function yAxis(node, plot, max, formatTick) {
     const ticks = niceTicks(max);
@@ -588,8 +572,7 @@ function bands(plot, count) {
     };
 }
 
-// Label every slot when they fit, every other when they don't. Text is never
-// rotated into the plot or clipped.
+// Label every slot when they fit, every other when they don't — never rotated.
 function bandLabels(node, plot, band, count, labelAt) {
     const step = band.width < 52 ? 2 : 1;
 
@@ -611,7 +594,6 @@ function renderLoad(data) {
     const threshold = num(acwr.threshold) ?? 1.5;
     const ratio = num(current.ratio);
     const status = acwrStatus(ratio, threshold);
-    const colors = palette();
 
     const card = makeCard('load', {
         title: 'Training load',
@@ -677,7 +659,7 @@ function renderLoad(data) {
     svg('line', {class: 'axisline', x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom}, node);
 
     // A null ratio is "no chronic base to divide by", not zero, so the line
-    // breaks there instead of diving to the floor.
+    // breaks there rather than diving to the floor.
     let run = [];
 
     const flush = () => {
@@ -716,7 +698,7 @@ function renderLoad(data) {
     svgText(node, plot.left, plot.bottom + 18, fmtDay(points[0].date), {'text-anchor': 'start'});
     svgText(node, plot.right, plot.bottom + 18, fmtDay(last.date), {'text-anchor': 'end'});
 
-    // The crosshair finds the X: readers aim at a date, never at a 2px line.
+    // Readers aim at a date, never at a 2px line.
     const crosshair = svg('line', {
         class: 'axisline', x1: 0, x2: 0, y1: plot.top, y2: plot.bottom, opacity: 0
     }, node);
@@ -757,7 +739,6 @@ function renderVolume(data) {
     const volume = data.weeklyVolume || {};
     const weeks = Array.isArray(volume.weeks) ? volume.weeks : [];
     const rollingWeeks = num(volume.rollingWeeks) ?? 4;
-    const colors = palette();
     const card = makeCard('volume', {
         title: 'Weekly volume',
         subtitle: 'Kilometres per week, the rolling average behind them, and the longest single run of each week.'
@@ -770,8 +751,7 @@ function renderVolume(data) {
         return;
     }
 
-    // Order matters: this is the validated slot order, and reordering it is
-    // what breaks the colour-blind separation between the two lines.
+    // Validated slot order: reordering it breaks the colour-blind separation.
     const series = [
         {name: 'Weekly km', color: colors.s1, shape: 'rect'},
         {name: `${rollingWeeks}-week average`, color: colors.s2, shape: 'line'},
@@ -803,7 +783,7 @@ function renderVolume(data) {
         }
     });
 
-    // Two lines, both in km, on the one axis — never a second scale.
+    // Both lines are in km, so they share the one axis — never a second scale.
     for (const [key, color] of [['rolling4WeekAvgKm', colors.s2], ['longestRunKm', colors.s3]]) {
         const drawn = weeks
             .map((week, index) => ({value: num(week[key]), index}))
@@ -827,7 +807,7 @@ function renderVolume(data) {
     svg('line', {class: 'axisline', x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom}, node);
     bandLabels(node, plot, band, weeks.length, index => fmtDay(weeks[index].weekStart));
 
-    // One direct label, on the week the reader is actually asking about.
+    // One direct label, on the week the reader is asking about.
     const latest = weeks[weeks.length - 1];
 
     if (num(latest.km) > 0) {
@@ -870,13 +850,12 @@ function renderVolume(data) {
 
 /* ------------------------------------------------------------ card: pace -- */
 
-// Pace only means something next to the effort that produced it, so the run
-// types are faceted rather than plotted on top of each other in five colours.
-// One series per panel, one shared scale, so panels stay comparable.
+// Pace only means something next to the effort that produced it, so run types
+// are faceted rather than stacked in five colours. One shared scale, so the
+// panels stay comparable.
 function renderPace(data) {
     const pace = data.pace || {};
     const series = Array.isArray(pace.series) ? pace.series : [];
-    const colors = palette();
     const card = makeCard('pace', {
         title: 'Pace by run type',
         subtitle: 'Minutes per kilometre, faster upwards. One panel per run type, all sharing one scale.'
@@ -896,9 +875,11 @@ function renderPace(data) {
     }
 
     const paces = all.map(point => num(point.paceMinPerKm)).filter(value => value !== null);
-    const spread = Math.max(Math.max(...paces) - Math.min(...paces), 0.5);
-    const slowest = Math.max(...paces) + spread * 0.2;
-    const fastest = Math.min(...paces) - spread * 0.2;
+    const slowestPace = Math.max(...paces);
+    const fastestPace = Math.min(...paces);
+    const spread = Math.max(slowestPace - fastestPace, 0.5);
+    const slowest = slowestPace + spread * 0.2;
+    const fastest = fastestPace - spread * 0.2;
     const times = all.map(point => (parseDay(point.date) || new Date()).getTime());
     const firstDay = Math.min(...times);
     const lastDay = Math.max(...times);
@@ -906,9 +887,8 @@ function renderPace(data) {
     const panels = html('div', {class: 'panels'}, card.body);
     const order = [...populated].sort((left, right) =>
         RUN_TYPE_ORDER.indexOf(left.runType) - RUN_TYPE_ORDER.indexOf(right.runType));
-    // Every panel exists before any is drawn: a chart measured while it is the
-    // grid's only child gets the full width, then shrinks when its siblings
-    // arrive and takes its text down with it.
+    // Every panel exists before any is drawn: a chart measured as the grid's
+    // only child gets the full width, then shrinks when its siblings arrive.
     const slots = order.map(entry => ({entry, panel: html('div', {class: 'panel'}, panels)}));
 
     for (const {entry, panel} of slots) {
@@ -919,8 +899,7 @@ function renderPace(data) {
         svgText(node, 0, 14, `${capitalise(entry.runType)} · ${plural(entry.points.length, 'run', 'runs')}`,
             {class: 'panel-title', 'text-anchor': 'start'});
 
-        // Inverted on purpose: a lower min/km is a faster run, and a faster run
-        // belongs higher on the page.
+        // Inverted: a lower min/km is a faster run, and faster belongs higher.
         const y = linear(fastest, slowest, plot.top, plot.bottom);
 
         for (const tick of [fastest, (fastest + slowest) / 2, slowest]) {
@@ -930,7 +909,7 @@ function renderPace(data) {
         svg('line', {class: 'axisline', x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom}, node);
 
         // A single run has no range to spread across, so it sits mid-panel
-        // rather than pinned to one edge as if it were an endpoint.
+        // rather than pinned to an edge as if it were an endpoint.
         const x = lastDay === firstDay
             ? () => (plot.left + plot.right) / 2
             : linear(firstDay, lastDay, plot.left, plot.right);
@@ -952,8 +931,7 @@ function renderPace(data) {
         }
 
         for (const item of placed) {
-            // A 24px transparent hit area under a 9px dot — nobody reliably
-            // lands on the painted pixels.
+            // A 24px hit area under a 9px dot: nobody lands on painted pixels.
             const hit = svg('circle', {cx: item.cx, cy: item.cy, r: 12, fill: 'transparent'}, node);
 
             svg('circle', {
@@ -968,7 +946,7 @@ function renderPace(data) {
             ]);
         }
 
-        // Label the latest run only. A number on every dot goes unread.
+        // The latest run only: a number on every dot goes unread.
         const latest = placed[placed.length - 1];
 
         if (latest) {
@@ -1007,7 +985,6 @@ function renderPace(data) {
 function renderZones(data) {
     const zones = data.weeklyZones || {};
     const weeks = Array.isArray(zones.weeks) ? zones.weeks : [];
-    const colors = palette();
     const card = makeCard('zones', {
         title: 'Intensity split',
         subtitle: `Minutes per week in the easy zones against zone 3 and up. Easy training aims for about ${fmtPercent(EASY_SHARE_TARGET)} easy.`
@@ -1044,8 +1021,8 @@ function renderZones(data) {
         const hardBottom = easyHeight > 0 ? easyTop - GAP : plot.bottom;
         const hardTop = hardBottom - hardHeight;
 
-        // Only the top of the stack gets the rounded data-end; interior
-        // segments stay square so the stack reads as one column.
+        // Only the top of the stack is rounded; interior segments stay square
+        // so the stack reads as one column.
         if (hardHeight > 0.5) {
             svg('path', {d: columnPath(left, hardTop, columnWidth, hardHeight), fill: colors.s2}, node);
         }
@@ -1114,7 +1091,6 @@ function renderZones(data) {
 function renderEfficiency(data) {
     const efficiency = data.efficiencyFactor || {};
     const points = Array.isArray(efficiency.points) ? efficiency.points : [];
-    const colors = palette();
     const basis = efficiency.basis ? String(efficiency.basis) : 'easy runs only';
     const card = makeCard('efficiency', {
         title: 'Aerobic efficiency',
@@ -1179,6 +1155,7 @@ function render(data) {
     }
     currentData = data;
     hideTooltip();
+    readPalette();
     cardsEl.replaceChildren();
     // Before anything is drawn, not after: a chart measured inside a
     // display:none container measures zero and falls back to a default width,
@@ -1215,7 +1192,7 @@ function setBusy(busy) {
     refreshButton.classList.toggle('loading', busy);
     refreshButton.setAttribute('aria-busy', String(busy));
     refreshText.textContent = busy ? 'Reading…' : 'Refresh';
-    // Refetch keeps the frame: the previous render stays put, dimmed.
+    // A refetch keeps the frame: the previous render stays put, dimmed.
     dashboardEl.classList.toggle('stale', busy && dashboardEl.classList.contains('loaded'));
 }
 
@@ -1224,10 +1201,9 @@ function setStatus(message, kind = '') {
     statusEl.className = kind ? `status ${kind}` : 'status';
 }
 
-// Turn a fetch rejection into something that can be acted on. A missing CORS
-// rule on the storage account and a `connect-src` violation both surface as a
-// bare TypeError with nothing in the object to tell them apart, so the two
-// have to be reported together.
+// A missing CORS rule on the storage account and a `connect-src` violation both
+// surface as a bare TypeError with nothing to tell them apart, so the two are
+// reported together.
 function describeFailure(error) {
     if (error.name === 'TimeoutError') {
         return `No response within ${REQUEST_TIMEOUT / 1000}s.`;
@@ -1254,9 +1230,8 @@ async function loadFeed() {
     loadErrorEl.style.display = 'none';
 
     try {
-        // The blob is served with a five-minute cache, so a manual refresh
-        // carries a cache-buster. No request headers are set: keeping this a
-        // simple request means no CORS preflight to satisfy.
+        // The blob has a five-minute cache, so a manual refresh carries a
+        // cache-buster. No request headers: a simple request needs no preflight.
         const response = await fetch(`${FEED_URL}?t=${Date.now()}`, {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT)
         });
@@ -1284,7 +1259,7 @@ async function loadFeed() {
 refreshButton.addEventListener('click', loadFeed);
 
 // Charts are drawn at pixel sizes, so a width change needs a redraw. Debounced,
-// and only on width: a mobile browser collapsing its address bar changes the
+// and width-only: a mobile browser collapsing its address bar changes the
 // height on every scroll and must not trigger one.
 let resizeTimer = null;
 let lastWidth = window.innerWidth;
@@ -1299,8 +1274,7 @@ window.addEventListener('resize', () => {
 }, {passive: true});
 
 
-// Initialize
-// The script is deferred, so the DOM is ready and the theme can be applied
-// before first paint instead of after every image has finished loading.
+// The script is deferred, so the DOM is ready and the theme lands before first
+// paint rather than after every image has loaded.
 initTheme();
 loadFeed();

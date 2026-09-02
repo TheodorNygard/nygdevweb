@@ -1,6 +1,6 @@
-// What each claim is, in one line. Only claims Entra actually mints are here;
-// anything unlisted still renders, just without the third column. Sources:
-// the Microsoft identity platform token reference for v1.0 and v2.0.
+// What each claim is, in one line. Only claims Entra mints are here; anything
+// unlisted still renders, just without the third column. Source: the Microsoft
+// identity platform token reference for v1.0 and v2.0.
 export const CLAIM_ABOUT: Record<string, string> = {
     acr: 'Authentication context class (v1.0 tokens).',
     acrs: 'Auth context IDs the token satisfies, for Conditional Access.',
@@ -57,9 +57,8 @@ export const CLAIM_ABOUT: Record<string, string> = {
     xms_tpl: 'Tenant preferred language.',
 };
 
-// Claims a reader looks for first, in the order they want them. Everything
-// else follows alphabetically, so an unfamiliar claim is easy to spot rather
-// than scattered through the familiar ones.
+// Claims a reader looks for first, in the order they want them. Everything else
+// follows alphabetically, so an unfamiliar claim is easy to spot.
 export const CLAIM_ORDER = [
     'aud', 'iss', 'ver', 'tid', 'oid', 'sub',
     'name', 'preferred_username', 'upn', 'email',
@@ -71,8 +70,6 @@ export const CLAIM_ORDER = [
 
 export const TIME_CLAIMS = new Set(['exp', 'iat', 'nbf', 'auth_time', 'pwd_exp']);
 
-// The order the table renders in: known claims first in CLAIM_ORDER's order,
-// then everything else alphabetically.
 export function orderClaims(payload: Record<string, unknown>): string[] {
     const keys = Object.keys(payload);
     const known = CLAIM_ORDER.filter((key) => keys.includes(key));

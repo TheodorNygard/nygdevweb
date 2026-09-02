@@ -1,7 +1,5 @@
-// One sprite, defined once and referenced by <use>. The paths are the same
-// ones the pre-React page carried; keeping them in a hidden <svg> rather than
-// inlining each icon at every call site means an icon costs a 40-byte
-// reference wherever it is used.
+// One sprite, defined once and referenced by <use>, so an icon costs a 40-byte
+// reference at each call site rather than a repeated path.
 export type IconName = 'moon' | 'sun' | 'alert' | 'key' | 'signout';
 
 export function IconSprite() {

@@ -16,10 +16,9 @@ import { useTheme } from './hooks/useTheme';
 import { loadConfig, saveConfig } from './lib/config';
 
 export function App() {
-    // Read once. Saving the configuration reloads the page rather than
-    // re-reading it, because MSAL cannot be reconfigured after construction —
-    // so this value is fixed for the life of the page and belongs in a state
-    // initialiser rather than in an effect.
+    // Read once: MSAL cannot be reconfigured after construction, so saving
+    // reloads the page instead. The value is fixed for the life of the page,
+    // which is why it is a state initialiser and not an effect.
     const [config] = useState(loadConfig);
 
     const [theme, toggleTheme] = useTheme();
@@ -41,8 +40,8 @@ export function App() {
 
         setLocalStatus(null);
 
-        // Remembered so a reload lands on the same request. Best-effort: a
-        // browser that refuses localStorage still gets the token.
+        // Remembered so a reload lands on the same request. Best-effort — a
+        // browser that refuses localStorage still gets its token.
         saveConfig({ ...config, apiScope: trimmed });
 
         void auth.acquireToken(trimmed);

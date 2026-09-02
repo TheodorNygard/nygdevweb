@@ -1,10 +1,11 @@
-// Constants
 const FOUNDRY_URL = 'https://rpg.nygard.dev';
 const WEBHOOK_URL = 'https://prod-19.norwayeast.logic.azure.com:443/workflows/22fe1114d4e84963912784519f33e676/triggers/POST/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FPOST%2Frun&sv=1.0&sig=8LHefy-KqDqf-rEYoNhagAdIMd4Ui0UBKgOwZWbTmN0';
-const CHECK_TIMEOUT = 3000;       // 3 seconds for status check
-const POLLING_INTERVAL = 5000;   // 5 seconds between server startup checks
-const PERIODIC_CHECK = 300000;    // 5 minutes for regular status checks
-const MAX_STARTUP_WAIT = 600000;  // 10 minutes maximum wait time
+const CHECK_TIMEOUT = 3000;        // per status request
+const POLLING_INTERVAL = 5000;     // between startup checks
+const PERIODIC_CHECK = 300000;     // between idle status checks
+const MAX_STARTUP_WAIT = 600000;   // total budget for a start, from the click
+const SETTLE_DELAY = 8000;         // nginx answers before Foundry is ready
+const SPINNER_HOLD = 3000;         // spinner comes off, the wait carries on
 
 // DOM elements
 const themeToggle = document.getElementById('themeToggle');
@@ -14,27 +15,25 @@ const foundryButton = document.getElementById('foundryButton');
 const buttonText = document.getElementById('buttonText');
 const statusDiv = document.getElementById('status');
 
-// Track active startup polling interval to prevent duplicates
-let activePollingInterval = null;
+// True from the webhook call until the server answers or the budget runs out,
+// including the pause between the two confirmation pings. The periodic check
+// stands down while it is set, so a routine poll cannot overwrite
+// "Server starting..." with "offline" halfway through a start.
+let awaitingStart = false;
+let pollTimer = null;
 
-// Set current year
 document.getElementById('year').textContent = new Date().getFullYear();
 
-// Fetch with timeout
-function fetchWithTimeout(url, options = {}, timeout = CHECK_TIMEOUT) {
-    return fetch(url, {
-        ...options,
-        signal: AbortSignal.timeout(timeout)
+function ping() {
+    return fetch(FOUNDRY_URL, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(CHECK_TIMEOUT)
     });
 }
 
-// Theme switcher
-function setThemeColor(dark) {
-    themeColorMeta.setAttribute('content', dark ? '#121212' : '#f8f9fa');
-}
-
-// data-theme lives on <html> so `color-scheme` reaches the page canvas,
-// which is what themes the scrollbars and native form controls.
+// data-theme lives on <html> so `color-scheme` reaches the page canvas, which
+// themes the scrollbars and native form controls.
 function applyTheme(dark) {
     if (dark) {
         document.documentElement.setAttribute('data-theme', 'dark');
@@ -43,14 +42,14 @@ function applyTheme(dark) {
     }
     themeIcon.setAttribute('href', dark ? '#sun-icon' : '#moon-icon');
     themeToggle.setAttribute('aria-pressed', String(dark));
-    setThemeColor(dark);
+    themeColorMeta.setAttribute('content', dark ? '#121212' : '#f8f9fa');
 }
 
 function initTheme() {
-    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-    const currentTheme = localStorage.getItem('theme');
+    const stored = localStorage.getItem('theme');
 
-    applyTheme(currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches));
+    applyTheme(stored === 'dark'
+        || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches));
 }
 
 themeToggle.addEventListener('click', () => {
@@ -60,146 +59,125 @@ themeToggle.addEventListener('click', () => {
     localStorage.setItem('theme', dark ? 'dark' : 'light');
 }, {passive: true});
 
-// The die is the status light: rolling while checking, green online, red offline
+// The die is the status light: rolling while checking, green online, red offline.
 function setDiceState(state) {
     foundryButton.classList.remove('is-checking', 'is-online', 'is-offline');
     foundryButton.classList.add(state);
 }
 
-// Clear the message line (start/error messages are the only thing it carries)
-function clearStatusMessage() {
-    statusDiv.textContent = '';
-    statusDiv.className = 'status';
+function setStatus(message, kind = '') {
+    statusDiv.textContent = message;
+    statusDiv.className = kind ? `status ${kind}` : 'status';
 }
 
-// Check if Foundry server is online
+// The two resting states. Both clear the message line, which carries start and
+// error notices only, and end any start in progress.
+function settle(state, label, onClick) {
+    awaitingStart = false;
+    stopPolling();
+    setDiceState(state);
+    buttonText.textContent = label;
+    foundryButton.onclick = onClick;
+    foundryButton.classList.remove('loading');
+    foundryButton.disabled = false;
+    setStatus('');
+}
+
+function setFoundryOnline() {
+    settle('is-online', 'Go to Foundry RPG', () => window.open(FOUNDRY_URL, '_blank'));
+}
+
+function setFoundryOffline() {
+    settle('is-offline', 'Start Foundry Server', startFoundryServer);
+}
+
+function stopPolling() {
+    clearInterval(pollTimer);
+    pollTimer = null;
+}
+
 async function checkFoundryStatus() {
+    // A start is already being waited out, and its own loop owns the button.
+    if (awaitingStart) {
+        return;
+    }
     setDiceState('is-checking');
     buttonText.textContent = 'Checking status...';
 
     try {
-        await fetchWithTimeout(FOUNDRY_URL, {
-            method: 'HEAD',
-            mode: 'no-cors'
-        });
-
-        // Server is online
+        await ping();
         setFoundryOnline();
-    } catch (error) {
-        // Server is offline
+    } catch {
         setFoundryOffline();
     }
 }
 
-// Set button to "online" state
-function setFoundryOnline() {
-    setDiceState('is-online');
-    buttonText.textContent = 'Go to Foundry RPG';
-    foundryButton.onclick = () => window.open(FOUNDRY_URL, '_blank');
-    clearStatusMessage();
-    foundryButton.classList.remove('loading');
-    foundryButton.disabled = false;
-}
-
-// Set button to "offline" state
-function setFoundryOffline() {
-    setDiceState('is-offline');
-    buttonText.textContent = 'Start Foundry Server';
-    foundryButton.onclick = startFoundryServer;
-    clearStatusMessage();
-    foundryButton.classList.remove('loading');
-    foundryButton.disabled = false;
-}
-
-// Start the Foundry server via webhook
 function startFoundryServer() {
     foundryButton.classList.add('loading');
     foundryButton.disabled = true;
-    statusDiv.textContent = 'Starting server...';
-    statusDiv.className = 'status';
+    setStatus('Starting server...');
 
-    fetchWithTimeout(WEBHOOK_URL, {
+    fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ message: 'Webhook triggered' }),
-        mode: 'no-cors'
+        body: JSON.stringify({message: 'Webhook triggered'}),
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(CHECK_TIMEOUT)
     })
     .then(() => {
-        statusDiv.textContent = 'Server starting! It will be ready in a few minutes.';
-        statusDiv.classList.add('success');
-        startPollingForServerStart();
+        setStatus('Server starting! It will be ready in a few minutes.', 'success');
+        awaitingStart = true;
+        pollForServerStart(Date.now() + MAX_STARTUP_WAIT);
     })
     .catch(() => {
-        statusDiv.textContent = 'Error starting server. Please try again.';
-        statusDiv.classList.add('error');
+        setStatus('Error starting server. Please try again.', 'error');
         foundryButton.classList.remove('loading');
         foundryButton.disabled = false;
     });
 }
 
-// Poll to check if server is up
-function startPollingForServerStart() {
+// Wait for the server to come up. The deadline is carried through rather than
+// recomputed, so the confirmation step below can restart the loop without
+// extending the budget past MAX_STARTUP_WAIT.
+function pollForServerStart(deadline) {
+    stopPolling();
     setDiceState('is-checking');
     buttonText.textContent = 'Server starting...';
 
-    let pollingCount = 0;
-    const maxPolls = Math.ceil(MAX_STARTUP_WAIT / POLLING_INTERVAL);
-
-    // Remove loading spinner but keep button disabled for better UX
+    // The spinner comes off early — the button stays usable while the wait
+    // carries on in the background.
     setTimeout(() => {
         foundryButton.classList.remove('loading');
         foundryButton.disabled = false;
-    }, 3000);
+    }, SPINNER_HOLD);
 
-    // Clear any existing polling loop before starting a new one
-    if (activePollingInterval !== null) {
-        clearInterval(activePollingInterval);
-    }
+    const giveUp = () => {
+        setFoundryOffline();
+        setStatus('Server might be taking longer than expected. Try refreshing.', 'error');
+    };
 
-    // Check every 5 seconds
-    activePollingInterval = setInterval(() => {
-        pollingCount++;
-
-        fetchWithTimeout(FOUNDRY_URL, {
-            method: 'HEAD',
-            mode: 'no-cors'
-        })
-        .then(() => {
-            // Got a response - but nginx can reply before Foundry is ready.
-            // Confirm with a second check before declaring online.
-            clearInterval(activePollingInterval);
-            activePollingInterval = null;
+    pollTimer = setInterval(() => {
+        ping().then(() => {
+            // nginx can answer before Foundry itself is ready, so a first
+            // response only earns a second check.
+            stopPolling();
             setDiceState('is-checking');
             buttonText.textContent = 'Almost ready...';
             setTimeout(() => {
-                fetchWithTimeout(FOUNDRY_URL, { method: 'HEAD', mode: 'no-cors' })
-                    .then(() => setFoundryOnline())
-                    .catch(() => {
-                        // Still not truly ready - resume polling
-                        startPollingForServerStart();
-                    });
-            }, 8000);
-        })
-        .catch(() => {
-            // Server still starting
-            if (pollingCount >= maxPolls) {
-                clearInterval(activePollingInterval);
-                activePollingInterval = null;
-                setFoundryOffline();
-                statusDiv.textContent = 'Server might be taking longer than expected. Try refreshing.';
-                statusDiv.className = 'status error';
+                ping()
+                    .then(setFoundryOnline)
+                    .catch(() => (Date.now() < deadline ? pollForServerStart(deadline) : giveUp()));
+            }, SETTLE_DELAY);
+        }).catch(() => {
+            if (Date.now() >= deadline) {
+                giveUp();
             }
         });
     }, POLLING_INTERVAL);
 }
 
-// Initialize
-function init() {
-    initTheme();
-    checkFoundryStatus();
-    setInterval(checkFoundryStatus, PERIODIC_CHECK);
-}
-
-// The script is deferred, so the DOM is ready and the theme can be applied
-// before first paint instead of after every image has finished loading.
-init();
+// The script is deferred, so the DOM is ready and the theme lands before first
+// paint rather than after every image has loaded.
+initTheme();
+checkFoundryStatus();
+setInterval(checkFoundryStatus, PERIODIC_CHECK);
