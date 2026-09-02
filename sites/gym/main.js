@@ -50,9 +50,14 @@ const STORAGE_KEY = 'gym.inspector.config';
 
 // Exactly what MSAL will send as redirect_uri, so the value shown on the page
 // is the value to paste into the portal rather than an approximation of it.
-// Query and hash are dropped: Entra matches the registered URI as a string and
-// a stray `?` turns a correct registration into AADSTS50011.
-const REDIRECT_URI = window.location.origin + window.location.pathname;
+//
+// Pinned to the origin root rather than built from location.pathname. Entra
+// matches the registered URI as a string, and a page reached at /index.html
+// rather than / would otherwise send a redirect_uri that differs from the one
+// registered — the same site, one registration, and AADSTS50011 depending on
+// how you happened to navigate to it. There is one page here, it lives at the
+// root, and there is exactly one string to register.
+const REDIRECT_URI = window.location.origin + '/';
 
 function loadConfig() {
     let stored = {};
