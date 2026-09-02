@@ -1,0 +1,97 @@
+name: Deploy gym.nygard.dev
+
+# Manual-only, matching the other two site workflows: deploy on demand from the
+# Actions tab ("Run workflow"). Auto-deploy on push/PR is intentionally off.
+on:
+  workflow_dispatch:
+
+# OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
+# Reuses the federated credential already scoped to this repo. id-token: write
+# is for azure/login only; like the run.nygard.dev workflow this one does not
+# hand an OIDC token to the deploy action (see the Build And Deploy step).
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Az CLI login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve target Static Web App
+        env:
+          SWA_NAME: ${{ vars.AZURE_SWA_NAME_GYM }}
+          SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP_GYM }}
+          SWA_RG_SHARED: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
+        run: |
+          # An unset repository variable expands to an empty string, which the
+          # Az CLI reports as a bare "expected one argument" usage error. Fail
+          # here instead, naming the variable that needs setting.
+          if [ -z "$SWA_NAME" ]; then
+            echo "::error::Repository variable AZURE_SWA_NAME_GYM is not set (Settings -> Secrets and variables -> Actions -> Variables). It must hold the Azure resource name of the gym.nygard.dev Static Web App."
+            exit 1
+          fi
+
+          # The resource group is usually shared with the other two apps, so
+          # fall back to AZURE_SWA_RESOURCE_GROUP when no _GYM override is set.
+          if [ -z "$SWA_RG" ]; then
+            SWA_RG="$SWA_RG_SHARED"
+          fi
+          if [ -z "$SWA_RG" ]; then
+            echo "::error::Neither AZURE_SWA_RESOURCE_GROUP_GYM nor AZURE_SWA_RESOURCE_GROUP is set."
+            exit 1
+          fi
+
+          echo "Deploying to Static Web App '$SWA_NAME' in resource group '$SWA_RG'"
+          echo "SWA_NAME=$SWA_NAME" >> "$GITHUB_ENV"
+          echo "SWA_RG=$SWA_RG" >> "$GITHUB_ENV"
+
+      - name: Retrieve Static Web Apps deployment token
+        run: |
+          # Fetch the deployment token just-in-time over the federated identity
+          # instead of storing it as a long-lived GitHub secret. The deploy
+          # identity needs a role on the Static Web App that grants
+          # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
+          TOKEN=$(az staticwebapp secrets list \
+            --name "$SWA_NAME" \
+            --resource-group "$SWA_RG" \
+            --query "properties.apiKey" \
+            --output tsv)
+          echo "::add-mask::$TOKEN"
+          echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      # The vendored MSAL bundle has to reach the app as a plain file. There is
+      # no build step to copy it: skip_app_build keeps the Oryx builder out of
+      # the way, so app_location is uploaded as-is and /vendor/ survives. A
+      # build step would look for a package.json, find none, and drop the
+      # directory — which surfaces as a 404 on the script and a page that
+      # reports "MSAL did not load".
+      #
+      # No github_id_token, for the same reason as the run.nygard.dev workflow:
+      # that path resolves the target app from the workflow filename Azure
+      # registered at provisioning time, and this app has no such registration.
+      # Requires the app's deployment authorization policy to be "Deployment
+      # token" (portal: Static Web App -> Settings -> Deployment configuration).
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "sites/gym"
+          api_location: ""
+          output_location: "."
+          skip_app_build: true
