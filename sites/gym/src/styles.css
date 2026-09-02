@@ -1,0 +1,688 @@
+/* Palette is lifted from sites/run so the two subdomains read as one
+   site. The chart slots are not copied — nothing here is charted. The
+   three JWT segment colours are the only addition, and they carry a
+   label as well as a hue: segment colour is decoration, the words
+   "header", "payload" and "signature" are the actual signal. */
+:root {
+    color-scheme: light;
+    --primary: #4361ee;
+    --primary-dark: #3a56d4;
+    --secondary: #7209b7;
+    --text: #2b2d42;
+    --light-text: #555;
+    --background: #f8f9fa;
+    --card-bg: #ffffff;
+    --code-bg: #f1f3f5;
+    --border: #e3e6ea;
+    /* These four are darker than the same-named tokens in sites/run,
+       and deliberately so. There, --success and --error tint a status
+       line that always ships an icon and a word alongside it, so the
+       hue is redundant. Here they are the whole of a pill that reads
+       "Expires in 12 minutes" or "Expired 2 hours ago" — text carrying
+       meaning on its own, which puts it under the 4.5:1 floor rather
+       than the 3:1 one. run's #38b000 measures 2.70:1 on this page's
+       background. Anything reassigned here must be re-checked against
+       all three light surfaces: #ffffff, #f8f9fa and #f1f3f5. */
+    --success: #2e7d32;
+    --error: #cc2936;
+    --warning: #b26a00;
+    --warning-bg: #fff8e6;
+    --muted: #6f6d67;
+
+    /* Segment colours for the raw JWT, measured on --code-bg. Colour
+       is the redundant channel here: the legend under each block names
+       the three segments in the same order, and the dots between them
+       mark the boundaries, so nothing depends on telling them apart. */
+    --jwt-header: #1f6f9c;
+    --jwt-payload: #a2381f;
+    --jwt-signature: #3f6b25;
+
+    --border-radius: 12px;
+    --transition: all 0.3s ease;
+    --shadow: 0 8px 30px rgba(0,0,0,0.05);
+    --shadow-hover: 0 10px 40px rgba(0,0,0,0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --primary: #4cc9f0;
+        --primary-dark: #4361ee;
+        --secondary: #f72585;
+        --text: #f8f9fa;
+        --light-text: #d9d9d9;
+        --background: #121212;
+        --card-bg: #1e1e1e;
+        --code-bg: #161616;
+        --border: #333;
+        --success: #52b788;
+        --error: #ff6b78;
+        --warning: #ffc75a;
+        --warning-bg: #2a2213;
+        --muted: #898781;
+        --jwt-header: #6fc0ec;
+        --jwt-payload: #f08a6e;
+        --jwt-signature: #8fd05f;
+        --shadow: 0 8px 30px rgba(0,0,0,0.2);
+        --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --primary: #4cc9f0;
+    --primary-dark: #4361ee;
+    --secondary: #f72585;
+    --text: #f8f9fa;
+    --light-text: #d9d9d9;
+    --background: #121212;
+    --card-bg: #1e1e1e;
+    --code-bg: #161616;
+    --border: #333;
+    --success: #52b788;
+    --error: #ff6b78;
+    --warning: #ffc75a;
+    --warning-bg: #2a2213;
+    --muted: #898781;
+    --jwt-header: #6fc0ec;
+    --jwt-payload: #f08a6e;
+    --jwt-signature: #8fd05f;
+    --shadow: 0 8px 30px rgba(0,0,0,0.2);
+    --shadow-hover: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--background);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    color: var(--text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    line-height: 1.6;
+    padding: 24px 20px 40px;
+}
+
+.page {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* The <svg> holding the <symbol> definitions. It is markup, not a
+   picture: it defines what <use> refers to and must never be painted.
+   This is a class rather than the inline style attribute the pre-React
+   page used, because a style attribute is what would force
+   'unsafe-inline' back into the CSP's style-src. */
+.sprite {display: none;}
+
+.icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    stroke-width: 0;
+    stroke: currentColor;
+    fill: currentColor;
+    font-size: 1.1rem;
+    flex: none;
+}
+
+code, pre, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+/* Header */
+.masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.underline {
+    display: block;
+    height: 4px;
+    width: 80px;
+    margin: 8px 0 10px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: 2px;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: var(--light-text);
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 18px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: inherit;
+    background-color: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+}
+
+/* Dark mode flips the primary button to a light fill, so its label has
+   to go dark to stay legible. The :not() is load-bearing: .secondary
+   is a transparent button that keeps `color: var(--text)`, and without
+   the exclusion this rule out-specifies it and paints dark text onto a
+   dark background. */
+:root[data-theme="dark"] .button:not(.secondary) {color: #10202a;}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .button:not(.secondary) {color: #10202a;}
+}
+
+.button:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.button:active {transform: translateY(0);}
+
+.button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    transform: none;
+    box-shadow: none;
+}
+
+.button.secondary {
+    background-color: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.button.secondary:hover {
+    background-color: var(--code-bg);
+    border-color: var(--primary);
+}
+
+.button:focus-visible,
+.theme-switch:focus-visible,
+.ghost:focus-visible,
+.tab:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 3px solid var(--secondary);
+    outline-offset: 3px;
+}
+
+.theme-switch {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 6px;
+    line-height: 0;
+    transition: var(--transition);
+}
+
+.theme-switch:hover {transform: rotate(30deg);}
+
+.ghost {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--light-text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.ghost:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+/* Cards */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+}
+
+.card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.card h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.hint {
+    font-size: 0.85rem;
+    color: var(--light-text);
+    margin-top: 10px;
+}
+
+.hint code {
+    background-color: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+}
+
+/* The page prints bearer tokens in full. That is the entire point of
+   it, and it is also the one thing a visitor should be told without
+   having to think about it. */
+.warning {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background-color: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: var(--border-radius);
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 0.88rem;
+    color: var(--text);
+}
+
+.warning .icon {color: var(--warning); margin-top: 3px;}
+
+.status {
+    font-size: 0.9rem;
+    min-height: 24px;
+    margin-bottom: 14px;
+}
+
+.status.error {color: var(--error);}
+.status.success {color: var(--success);}
+.status.working {color: var(--light-text);}
+
+/* An auth failure explains itself in place, the way the run
+   dashboard's load error does: the AADSTS code is the only part worth
+   searching for, so it is shown on its own line rather than buried in
+   the sentence. There is no `display: none` here and no `.visible`
+   class: the panel is in the DOM only while there is an error, so its
+   presence and its visibility cannot disagree. */
+.auth-error {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--error);
+    border-radius: var(--border-radius);
+    padding: 18px 22px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+}
+
+.auth-error h2 {font-size: 1.05rem; margin-bottom: 8px;}
+
+.auth-error dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 14px;
+    font-size: 0.86rem;
+    margin-bottom: 10px;
+}
+
+.auth-error dt {color: var(--light-text); font-weight: 600;}
+.auth-error dd {overflow-wrap: anywhere;}
+.auth-error .fix {font-size: 0.88rem; color: var(--light-text);}
+.auth-error .fix strong {color: var(--text);}
+
+/* Settings */
+details.settings {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+}
+
+details.settings > summary {
+    cursor: pointer;
+    padding: 16px 24px;
+    font-weight: 700;
+    font-size: 1rem;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+details.settings > summary::-webkit-details-marker {display: none;}
+
+details.settings > summary::after {
+    content: "▾";
+    color: var(--light-text);
+    transition: var(--transition);
+}
+
+details.settings[open] > summary::after {transform: rotate(180deg);}
+details.settings > summary .summary-note {
+    font-weight: 400;
+    font-size: 0.82rem;
+    color: var(--light-text);
+    margin-left: auto;
+    overflow-wrap: anywhere;
+}
+
+.settings-body {
+    padding: 0 24px 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+}
+
+.field {margin-bottom: 14px;}
+
+.field label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--light-text);
+    margin-bottom: 5px;
+}
+
+.field-note {
+    font-size: 0.8rem;
+    color: var(--light-text);
+    margin-top: 4px;
+}
+
+input[type="text"], select {
+    width: 100%;
+    padding: 9px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.86rem;
+    color: var(--text);
+    background-color: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+select {font-family: inherit;}
+input[readonly] {color: var(--light-text);}
+
+.field-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.field-row input {flex: 1; min-width: 0;}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0 20px;
+}
+
+/* Account */
+.account-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.fact-label {
+    font-size: 0.74rem;
+    color: var(--light-text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.fact-value {
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.fact-value.plain {font-family: inherit;}
+
+/* Tokens */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--light-text);
+    white-space: nowrap;
+}
+
+.pill.valid {color: var(--success); border-color: currentColor;}
+.pill.expired {color: var(--error); border-color: currentColor;}
+
+pre.jwt {
+    background-color: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 210px;
+    overflow-y: auto;
+}
+
+.seg-h {color: var(--jwt-header);}
+.seg-p {color: var(--jwt-payload);}
+.seg-s {color: var(--jwt-signature);}
+.seg-dot {color: var(--muted);}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 0.76rem;
+    color: var(--light-text);
+    margin-top: 8px;
+}
+
+.legend span::before {
+    content: "■ ";
+    font-size: 0.9em;
+}
+
+.legend .l-h::before {color: var(--jwt-header);}
+.legend .l-p::before {color: var(--jwt-payload);}
+.legend .l-s::before {color: var(--jwt-signature);}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin: 18px 0 0;
+    flex-wrap: wrap;
+}
+
+.tab {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--light-text);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tab:hover {color: var(--text);}
+
+.tab[aria-selected="true"] {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tabpanel {padding-top: 14px;}
+.tabpanel[hidden] {display: none;}
+
+pre.json {
+    background-color: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.table-wrap {overflow-x: auto;}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+thead th {
+    color: var(--light-text);
+    font-weight: 600;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+tbody tr:last-child td {border-bottom: none;}
+
+td.claim-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+td.claim-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    overflow-wrap: anywhere;
+    min-width: 180px;
+}
+
+td.claim-about {color: var(--light-text); min-width: 200px;}
+.claim-extra {color: var(--light-text); font-family: inherit;}
+
+.empty {
+    color: var(--light-text);
+    font-size: 0.88rem;
+    font-style: italic;
+}
+
+.stack {display: flex; flex-direction: column; gap: 4px;}
+
+.footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 16px;
+    margin-top: 32px;
+    font-size: 0.8rem;
+    color: var(--light-text);
+}
+
+.footer a {
+    color: var(--light-text);
+    text-decoration: none;
+    opacity: 0.8;
+    transition: var(--transition);
+    overflow-wrap: anywhere;
+}
+
+.footer a:hover {color: var(--primary); opacity: 1;}
+
+.spinner {
+    display: none;
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(255,255,255,.35);
+    border-radius: 50%;
+    border-top-color: currentColor;
+    animation: spin 1s ease-in-out infinite;
+}
+
+.button.loading .spinner {display: inline-block;}
+.button.loading .icon {display: none;}
+
+@keyframes spin {to {transform: rotate(360deg);}}
+
+[hidden] {display: none !important;}
+
+@media (max-width: 600px) {
+    body {padding: 20px 14px 32px;}
+    .card, .settings-body {padding-left: 16px; padding-right: 16px;}
+    details.settings > summary {padding-left: 16px; padding-right: 16px;}
+    h1 {font-size: 1.9rem;}
+    .masthead {align-items: flex-start;}
+    .auth-error dl {grid-template-columns: 1fr;}
+    .auth-error dt {margin-top: 6px;}
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, .spinner {
+        animation: none !important;
+        transition: none !important;
+    }
+}

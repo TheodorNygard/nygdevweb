@@ -23,6 +23,32 @@ jobs:
           submodules: true
           lfs: false
 
+      # The site is a Vite build now, so the artifact that gets uploaded is
+      # produced here rather than being the checked-in files. Node 22 is what
+      # Vite 8 asks for (^20.19 || >=22.12); pinning it here rather than
+      # relying on the runner's default keeps a runner image bump from
+      # silently changing the toolchain the bundle is built with.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sites/gym/package-lock.json
+
+      # `npm ci` rather than `npm install`: it installs exactly what the
+      # lockfile pins and fails if package.json and the lockfile disagree,
+      # which is the property that makes a deploy reproducible.
+      - name: Install dependencies
+        working-directory: sites/gym
+        run: npm ci
+
+      # Type errors fail the build here rather than reaching the browser as a
+      # runtime surprise. `npm run build` runs tsc before vite, so this is the
+      # gate as well as the bundle.
+      - name: Build
+        working-directory: sites/gym
+        run: npm run build
+
       - name: Az CLI login (OIDC)
         uses: azure/login@v3
         with:
@@ -72,12 +98,12 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
-      # The vendored MSAL bundle has to reach the app as a plain file. There is
-      # no build step to copy it: skip_app_build keeps the Oryx builder out of
-      # the way, so app_location is uploaded as-is and /vendor/ survives. A
-      # build step would look for a package.json, find none, and drop the
-      # directory — which surfaces as a 404 on the script and a page that
-      # reports "MSAL did not load".
+      # The build already ran, above, on a Node version this repo chose. Azure's
+      # Oryx builder is kept out of the way with skip_app_build so that
+      # app_location is uploaded exactly as built: sites/gym/dist, which
+      # already contains index.html, the hashed assets, the favicons, the
+      # first-party 404 page and staticwebapp.config.json. Letting Oryx build
+      # instead would mean a second, unpinned toolchain deciding what ships.
       #
       # No github_id_token, for the same reason as the run.nygard.dev workflow:
       # that path resolves the target app from the workflow filename Azure
@@ -91,7 +117,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "sites/gym"
+          app_location: "sites/gym/dist"
           api_location: ""
           output_location: "."
           skip_app_build: true

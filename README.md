@@ -1,16 +1,20 @@
 # nygdevweb
 
 Source for three static sites, each deployed to its own Azure Static Web App on
-the free tier. No framework and no build step — HTML with styles and SVG icons
-inlined, one script each, some favicons. One vendored dependency, in
-`sites/gym/vendor/`, and it is there because a CDN cannot be used rather than
-because a bundler wanted it.
+the free tier.
+
+Two of them — nygdev.dev and run.nygard.dev — have no framework and no build
+step: HTML with styles and SVG icons inlined, one script each, some favicons.
+gym.nygard.dev is a React + TypeScript app built with Vite, because its one
+dependency (MSAL) is large enough that bundling it beats vendoring it by hand.
+All three still ship as plain static files; only one of them has a step that
+produces those files.
 
 | Site | Folder | What it is |
 | --- | --- | --- |
 | [nygdev.dev](https://nygdev.dev) | `sites/nygdev/` | One-page personal site: profile links, a link to my LikeC4 architecture diagram, and a live status button for my self-hosted Foundry VTT server that can start the server when it's down |
 | [run.nygard.dev](https://run.nygard.dev) | `sites/run/` | Marathon prep dashboard: reads a precomputed JSON feed from public blob storage and charts training load, weekly volume, pace by run type and the easy/hard intensity split |
-| [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog's front end. Today it is a token inspector: signs in with MSAL against Entra ID and prints the resulting tokens decoded, the way jwt.ms does for one you paste in |
+| [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog's front end, a React + Vite + TypeScript app. Today it is a token inspector: signs in with MSAL against Entra ID and prints the resulting tokens decoded, the way jwt.ms does for one you paste in |
 
 All three sites live in one repo because the deploy identity is federated to
 this repo — a second repo would need its own federated credential subjects. A
@@ -20,7 +24,9 @@ routing, so three subdomains with different content need three SWA resources.
 Each site folder is self-contained and holds its own
 `staticwebapp.config.json` (security headers: CSP, HSTS, frame options,
 referrer policy, cross-origin isolation). SWA serves `app_location` as the site
-root, so a site's public paths match its folder contents.
+root, so a site's public paths match its folder contents — for `sites/gym/`
+that root is `dist/`, and the config file lives in `public/` so the build
+copies it there.
 
 ## Deployment
 
@@ -31,7 +37,7 @@ on push and PR is intentionally off.
 | --- | --- | --- | --- |
 | `.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml` | nygdev.dev | `sites/nygdev` | GitHub OIDC |
 | `.github/workflows/deploy-run.yml` | run.nygard.dev | `sites/run` | deployment token |
-| `.github/workflows/deploy-gym.yml` | gym.nygard.dev | `sites/gym` | deployment token |
+| `.github/workflows/deploy-gym.yml` | gym.nygard.dev | `sites/gym/dist` | deployment token |
 
 **The nygdev.dev workflow file must keep its generated name.** That app's
 deployment authorization policy is "GitHub", so the content server identifies
@@ -230,20 +236,75 @@ that needs the API registration, and it is separate for that reason — a broken
 scope produces an error next to a working sign-in rather than one failure that
 could be either.
 
-### MSAL is vendored, not loaded from a CDN
+### The build, and working on it locally
 
-`script-src 'self'` blocks a CDN `<script>` outright, so
-`@azure/msal-browser` is committed at `sites/gym/vendor/`. Loosening the policy
-to admit a CDN would mean trusting a third-party origin with script execution
-on the one page in this repo that handles access tokens, which is the worst
-page to make that trade on. `sites/gym/vendor/README.md` carries the version,
-the digest and the command that reproduces it.
+React 19, TypeScript 7 and Vite 8, with `@azure/msal-browser` 5 as the only
+runtime dependency. `package.json` is the record of what is pinned; the majors
+are named here because each decides something that shows up elsewhere in this
+repo: React 19 for the hooks the app is written in, TypeScript 7 for the strict
+options the port leaned on, Vite 8 for the Node version the deploy workflow
+pins.
 
-The UMD build is deliberate: it defines a `msal` global and needs no bundler,
-so the repo keeps its no-build-step property. That property is also why
-`skip_app_build: true` matters in the deploy workflow — an Oryx build step
-would look for a `package.json`, find none, and drop `/vendor/`, which reaches
-the browser as *"MSAL did not load"*.
+Everything is in `sites/gym/`:
+
+```sh
+cd sites/gym
+npm ci            # exactly what package-lock.json pins
+npm run dev       # Vite dev server on http://localhost:5173
+npm run typecheck # tsc alone, without producing a bundle
+npm run build     # tsc --build, then vite build, into dist/
+npm run preview   # serve the built dist/ over HTTP
+```
+
+| Path | What it holds |
+| --- | --- |
+| `index.html` | The shell. One `<div id="root">` and the module script Vite rewrites at build time |
+| `src/lib/` | No React: config storage, JWT decoding, the claim reference table, formatting, the AADSTS error map |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useTheme`, `useNow` |
+| `src/components/` | The cards, tabs, tables and the SVG sprite |
+| `public/` | Copied to the deployed root untouched: favicons, `404.html` and its stylesheet, and `staticwebapp.config.json` |
+| `dist/` | Build output. Gitignored; produced in CI and uploaded as-is |
+
+`npm run build` runs `tsc --build` before Vite, so a type error fails the
+deploy rather than reaching the browser. The compiler options are strict, and
+deliberately include `noUncheckedIndexedAccess` and
+`exactOptionalPropertyTypes` — both of them caught real things during the port,
+the second because MSAL's request types will not accept an explicit
+`account: undefined` where the pre-TypeScript code passed a possibly-null one.
+
+**Neither `npm run dev` nor `npm run preview` carries the CSP.** Those headers
+come from `staticwebapp.config.json`, and only Azure reads that file — Vite
+serves `dist/` without them, and the dev server additionally injects inline
+scripts for hot reload that the policy would reject. Checking a change against
+the real policy means serving `dist/` with those headers attached, which is
+what the deployed site does and what a local check has to imitate.
+
+### MSAL is bundled, not loaded from a CDN
+
+`script-src 'self'` blocks a CDN `<script>` outright, so `@azure/msal-browser`
+has to be served same-origin. Before the React rewrite that meant committing
+the UMD build under `sites/gym/vendor/` and keeping its version and digest in a
+table by hand. It now comes from npm, pinned by `package-lock.json`, and Vite
+emits it inside the same hashed, same-origin bundle as the rest of the app.
+
+That is the same security property arrived at with less ceremony: the lockfile
+is the record the vendor README used to be, `npm ci` is what checks it, and
+there is no hand-maintained digest to go stale. Loosening the policy to admit
+a CDN is still the thing not to do — it would mean trusting a third-party
+origin with script execution on the one page in this repo that handles access
+tokens, which is the worst page to make that trade on.
+
+`skip_app_build: true` stays in the deploy workflow, and now matters for a
+different reason. The workflow builds on a Node version it pins, then uploads
+`sites/gym/dist` exactly as built; letting Azure's Oryx builder run instead
+would put a second, unpinned toolchain in charge of what ships.
+
+Read the upstream changelog before bumping MSAL's major. Its breaking changes
+are usually in the configuration object — v5 moved `navigateToLoginRequestUrl`
+out of the config and onto `handleRedirectPromise`, and dropped
+`storeAuthStateInCookie` entirely. Under TypeScript those surface as build
+errors, which is a real improvement on the pre-build behaviour, where the same
+change was a silently ignored property and a sign-in that failed at runtime.
 
 ### Where this site's CSP differs from the other two
 
@@ -254,6 +315,14 @@ Three deltas, all of them forced by the sign-in:
 | `connect-src` | `login.microsoftonline.com` | the blob endpoint | Where MSAL fetches OIDC metadata and redeems the code for tokens. |
 | `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
 | `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup, which is exactly what MSAL's popup flow polls. Redirect is the default here and is unaffected; this is what keeps the popup option from being a trap. |
+
+`style-src` is also different, and that one is not forced by anything — it is
+plain `'self'` here, where the other two sites need `'unsafe-inline'` for their
+inlined `<style>` block. Vite emits the stylesheet as a hashed same-origin
+file, so nothing on this site needs inline styles: the SVG sprite is hidden by
+a class rather than a `style` attribute, and `404.html` links `404.css` instead
+of carrying its own `<style>`. MSAL's hidden renewal iframe is unaffected — it
+sets `element.style.visibility` through the CSSOM, which CSP does not govern.
 
 `Cross-Origin-Embedder-Policy` is **omitted** here, where the other two sites
 set `credentialless`. It buys this page nothing — there is no
@@ -266,7 +335,7 @@ that only breaks a working path is not a security control.
 
 The page pulls the `AADSTS` code out of the error and shows it on its own line,
 with the fix for the ones that mean something specific about this setup. The
-`ERROR_FIXES` table in `main.js` is that list; the codes worth knowing on sight
+`ERROR_FIXES` table in `src/lib/errors.ts` is that list; the codes worth knowing on sight
 are `AADSTS50011` (redirect URI not registered), `AADSTS9002326` (registered
 under Web instead of SPA) and `AADSTS650053` (the scope is not what the API
 registration exposes).
@@ -283,15 +352,24 @@ and both are deliberate:
 - MSAL's logger is **silenced**. Its verbose levels print tokens, and a token
   in a console someone screen-shares is a token leaked to everyone watching.
 
-Claim values reach the DOM through `textContent`, never `innerHTML`. A JWT is
-attacker-influenced input — anyone can sign in, and a display name is
-whatever its owner set it to — so it is rendered as data, not markup.
+Claim values reach the DOM as JSX text, which React escapes — never through
+`dangerouslySetInnerHTML`, which is not used anywhere in this app. A JWT is
+attacker-influenced input — anyone can sign in, and a display name is whatever
+its owner set it to — so it is rendered as data, not markup. That was
+`textContent` before the rewrite and is the same property by a different
+mechanism.
+
+Stored configuration is treated the same way. `localStorage` holds whatever a
+previous version of the page or a typo in devtools left there, so `loadConfig`
+takes each field only when it is the type the rest of the code assumes and
+falls back to the default otherwise.
 
 ## Inline scripts and the CSP
 
-No site here has ever had an inline `<script>`. Each loads its `main.js` from
-its own origin, and gym.nygard.dev additionally loads its vendored MSAL bundle
-from the same origin — which is all `script-src 'self'` needs. A browser
+No site here has ever had an inline `<script>`. nygdev.dev and run.nygard.dev
+each load their `main.js` from their own origin; gym.nygard.dev loads one
+hashed module bundle, with MSAL inside it, from its own origin. Either way that
+is all `script-src 'self'` needs. A browser
 reporting an inline script blocked on one of these pages, with a hash to add, is
 reporting
 something that is not served from here — almost always an extension injecting
@@ -306,4 +384,6 @@ which comes from Microsoft's edge without the headers in
 `404.html`, wired up through `responseOverrides`, so 404s are first-party and
 carry the same policy as the rest of the site. Those pages are deliberately
 script-free — the theme follows the OS instead of a toggle — so there is
-nothing on them for the policy to have an opinion about.
+nothing on them for the policy to have an opinion about. gym.nygard.dev's also
+links its stylesheet instead of inlining it, which is what lets that site's
+`style-src` be plain `'self'`.

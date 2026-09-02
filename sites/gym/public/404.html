@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Not found</title>
+    <meta name="description" content="No such page on gym.nygard.dev.">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="theme-color" content="#f8f9fa">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- This page exists to keep Azure's stock 404 off the domain: that one is
+         served from Microsoft's edge, carries an inline script and none of
+         the security headers in staticwebapp.config.json. Deliberately
+         script-free — the theme follows the OS instead of a toggle, so there
+         is nothing here for `script-src 'self'` to have an opinion about.
+
+         The styles are a same-origin file rather than an inline <style> block
+         for the matching reason: it is what lets `style-src` be plain 'self',
+         with no 'unsafe-inline' anywhere in the policy. -->
+    <link rel="stylesheet" href="/404.css">
+</head>
+<body>
+    <div class="container">
+        <h1>404</h1>
+        <div class="underline"></div>
+        <p>There is nothing at this address.</p>
+        <a class="home" href="/">Back to the token inspector</a>
+    </div>
+</body>
+</html>
