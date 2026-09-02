@@ -1,0 +1,29 @@
+{
+  "name": "gym-nygard-dev",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "gym.nygard.dev — Entra ID token inspector",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --build && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --build --force"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^5.20.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}
