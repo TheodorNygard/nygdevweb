@@ -1,18 +1,21 @@
 # nygdevweb
 
-Source for two static sites, each deployed to its own Azure Static Web App on
-the free tier. No framework, no build step, no dependencies — HTML with styles
-and SVG icons inlined, one script each, some favicons.
+Source for three static sites, each deployed to its own Azure Static Web App on
+the free tier. No framework and no build step — HTML with styles and SVG icons
+inlined, one script each, some favicons. One vendored dependency, in
+`sites/gym/vendor/`, and it is there because a CDN cannot be used rather than
+because a bundler wanted it.
 
 | Site | Folder | What it is |
 | --- | --- | --- |
 | [nygdev.dev](https://nygdev.dev) | `sites/nygdev/` | One-page personal site: profile links, a link to my LikeC4 architecture diagram, and a live status button for my self-hosted Foundry VTT server that can start the server when it's down |
 | [run.nygard.dev](https://run.nygard.dev) | `sites/run/` | Marathon prep dashboard: reads a precomputed JSON feed from public blob storage and charts training load, weekly volume, pace by run type and the easy/hard intensity split |
+| [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog's front end. Today it is a token inspector: signs in with MSAL against Entra ID and prints the resulting tokens decoded, the way jwt.ms does for one you paste in |
 
-Both sites live in one repo because the deploy identity is federated to this
-repo — a second repo would need its own federated credential subjects. A Static
-Web App has one content root and routes on path only, with no host-based
-routing, so two subdomains with different content need two SWA resources.
+All three sites live in one repo because the deploy identity is federated to
+this repo — a second repo would need its own federated credential subjects. A
+Static Web App has one content root and routes on path only, with no host-based
+routing, so three subdomains with different content need three SWA resources.
 
 Each site folder is self-contained and holds its own
 `staticwebapp.config.json` (security headers: CSP, HSTS, frame options,
@@ -28,6 +31,7 @@ on push and PR is intentionally off.
 | --- | --- | --- | --- |
 | `.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml` | nygdev.dev | `sites/nygdev` | GitHub OIDC |
 | `.github/workflows/deploy-run.yml` | run.nygard.dev | `sites/run` | deployment token |
+| `.github/workflows/deploy-gym.yml` | gym.nygard.dev | `sites/gym` | deployment token |
 
 **The nygdev.dev workflow file must keep its generated name.** That app's
 deployment authorization policy is "GitHub", so the content server identifies
@@ -36,8 +40,9 @@ at provisioning time (portal: Overview → "Edit workflow"). Renaming the file
 breaks deploys with *"Could not determine the Static Web App from the GitHub
 OIDC workflow reference"*. The `name:` inside the file is free to change.
 
-run.nygard.dev has no such constraint because it authorizes with the deployment
-token instead, which is why its file can be named for what it deploys. That
+run.nygard.dev and gym.nygard.dev have no such constraint because they
+authorize with the deployment token instead, which is why their files can be
+named for what they deploy. That
 requires its deployment authorization policy to be **Deployment token** (portal:
 Settings → Deployment configuration). Both approaches still keep the token out
 of GitHub — it is fetched at runtime over the federated identity either way.
@@ -51,9 +56,11 @@ resource-name variables:
 | Variable | Used by | Required |
 | --- | --- | --- |
 | `AZURE_SWA_NAME` | nygdev.dev | yes |
-| `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev, and run.nygard.dev when no `_RUN` override is set | yes |
+| `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev, and the other two when no `_RUN`/`_GYM` override is set | yes |
 | `AZURE_SWA_NAME_RUN` | run.nygard.dev | yes |
-| `AZURE_SWA_RESOURCE_GROUP_RUN` | run.nygard.dev | only if the two apps are in different resource groups |
+| `AZURE_SWA_RESOURCE_GROUP_RUN` | run.nygard.dev | only if it sits in a different resource group |
+| `AZURE_SWA_NAME_GYM` | gym.nygard.dev | yes |
+| `AZURE_SWA_RESOURCE_GROUP_GYM` | gym.nygard.dev | only if it sits in a different resource group |
 
 An unset variable expands to an empty string, which the Az CLI reports as a bare
 `expected one argument` usage error. Both workflows check first and fail naming
@@ -149,11 +156,144 @@ Two conventions in `sites/run/` are load-bearing rather than cosmetic:
 Every chart ships a table view, and every mark answers to keyboard focus with
 the same readout it gives on hover.
 
+## gym.nygard.dev and the token inspector
+
+The page signs in against Entra ID with MSAL and prints what comes back: the
+ID token always, and an access token for whatever resource scope you ask it
+for. Each is shown raw, split into its three segments, then decoded into a
+claims table with the timestamps resolved and a one-line note on what each
+claim is for. It is jwt.ms with the sign-in attached, so the request that
+produced a token is visible next to the token.
+
+There is no backend. Nothing is sent anywhere except to Entra ID, and the CSP
+is what makes that checkable rather than a promise — `connect-src` names
+exactly one origin, so an exfiltration path would have to change a file in this
+repo to exist at all.
+
+### Two registrations, and which is which
+
+This is the thing to get straight before touching the portal, because the same
+GUID means different things in different fields.
+
+| | Front end (this page) | API (`func-nygdev-api`) |
+| --- | --- | --- |
+| Registration | **GymLog**, `f6922f08-…` | its own, separate |
+| Platform | Single-page application | — |
+| Role in the token | `appid` / `azp` — who *obtained* it | `aud` — who it is *for* |
+| Secret | none, and must not have one | — |
+
+The front end signs in **as** GymLog and asks for a scope **on** the API
+registration. That is what makes the resulting access token satisfy both halves
+of the Easy Auth check on the function app: `allowed_audiences` matches the API
+registration, and `allowed_applications` matches GymLog.
+
+> **The terraform in NygDevAzure does not describe this split yet.**
+> `terraform/consumption.tf` currently points `client_id` and
+> `allowed_audiences` at `var.gymlog_client_id`, from when GymLog was going to
+> be both halves. Once the API registration exists, those two need to name it
+> instead — `allowed_applications` is the one field that stays as it is, since
+> GymLog really is the calling client. Until that change is applied, a token
+> minted for the new API registration is rejected by the function app with a
+> 401, and the inspector will happily show you the perfectly valid token that
+> is being rejected.
+
+### Portal setup
+
+Neither registration is managed by terraform — granting the apply workflow's
+identity Microsoft Graph application permissions is a far wider grant than a
+couple of app registrations is worth — so this is a manual checklist.
+
+On **GymLog**, once:
+
+1. **Authentication → Add a platform → Single-page application.**
+2. Redirect URI: the exact string the Configuration panel on the page shows.
+   Copy it from there rather than typing it — Entra matches it as a string, and
+   a trailing slash that disagrees is `AADSTS50011`.
+3. Leave it with no client secret. The SPA platform means authorization code
+   with PKCE, and a SPA that sends a secret is a SPA that has leaked one.
+
+The SPA platform is the load-bearing choice. Registering the same URI under
+**Web** instead looks identical in the portal and fails at sign-in with
+`AADSTS9002326`, because a Web redirect URI makes Entra treat the caller as a
+confidential client and demand the secret a browser cannot keep.
+
+On the **API registration**: expose a scope under **Expose an API**, and put
+`api://<api-client-id>/<scope-name>` in the resource-scope box on the page.
+Both halves have to match what the blade says.
+
+### Signing in without a scope
+
+The page works before any of the API side exists. Sign in with the default
+scopes and you get an ID token, which is enough to confirm the registration,
+the redirect URI and the tenant are right. The resource-scope box is the part
+that needs the API registration, and it is separate for that reason — a broken
+scope produces an error next to a working sign-in rather than one failure that
+could be either.
+
+### MSAL is vendored, not loaded from a CDN
+
+`script-src 'self'` blocks a CDN `<script>` outright, so
+`@azure/msal-browser` is committed at `sites/gym/vendor/`. Loosening the policy
+to admit a CDN would mean trusting a third-party origin with script execution
+on the one page in this repo that handles access tokens, which is the worst
+page to make that trade on. `sites/gym/vendor/README.md` carries the version,
+the digest and the command that reproduces it.
+
+The UMD build is deliberate: it defines a `msal` global and needs no bundler,
+so the repo keeps its no-build-step property. That property is also why
+`skip_app_build: true` matters in the deploy workflow — an Oryx build step
+would look for a `package.json`, find none, and drop `/vendor/`, which reaches
+the browser as *"MSAL did not load"*.
+
+### Where this site's CSP differs from the other two
+
+Three deltas, all of them forced by the sign-in:
+
+| Header | Here | Elsewhere | Why |
+| --- | --- | --- | --- |
+| `connect-src` | `login.microsoftonline.com` | the blob endpoint | Where MSAL fetches OIDC metadata and redeems the code for tokens. |
+| `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
+| `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup, which is exactly what MSAL's popup flow polls. Redirect is the default here and is unaffected; this is what keeps the popup option from being a trap. |
+
+`Cross-Origin-Embedder-Policy` is **omitted** here, where the other two sites
+set `credentialless`. It buys this page nothing — there is no
+`SharedArrayBuffer` and no cross-origin isolation to earn — and it costs
+something real: `credentialless` strips cookies from the sign-in iframe, so
+silent renewal fails on a session that would otherwise have worked. A header
+that only breaks a working path is not a security control.
+
+### When sign-in fails
+
+The page pulls the `AADSTS` code out of the error and shows it on its own line,
+with the fix for the ones that mean something specific about this setup. The
+`ERROR_FIXES` table in `main.js` is that list; the codes worth knowing on sight
+are `AADSTS50011` (redirect URI not registered), `AADSTS9002326` (registered
+under Web instead of SPA) and `AADSTS650053` (the scope is not what the API
+registration exposes).
+
+### Tokens on screen
+
+The page prints live credentials, which is its job and also its main hazard. A
+token shown here can be replayed by anyone who reads it until it expires, so a
+screenshot of this page is a password. Two things keep the blast radius small
+and both are deliberate:
+
+- MSAL caches in **`sessionStorage`**, not `localStorage`. Tokens die with the
+  tab rather than sitting on disk after the window is closed.
+- MSAL's logger is **silenced**. Its verbose levels print tokens, and a token
+  in a console someone screen-shares is a token leaked to everyone watching.
+
+Claim values reach the DOM through `textContent`, never `innerHTML`. A JWT is
+attacker-influenced input — anyone can sign in, and a display name is
+whatever its owner set it to — so it is rendered as data, not markup.
+
 ## Inline scripts and the CSP
 
-Neither site has ever had an inline `<script>`; each loads one `main.js` from
-its own origin, which is all `script-src 'self'` needs. A browser reporting an
-inline script blocked on one of these pages, with a hash to add, is reporting
+No site here has ever had an inline `<script>`. Each loads its `main.js` from
+its own origin, and gym.nygard.dev additionally loads its vendored MSAL bundle
+from the same origin — which is all `script-src 'self'` needs. A browser
+reporting an inline script blocked on one of these pages, with a hash to add, is
+reporting
 something that is not served from here — almost always an extension injecting
 into the page. Reproduce in a clean profile (Firefox: Help → Troubleshoot Mode)
 before touching the policy. Never paste a suggested hash into the CSP without
@@ -162,6 +302,8 @@ code produces it.
 
 The one inline script Azure did serve on these domains was its stock 404 page,
 which comes from Microsoft's edge without the headers in
-`staticwebapp.config.json`. `sites/run/` now ships its own `404.html`, wired up
-through `responseOverrides`, so 404s are first-party and carry the same
-policy as the rest of the site.
+`staticwebapp.config.json`. `sites/run/` and `sites/gym/` now ship their own
+`404.html`, wired up through `responseOverrides`, so 404s are first-party and
+carry the same policy as the rest of the site. Those pages are deliberately
+script-free — the theme follows the OS instead of a toggle — so there is
+nothing on them for the policy to have an opinion about.
