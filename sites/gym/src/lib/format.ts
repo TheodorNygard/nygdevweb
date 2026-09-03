@@ -39,6 +39,15 @@ export function rpeNote(value: number): string {
 }
 
 /**
+ * A week's intensity target in words — "2 reps in the tank", and the singular
+ * at one. The same idea the RPE notes above are written in, which is the point:
+ * the target and the slider under it should read as the same sentence.
+ */
+export function tankLabel(tank: number): string {
+    return `${tank} rep${tank === 1 ? '' : 's'} in the tank`;
+}
+
+/**
  * Today as `YYYY-MM-DD` in the phone's timezone — the one field the API cannot
  * derive. Built from the local parts rather than `toISOString()`, which
  * converts to UTC and would file a 21:00 Oslo session under tomorrow.

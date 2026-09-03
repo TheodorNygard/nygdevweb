@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { DayPlanSheet } from '../components/DayPlanSheet';
 import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
-import { draftIn, sessionsFor } from '../lib/block';
+import { draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
 import type {
     CurrentBlock,
     DayInput,
@@ -54,8 +54,7 @@ function samePlan(a: DayInput, b: DayInput): boolean {
 
             return other !== undefined
                 && exercise.exerciseName === other.exerciseName
-                && exercise.sets === other.sets
-                && exercise.reps === other.reps;
+                && exercise.sets === other.sets;
         });
 }
 
@@ -166,6 +165,12 @@ export function PlanScreen({
 
         return {
             week,
+
+            // Read off the *draft's* length too, so stepping weeks up or down
+            // moves the whole ramp with it — the last row is always the rest
+            // week, whatever the block is being resized to.
+            rest: isRestWeek(week, draft.weeks),
+            tank: repsInTank(week, draft.weeks),
             cells: draft.days.map((_, dayIndex) => {
                 const cell = sessionsFor(block.sessions, week, dayIndex);
                 const submitted = cell.some((session) => session.status === 'submitted');
@@ -185,8 +190,8 @@ export function PlanScreen({
         <div className="screen">
             <h1 className="title">Mesocycle</h1>
             <p className="lede">
-                3–8 weeks, 2–6 workouts per week. Changing the plan never touches sessions you have
-                already logged.
+                3–8 weeks, 2–6 workouts per week — the last of them a rest week. Changing the plan
+                never touches sessions you have already logged.
             </p>
 
             <section className="panel">
@@ -258,6 +263,13 @@ export function PlanScreen({
                                 />
                             ))}
                         </span>
+                        {/* The ramp, which is the only thing that distinguishes one
+                            week of the block from another now that days are shared. */}
+                        <span
+                            className={row.rest ? 'map__tank map__tank--rest' : 'map__tank'}
+                        >
+                            {row.rest ? 'REST' : `${row.tank} LEFT`}
+                        </span>
                     </div>
                 ))}
                 <div className="map__key">
@@ -265,6 +277,10 @@ export function PlanScreen({
                     <span>▨ in progress</span>
                     <span>□ planned</span>
                 </div>
+                <p className="map__note">
+                    The number is reps left in the tank: how much you should have in reserve when
+                    a set ends. It tightens week by week and resets in the rest week.
+                </p>
             </div>
 
             <div className="stack-22">

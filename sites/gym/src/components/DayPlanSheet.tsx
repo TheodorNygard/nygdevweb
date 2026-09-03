@@ -7,12 +7,11 @@ import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise } from '../lib/types';
 
 /** What a newly planned exercise prescribes before it is adjusted. */
-const OPENING = { sets: 3, reps: 8 };
+const OPENING = { sets: 3 };
 
 /** The API's bounds, so the editor cannot compose a plan the API refuses. */
 const MAX_PLANNED = 20;
 const MAX_SETS = 60;
-const MAX_REPS = 200;
 
 interface DayPlanSheetProps {
     label: string;
@@ -24,16 +23,18 @@ interface DayPlanSheetProps {
 }
 
 /**
- * What a day prescribes: which exercises, and how many sets of how many reps.
+ * What a day prescribes: which exercises, and how many sets of each.
  *
  * Editing is local to the Plan tab's draft — nothing writes until Save. That
  * matters more than usual here, because `days` is replaced wholesale by the
- * PATCH: a write per stepper tap would be a write per rep.
+ * PATCH: a write per stepper tap would be a write per tap on a number.
  *
- * No target weight, by design: a programme prescribes volume, the session
- * discovers the weight. The plan is not a contract either — it seeds a
- * session's exercises and shows a target; nothing stops you logging four sets
- * against a three-set plan.
+ * No target weight and no target reps, by design: a programme prescribes how
+ * much work, the session discovers the rest. How hard each set should be is the
+ * week's business rather than the plan's — the logger reads a reps-in-the-tank
+ * target off the position in the block. The plan is not a contract either: it
+ * seeds a session's exercises and shows a target, and nothing stops you logging
+ * four sets against a three-set plan.
  */
 export function DayPlanSheet({
     label,
@@ -69,13 +70,14 @@ export function DayPlanSheet({
                 <div className="sheet__eyebrow">PLAN · DAY {dayIndex + 1}</div>
                 <div className="sheet__title">{label}</div>
                 <p className="day__sub" style={{ marginTop: 8 }}>
-                    Applies to {label} in every week of this block.
+                    Applies to {label} in every week of this block. Sets only — how hard each one
+                    should be comes from the week you are in.
                 </p>
 
                 {plan.length === 0 ? (
                     <p className="empty">
                         Nothing planned. Add exercises and this day starts with them already on
-                        it — you still log what you actually lift.
+                        it — you still log what you actually lift, for as many reps as it takes.
                     </p>
                 ) : (
                     <div className="planned">
@@ -97,7 +99,10 @@ export function DayPlanSheet({
                                         ×
                                     </button>
                                 </div>
-                                <div className="stepper-row" style={{ marginTop: 10 }}>
+                                <div
+                                    className="stepper-row stepper-row--single"
+                                    style={{ marginTop: 10 }}
+                                >
                                     <Stepper
                                         label="SETS"
                                         value={String(entry.sets)}
@@ -105,14 +110,6 @@ export function DayPlanSheet({
                                         onIncrease={() => replace(index, { sets: entry.sets + 1 })}
                                         canDecrease={entry.sets > 1}
                                         canIncrease={entry.sets < MAX_SETS}
-                                    />
-                                    <Stepper
-                                        label="REPS"
-                                        value={String(entry.reps)}
-                                        onDecrease={() => replace(index, { reps: entry.reps - 1 })}
-                                        onIncrease={() => replace(index, { reps: entry.reps + 1 })}
-                                        canDecrease={entry.reps > 1}
-                                        canIncrease={entry.reps < MAX_REPS}
                                     />
                                 </div>
                             </div>

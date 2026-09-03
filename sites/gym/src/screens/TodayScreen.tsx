@@ -1,5 +1,5 @@
-import { dayLabel, draftIn, progressOf, sessionsFor } from '../lib/block';
-import { kg, rpeLabel, todayLabel } from '../lib/format';
+import { dayLabel, draftIn, isRestWeek, progressOf, repsInTank, sessionsFor } from '../lib/block';
+import { kg, rpeLabel, tankLabel, todayLabel } from '../lib/format';
 import type { CurrentBlock } from '../lib/types';
 
 interface TodayScreenProps {
@@ -68,6 +68,11 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
     const canPrev = week > 1;
     const canNext = week < mesocycle.weeks;
 
+    // What this week asks for. The last week of a block is its deload, so the
+    // week bar says so rather than letting it look like another hard one.
+    const rest = isRestWeek(week, mesocycle.weeks);
+    const tank = repsInTank(week, mesocycle.weeks);
+
     return (
         <div className="screen">
             <div className="masthead">
@@ -90,7 +95,10 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
             </section>
 
             <div className="weekbar">
-                <span className="eyebrow">WEEK {week}</span>
+                <span className="eyebrow">
+                    WEEK {week}
+                    {rest ? ' · REST' : ''}
+                </span>
                 <div className="weekbar__arrows">
                     <button
                         type="button"
@@ -112,6 +120,12 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
                     </button>
                 </div>
             </div>
+
+            <p className="weeknote">
+                {rest
+                    ? `Deload — target ${tankLabel(tank)}. Same days, much less bar.`
+                    : `Target ${tankLabel(tank)} on every working set.`}
+            </p>
 
             <div className="daylist">
                 {rows.map((row, index) => {

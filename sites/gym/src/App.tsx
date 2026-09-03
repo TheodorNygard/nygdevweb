@@ -447,6 +447,7 @@ export function App() {
                     label={`W${session.workout.week} · ${dayLabel(meso, session.workout.dayIndex)}`}
                     library={library}
                     plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
+                    weeks={meso?.weeks ?? session.workout.week}
                     elapsed={elapsed}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}

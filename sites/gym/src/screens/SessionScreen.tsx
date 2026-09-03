@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
 import { Stepper } from '../components/Stepper';
-import { elapsedLabel, kg, num, rpeNote } from '../lib/format';
+import { isRestWeek, repsInTank } from '../lib/block';
+import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise, WorkSet, Workout } from '../lib/types';
 
@@ -13,6 +14,16 @@ const RPE_MAX = 10;
 
 /** What a fresh exercise opens on before anything has been logged against it. */
 const OPENING = { weightKg: 60, reps: 8, rpe: 7 };
+
+/**
+ * The RPE a reps-in-the-tank target is, since the slider is the control that
+ * target is actually aimed at: RPE 10 is nothing left, 8 is two left. Clamped
+ * to the slider's own range, which is what a rest week's full tank hits — the
+ * scale has no number for "eight left" and does not need one.
+ */
+function rpeForTank(tank: number): number {
+    return Math.min(RPE_MAX, Math.max(RPE_MIN, 10 - tank));
+}
 
 interface Pending {
     weightKg: number;
@@ -31,6 +42,9 @@ interface SessionScreenProps {
      * logged workout.
      */
     plan: PlannedExercise[];
+
+    /** How long the block is, which is what turns `workout.week` into a target. */
+    weeks: number;
     elapsed: number;
     savedAt: number | null;
     onAddExercise: () => void;
@@ -50,12 +64,18 @@ interface SessionScreenProps {
  *
  * One exercise expanded at a time: two open loggers is two "Log same again"
  * buttons, and the tap is no longer safe to make without reading.
+ *
+ * The plan gives it a set count and nothing more. How hard each set should be
+ * is the week's business — the band under the header carries one target of reps
+ * left in the tank for the whole session, because it is one number for the
+ * whole session, and the RPE control repeats it where it is acted on.
  */
 export function SessionScreen({
     workout,
     label,
     library,
     plan,
+    weeks,
     elapsed,
     savedAt,
     onAddExercise,
@@ -84,6 +104,12 @@ export function SessionScreen({
 
         if (workout.entries.length > 0) setActiveIndex(workout.entries.length - 1);
     }
+
+    // One target for the whole session: how deep into each set to go, read off
+    // where this week sits in the block rather than off the plan.
+    const rest = isRestWeek(workout.week, weeks);
+    const tank = repsInTank(workout.week, weeks);
+    const targetRpe = rpeForTank(tank);
 
     /**
      * The target for one entry, or none. By position first, because a seeded
@@ -117,10 +143,11 @@ export function SessionScreen({
             return { weightKg: last.weightKg, reps: last.reps, rpe: last.rpe ?? OPENING.rpe };
         }
 
-        // Nothing logged yet, so the prescribed rep count beats a generic eight.
-        const target = targetFor(entryIndex);
-
-        return { ...OPENING, ...(target ? { reps: target.reps } : {}) };
+        // Nothing logged yet. Reps open on a generic eight — the plan no longer
+        // prescribes one, and a target that names a number is the thing this
+        // screen stopped doing. The RPE opens on the week's target instead,
+        // which is where the intensity now comes from.
+        return { ...OPENING, rpe: targetRpe };
     }
 
     function adjust(entryIndex: number, patch: Partial<Pending>) {
@@ -157,6 +184,25 @@ export function SessionScreen({
                 </div>
             </header>
 
+            <div className={rest ? 'tank tank--rest' : 'tank'}>
+                <div className="tank__head">
+                    <span className="tank__week">
+                        {rest ? `WEEK ${workout.week} · REST` : `WEEK ${workout.week} OF ${weeks}`}
+                    </span>
+                    <span className="tank__value">{tankLabel(tank)}</span>
+                </div>
+                <p className="tank__note">
+                    {rest
+                        ? 'Deload. Same movements, half the load — leave the tank full and let '
+                            + 'the block finish itself.'
+                        : tank === 0
+                            ? 'Last training week. Take each set to the last rep you can hold '
+                                + `form on, around RPE ${num(targetRpe)}.`
+                            : `Stop each set with about ${tankLabel(tank)}, around RPE `
+                                + `${num(targetRpe)}.`}
+                </p>
+            </div>
+
             <div className="session__body">
                 {workout.entries.map((entry, entryIndex) => {
                     const isActive = entryIndex === activeIndex;
@@ -179,9 +225,7 @@ export function SessionScreen({
                                     <span className="exercise__name">{entry.exerciseName}</span>
                                     <span className="exercise__eq">
                                         {equipmentFor(library, entry.exerciseName)}
-                                        {target
-                                            ? ` · target ${target.sets} × ${target.reps}`
-                                            : ''}
+                                        {target ? ` · target ${target.sets} sets` : ''}
                                     </span>
                                 </span>
                                 <span
@@ -262,8 +306,14 @@ export function SessionScreen({
 
                                     <div className="rpe">
                                         <div className="rpe__head">
-                                            <span className="field-label">RPE</span>
-                                            <span className="rpe__note">
+                                            <span className="field-label">
+                                                RPE · TARGET {tank} LEFT
+                                            </span>
+                                            <span
+                                                className={values.rpe === targetRpe
+                                                    ? 'rpe__note rpe__note--met'
+                                                    : 'rpe__note'}
+                                            >
                                                 {rpeNote(values.rpe)}
                                             </span>
                                         </div>

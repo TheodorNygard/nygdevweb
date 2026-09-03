@@ -59,14 +59,20 @@ export interface SessionSummary {
 }
 
 /**
- * One exercise a day prescribes. Sets and reps, and deliberately no target
- * weight: a programme prescribes volume, the session discovers the weight, and
- * a prescribed weight is wrong the moment it is beaten.
+ * One exercise a day prescribes: a name and a number of sets.
+ *
+ * Deliberately no target weight and — since reps stopped being planned — no
+ * target reps. Both are what a session discovers rather than what a programme
+ * decides, and a prescribed one is wrong the moment it is beaten. How hard the
+ * sets should be comes from the week instead: see `repsInTank` in `lib/block`.
+ *
+ * Blocks saved while reps were planned still carry a `reps` on the wire. It is
+ * not in this type because nothing reads it, and the API ignores it on the way
+ * back in.
  */
 export interface PlannedExercise {
     exerciseName: string;
     sets: number;
-    reps: number;
 }
 
 /**

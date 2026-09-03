@@ -266,6 +266,14 @@ button {
     cursor: default;
 }
 
+/* What the week asks for, under the week bar. One line, because it is one
+   number and it is the same for every day in the week. */
+.weeknote {
+    margin: 8px 0 0;
+    font: 400 12px/1.4 var(--mono);
+    color: var(--fg-45);
+}
+
 .daylist {
     margin-top: 12px;
     display: flex;
@@ -395,6 +403,12 @@ button {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     margin-top: 14px;
+}
+
+/* The plan editor's row, which holds sets and nothing else since reps stopped
+   being planned. Full width rather than half a row with a hole beside it. */
+.stepper-row--single {
+    grid-template-columns: 1fr;
 }
 
 .stepper {
@@ -592,12 +606,33 @@ button {
     border-color: var(--accent);
 }
 
+/* The ramp beside each row of the block map. Fixed width so the numbers line
+   up in a column and the cells stay the same size on every row. */
+.map__tank {
+    flex: none;
+    width: 46px;
+    text-align: right;
+    font: 400 10px/1 var(--mono);
+    letter-spacing: 0.04em;
+    color: var(--fg-35);
+}
+
+.map__tank--rest {
+    color: var(--accent);
+}
+
 .map__key {
     display: flex;
     gap: 16px;
     margin-top: 6px;
     font: 400 10px/1 var(--mono);
     color: var(--fg-35);
+}
+
+.map__note {
+    margin: 8px 0 0;
+    font: 400 11px/1.45 var(--sans);
+    color: var(--fg-40);
 }
 
 /* -------------------------------------------------------------- buttons -- */
@@ -947,6 +982,49 @@ button {
     margin-top: 14px;
 }
 
+/* ------------------------------------------------------------ the target -- */
+
+/* The week's intensity target, between the session header and the exercises.
+   It sits outside the scrolling body on purpose: it is one number for the whole
+   session, so it should not scroll away from the sets it applies to. */
+.tank {
+    flex: none;
+    margin: 14px 16px 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--fill-soft);
+    border: 1px solid var(--line);
+}
+
+.tank--rest {
+    background: rgba(214, 255, 63, 0.06);
+    border-color: rgba(214, 255, 63, 0.3);
+}
+
+.tank__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tank__week {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--fg-35);
+}
+
+.tank__value {
+    font: 600 13px/1 var(--mono);
+    color: var(--accent);
+}
+
+.tank__note {
+    margin: 7px 0 0;
+    font: 400 12px/1.45 var(--sans);
+    color: var(--fg-45);
+}
+
 .rpe__head {
     display: flex;
     align-items: baseline;
@@ -956,6 +1034,12 @@ button {
 .rpe__note {
     font: 400 11px/1 var(--sans);
     color: var(--fg-45);
+}
+
+/* The slider is on the week's target. The accent is doing the same job it does
+   on an exercise that has met its set count. */
+.rpe__note--met {
+    color: var(--accent);
 }
 
 .rpe__controls {
