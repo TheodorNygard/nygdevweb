@@ -1,6 +1,7 @@
 import { API_BASE } from './config';
 import type {
     CurrentBlock,
+    DayInput,
     EntryResult,
     Mesocycle,
     MesocycleSummary,
@@ -213,7 +214,7 @@ export class GymApi {
     }
 
     /** Creating is also switching — the new block is current in the same transaction. */
-    async createMesocycle(name: string, weeks: number, days: string[]): Promise<Mesocycle> {
+    async createMesocycle(name: string, weeks: number, days: DayInput[]): Promise<Mesocycle> {
         const body = await this.send<{ mesocycle: Mesocycle }>({
             method: 'POST',
             path: '/gym/mesocycles',
@@ -224,9 +225,14 @@ export class GymApi {
     }
 
     /** All three fields optional; an absent one is left alone. */
+    /**
+     * All three fields optional; an absent one is left alone. `days` is
+     * replaced wholesale when sent, plans included — which is why the Plan tab
+     * sends back the whole array it is holding rather than a diff.
+     */
     async updateMesocycle(
         mesoId: string,
-        patch: { name?: string; weeks?: number; days?: string[] },
+        patch: { name?: string; weeks?: number; days?: DayInput[] },
     ): Promise<Mesocycle> {
         const body = await this.send<{ mesocycle: Mesocycle }>({
             method: 'PATCH',

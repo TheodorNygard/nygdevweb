@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react';
 
+import { DayPlanSheet } from '../components/DayPlanSheet';
 import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
 import { draftIn, sessionsFor } from '../lib/block';
-import type { CurrentBlock, Mesocycle, MesocycleSummary } from '../lib/types';
+import type {
+    CurrentBlock,
+    DayInput,
+    ExerciseLibrary,
+    Mesocycle,
+    MesocycleSummary,
+} from '../lib/types';
 
 /** The API's bounds, and the prototype's: 3–8 weeks of 2–6 workout days. */
 const MIN_WEEKS = 3;
@@ -17,26 +24,51 @@ const DEFAULT_DAYS = ['Upper A', 'Lower A', 'Upper B', 'Lower B', 'Push', 'Pull'
 interface Draft {
     name: string;
     weeks: number;
-    days: string[];
+
+    // The whole day, plan included: `days` is replaced wholesale by the PATCH,
+    // so the draft has to carry what it is not editing as well as what it is.
+    // Holding only labels here is how a save would silently clear every plan.
+    days: DayInput[];
 }
 
 function draftOf(mesocycle: Mesocycle | null): Draft {
     if (!mesocycle) {
-        return { name: 'Block 1', weeks: 5, days: DEFAULT_DAYS.slice(0, 4) };
+        return {
+            name: 'Block 1',
+            weeks: 5,
+            days: DEFAULT_DAYS.slice(0, 4).map((label) => ({ label, plan: [] })),
+        };
     }
 
     return {
         name: mesocycle.name,
         weeks: mesocycle.weeks,
-        days: mesocycle.days.map((day) => day.label),
+        days: mesocycle.days.map((day) => ({ label: day.label, plan: day.plan })),
     };
+}
+
+function samePlan(a: DayInput, b: DayInput): boolean {
+    return a.label === b.label
+        && a.plan.length === b.plan.length
+        && a.plan.every((exercise, index) => {
+            const other = b.plan[index];
+
+            return other !== undefined
+                && exercise.exerciseName === other.exerciseName
+                && exercise.sets === other.sets
+                && exercise.reps === other.reps;
+        });
 }
 
 function sameDraft(a: Draft, b: Draft): boolean {
     return a.name === b.name
         && a.weeks === b.weeks
         && a.days.length === b.days.length
-        && a.days.every((label, index) => label === b.days[index]);
+        && a.days.every((day, index) => {
+            const other = b.days[index];
+
+            return other !== undefined && samePlan(day, other);
+        });
 }
 
 interface PlanScreenProps {
@@ -46,9 +78,12 @@ interface PlanScreenProps {
     blocks: MesocycleSummary[];
     blocksLoading: boolean;
     onOpenBlock: (block: MesocycleSummary) => void;
+
+    /** For the equipment chip beside a planned exercise, and the picker. */
+    library: ExerciseLibrary | null;
     busy: boolean;
-    onSave: (patch: { name: string; weeks: number; days: string[] }) => void;
-    onCreate: (plan: { name: string; weeks: number; days: string[] }) => void;
+    onSave: (patch: { name: string; weeks: number; days: DayInput[] }) => void;
+    onCreate: (plan: { name: string; weeks: number; days: DayInput[] }) => void;
     onSignOut: () => void;
     account: string;
 }
@@ -67,6 +102,7 @@ export function PlanScreen({
     blocks,
     blocksLoading,
     onOpenBlock,
+    library,
     busy,
     onSave,
     onCreate,
@@ -76,6 +112,9 @@ export function PlanScreen({
     const saved = useMemo(() => draftOf(block.mesocycle), [block.mesocycle]);
     const [draft, setDraft] = useState<Draft>(saved);
     const [confirmFresh, setConfirmFresh] = useState(false);
+
+    // Which day's plan is being edited, by position. Null is the common case.
+    const [planningDay, setPlanningDay] = useState<number | null>(null);
 
     // The saved block changed under the draft — a create, or another device.
     // Adopting it is the honest thing: the alternative is showing edits
@@ -94,7 +133,10 @@ export function PlanScreen({
         const days = draft.days.slice();
 
         while (days.length < count) {
-            days.push(DEFAULT_DAYS[days.length] ?? `Day ${days.length + 1}`);
+            days.push({
+                label: DEFAULT_DAYS[days.length] ?? `Day ${days.length + 1}`,
+                plan: [],
+            });
         }
 
         setDraft({ ...draft, days: days.slice(0, count) });
@@ -103,7 +145,18 @@ export function PlanScreen({
     function rename(index: number, label: string) {
         setDraft({
             ...draft,
-            days: draft.days.map((existing, position) => (position === index ? label : existing)),
+            days: draft.days.map((existing, position) => (
+                position === index ? { ...existing, label } : existing
+            )),
+        });
+    }
+
+    function replan(index: number, plan: DayInput['plan']) {
+        setDraft({
+            ...draft,
+            days: draft.days.map((existing, position) => (
+                position === index ? { ...existing, plan } : existing
+            )),
         });
     }
 
@@ -128,7 +181,8 @@ export function PlanScreen({
         };
     });
 
-    const canSave = draft.name.trim().length > 0 && draft.days.every((day) => day.trim().length > 0);
+    const canSave = draft.name.trim().length > 0
+        && draft.days.every((day) => day.label.trim().length > 0);
 
     return (
         <div className="screen">
@@ -170,7 +224,7 @@ export function PlanScreen({
 
             <span className="section-label">WORKOUT DAYS</span>
             <div className="dayfields">
-                {draft.days.map((label, index) => (
+                {draft.days.map((day, index) => (
                     // The index is the identity here, and legitimately: a day
                     // *is* its position in the block — that position is the
                     // `dayIndex` every session is filed under.
@@ -178,11 +232,19 @@ export function PlanScreen({
                         <span className="dayfield__badge">D{index + 1}</span>
                         <input
                             className="dayfield__input"
-                            value={label}
+                            value={day.label}
                             onChange={(event) => rename(index, event.target.value)}
                             aria-label={`Label for day ${index + 1}`}
                             maxLength={40}
                         />
+                        <button
+                            type="button"
+                            className="dayfield__plan"
+                            onClick={() => setPlanningDay(index)}
+                            aria-label={`Plan ${day.label}`}
+                        >
+                            {day.plan.length === 0 ? 'plan' : `${day.plan.length} ex`}
+                        </button>
                     </div>
                 ))}
             </div>
@@ -218,7 +280,10 @@ export function PlanScreen({
                         const patch = {
                             name: draft.name.trim(),
                             weeks: draft.weeks,
-                            days: draft.days.map((day) => day.trim()),
+                            days: draft.days.map((day) => ({
+                                label: day.label.trim(),
+                                plan: day.plan,
+                            })),
                         };
 
                         if (exists) onSave(patch);
@@ -287,6 +352,17 @@ export function PlanScreen({
                 </button>
             </div>
 
+            {planningDay !== null && draft.days[planningDay] ? (
+                <DayPlanSheet
+                    label={draft.days[planningDay].label}
+                    dayIndex={planningDay}
+                    plan={draft.days[planningDay].plan}
+                    library={library}
+                    onChange={(plan) => replan(planningDay, plan)}
+                    onClose={() => setPlanningDay(null)}
+                />
+            ) : null}
+
             {confirmFresh ? (
                 <Sheet label="Start a fresh mesocycle" onClose={() => setConfirmFresh(false)}>
                     <div className="sheet__question">Start a fresh mesocycle?</div>
@@ -303,7 +379,10 @@ export function PlanScreen({
                             onCreate({
                                 name: draft.name.trim(),
                                 weeks: draft.weeks,
-                                days: draft.days.map((day) => day.trim()),
+                                days: draft.days.map((day) => ({
+                                    label: day.label.trim(),
+                                    plan: day.plan,
+                                })),
                             });
                         }}
                     >

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Stepper } from '../components/Stepper';
 import { elapsedLabel, kg, num, rpeNote } from '../lib/format';
 import { equipmentFor } from '../lib/library';
-import type { ExerciseLibrary, WorkSet, Workout } from '../lib/types';
+import type { ExerciseLibrary, PlannedExercise, WorkSet, Workout } from '../lib/types';
 
 /** The design's steps: 2.5 kg of weight, one rep, half a point of RPE. */
 const WEIGHT_STEP = 2.5;
@@ -24,6 +24,13 @@ interface SessionScreenProps {
     workout: Workout;
     label: string;
     library: ExerciseLibrary | null;
+
+    /**
+     * What this day prescribes, from the block rather than from the session.
+     * The targets are not copied onto a session — they live in one place so
+     * editing the plan cannot leave a stale number on a logged workout.
+     */
+    plan: PlannedExercise[];
     elapsed: number;
     savedAt: number | null;
     onAddExercise: () => void;
@@ -51,6 +58,7 @@ export function SessionScreen({
     workout,
     label,
     library,
+    plan,
     elapsed,
     savedAt,
     onAddExercise,
@@ -80,6 +88,29 @@ export function SessionScreen({
         if (workout.entries.length > 0) setActiveIndex(workout.entries.length - 1);
     }
 
+    /**
+     * The target for one entry, or none.
+     *
+     * By position first, because a seeded session's entries are the plan in
+     * order and that survives anything the session can do to itself — exercises
+     * are only ever appended, and there is no route that removes one. The name
+     * check is what keeps the position from being trusted blindly: an exercise
+     * added by hand before the planned ones would otherwise borrow a target
+     * that belongs to something else. Falling back to a name lookup covers the
+     * planned exercise that ended up somewhere unexpected.
+     */
+    function targetFor(entryIndex: number): PlannedExercise | undefined {
+        const entry = workout.entries[entryIndex];
+
+        if (!entry) return undefined;
+
+        const positional = plan[entryIndex];
+
+        if (positional && positional.exerciseName === entry.exerciseName) return positional;
+
+        return plan.find((planned) => planned.exerciseName === entry.exerciseName);
+    }
+
     function valuesFor(entryIndex: number): Pending {
         const held = pending[entryIndex];
 
@@ -88,9 +119,17 @@ export function SessionScreen({
         const sets = workout.entries[entryIndex]?.sets ?? [];
         const last = sets[sets.length - 1];
 
-        if (!last) return { ...OPENING };
+        // What you last lifted on this exercise beats what the plan asked for:
+        // the plan opens the session, the previous set continues it.
+        if (last) {
+            return { weightKg: last.weightKg, reps: last.reps, rpe: last.rpe ?? OPENING.rpe };
+        }
 
-        return { weightKg: last.weightKg, reps: last.reps, rpe: last.rpe ?? OPENING.rpe };
+        // Nothing logged yet, so the prescribed rep count is the better opening
+        // number than a generic eight — it is the one the plan just asked for.
+        const target = targetFor(entryIndex);
+
+        return { ...OPENING, ...(target ? { reps: target.reps } : {}) };
     }
 
     function adjust(entryIndex: number, patch: Partial<Pending>) {
@@ -131,6 +170,7 @@ export function SessionScreen({
                 {workout.entries.map((entry, entryIndex) => {
                     const isActive = entryIndex === activeIndex;
                     const values = valuesFor(entryIndex);
+                    const target = targetFor(entryIndex);
                     const volume = entry.sets.reduce(
                         (total, set) => total + set.weightKg * set.reps,
                         0,
@@ -148,12 +188,21 @@ export function SessionScreen({
                                     <span className="exercise__name">{entry.exerciseName}</span>
                                     <span className="exercise__eq">
                                         {equipmentFor(library, entry.exerciseName)}
+                                        {target
+                                            ? ` · target ${target.sets} × ${target.reps}`
+                                            : ''}
                                     </span>
                                 </span>
-                                <span className="exercise__summary">
-                                    {entry.sets.length > 0
-                                        ? `${entry.sets.length} sets · ${kg(volume)}`
-                                        : 'no sets yet'}
+                                <span
+                                    className={target && entry.sets.length >= target.sets
+                                        ? 'exercise__summary exercise__summary--met'
+                                        : 'exercise__summary'}
+                                >
+                                    {target
+                                        ? `${entry.sets.length} of ${target.sets} sets`
+                                        : entry.sets.length > 0
+                                            ? `${entry.sets.length} sets · ${kg(volume)}`
+                                            : 'no sets yet'}
                                 </span>
                             </button>
 

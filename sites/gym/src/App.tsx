@@ -20,7 +20,7 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { TodayScreen } from './screens/TodayScreen';
-import type { MesocycleSummary, SessionTotals, Workout } from './lib/types';
+import type { DayInput, MesocycleSummary, SessionTotals, Workout } from './lib/types';
 
 /** Which of the three full-screen states is showing. Sheets layer over these. */
 type Screen = 'tabs' | 'session' | 'done';
@@ -220,7 +220,7 @@ export function App() {
         block.reload();
     }
 
-    async function savePlan(patch: { name: string; weeks: number; days: string[] }) {
+    async function savePlan(patch: { name: string; weeks: number; days: DayInput[] }) {
         if (!api || !meso) return;
 
         setPlanBusy(true);
@@ -276,7 +276,10 @@ export function App() {
             await api.createMesocycle(
                 `${source.name} (copy)`,
                 source.weeks,
-                source.days.map((day) => day.label),
+                // Plans come with it. Copying a block for its shape and losing
+                // what each day prescribes would leave the least interesting
+                // half — the labels — and drop the part worth reusing.
+                source.days.map((day) => ({ label: day.label, plan: day.plan })),
             );
 
             setOpenBlock(null);
@@ -316,7 +319,7 @@ export function App() {
         }
     }
 
-    async function createPlan(plan: { name: string; weeks: number; days: string[] }) {
+    async function createPlan(plan: { name: string; weeks: number; days: DayInput[] }) {
         if (!api) return;
 
         setPlanBusy(true);
@@ -404,6 +407,7 @@ export function App() {
                                     blocks={blocks.blocks}
                                     blocksLoading={blocks.loading}
                                     onOpenBlock={setOpenBlock}
+                                    library={library}
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
@@ -446,6 +450,7 @@ export function App() {
                     workout={session.workout}
                     label={`W${session.workout.week} · ${dayLabel(meso, session.workout.dayIndex)}`}
                     library={library}
+                    plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
                     elapsed={elapsed}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}

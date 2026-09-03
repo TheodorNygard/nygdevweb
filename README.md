@@ -185,6 +185,49 @@ design offered — near-black, acid-lime accent, mono digits — and it was chos
 because a bright screen between sets is the thing that makes a logbook go
 unused. A light variant would be a different design, not a preference.
 
+### Planned sessions
+
+A day can carry a plan: which exercises, and how many sets of how many reps.
+Tapping the handle beside a day label on the Plan tab opens it.
+
+**The plan hangs off the day, not off a cell of the block**, so every week's
+"Upper A" shares it. That follows from the app's own premise — days are
+labelled, not scheduled — and it keeps a block one small document instead of up
+to 48 planned ones. Planning a single week differently, a deload week most of
+all, is what it gives up; that would be a plan per cell, and it is the change
+to make if per-week progression is ever wanted.
+
+**Targets are sets and reps, and deliberately not weight.** Sets and reps are
+what a programme prescribes; the weight is what the session discovers, and a
+prescribed one is wrong the moment it is beaten — it would need rewriting every
+block or it becomes noise on the screen.
+
+Starting a planned day opens the session with those exercises already on it and
+no sets against them. The seeding happens **server-side**, in `POST
+/gym/workouts`, which keeps Start one round trip rather than an entry POST per
+planned exercise and means the entry indexes the client logs against are the
+ones it was just handed. A resumed draft is not re-seeded — it already has what
+the plan gave it, and seeding again would duplicate every exercise each time
+Start was tapped twice.
+
+The targets themselves are **not copied onto the session**. They stay on the
+block, which the front end already holds, so editing a plan cannot leave a
+stale number on a logged workout. `SessionScreen` matches an entry to its
+target by position first — a seeded session's entries are the plan in order,
+and exercises are only ever appended — with a name check so an exercise added
+by hand before the planned ones cannot borrow a target belonging to something
+else.
+
+None of it is enforced. Nothing stops you logging four sets against a
+three-set plan or ignoring an exercise entirely; the plan opens the session and
+shows a target beside each exercise, and the previous set is what fills the
+steppers after that. An exercise whose target set count is met turns its
+counter to the accent — the same signal a completed day gets in the week list.
+
+The draft on the Plan tab carries whole days rather than labels, and that is
+load-bearing: `days` is replaced wholesale by the PATCH, so a draft holding
+only labels is how a rename would silently clear every plan in the block.
+
 ### The block list, and the one destructive button in the app
 
 The Plan tab lists every block, newest first, marks the one being trained and
@@ -197,9 +240,10 @@ you cannot see. Switching resets the displayed week to null so Today re-derives
 it: week 4 of the block you left is not week 4 of this one.
 
 **Copy** is not a route. `POST /gym/mesocycles` already takes a name, a week
-count and day labels, so copying is the client sending back the shape it is
-looking at, and creating is also switching. Only the shape is copied — the
-sessions stay where they were logged. The app then stays on Plan rather than
+count and the days, so copying is the client sending back the shape it is
+looking at, and creating is also switching. Plans come with it — a copy that
+kept the labels and dropped what each day prescribes would keep the least
+interesting half. The sessions stay where they were logged. The app then stays on Plan rather than
 jumping to Today, because a copy is almost always renamed straight afterwards
 and the field to do it in is at the top of that screen.
 

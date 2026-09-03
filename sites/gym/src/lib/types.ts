@@ -61,9 +61,37 @@ export interface SessionSummary {
     avgRpe: number | null;
 }
 
+/**
+ * One exercise a day prescribes, and how much of it.
+ *
+ * Sets and reps, and deliberately no target weight: sets and reps are what a
+ * programme prescribes, the weight is what the session discovers, and a
+ * prescribed weight is wrong the moment it is beaten.
+ */
+export interface PlannedExercise {
+    exerciseName: string;
+    sets: number;
+    reps: number;
+}
+
+/**
+ * A labelled day of the block, and what it plans.
+ *
+ * The plan hangs off the day rather than off a cell, so every week's "Upper A"
+ * shares it — days are labelled, not scheduled. `plan` is empty on a day that
+ * prescribes nothing, which is every day of a block written before planning
+ * existed.
+ */
 export interface MesoDay {
     dayIndex: number;
     label: string;
+    plan: PlannedExercise[];
+}
+
+/** What create and patch send for a day: the label, and what it prescribes. */
+export interface DayInput {
+    label: string;
+    plan: PlannedExercise[];
 }
 
 export interface Mesocycle {

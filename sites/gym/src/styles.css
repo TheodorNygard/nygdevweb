@@ -496,6 +496,63 @@ button {
     border-color: rgba(214, 255, 63, 0.6);
 }
 
+/* The plan handle on a day row. Sized to the 44px rule like every other
+   control, and labelled with the count so a planned day is legible without
+   opening it. */
+.dayfield__plan {
+    flex: none;
+    height: 48px;
+    min-width: 58px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--fg-45);
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.06em;
+}
+
+.dayfield__plan:hover {
+    border-color: rgba(214, 255, 63, 0.5);
+    color: var(--accent);
+}
+
+/* One planned exercise in the day-plan sheet: the name, and the two steppers
+   that say how much of it. */
+.planned {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.planned__item {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.planned__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.planned__name {
+    font: 600 16px/1.15 var(--sans);
+    letter-spacing: -0.01em;
+}
+
+.planned__eq {
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-40);
+    margin-top: 6px;
+}
+
 .map {
     margin-top: 12px;
     padding: 16px;
@@ -828,6 +885,13 @@ button {
     flex: none;
     font: 600 12px/1 var(--mono);
     color: var(--fg-45);
+}
+
+/* A planned exercise whose target set count has been met. The accent is doing
+   the same job it does on a completed day in the week list, which is why it is
+   the accent and not a tick. */
+.exercise__summary--met {
+    color: var(--accent);
 }
 
 .sets {
