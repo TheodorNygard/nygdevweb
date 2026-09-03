@@ -383,6 +383,13 @@ export function App() {
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
 
+    // The one screen that is not a phone column. Planning is done sitting down
+    // and has two things to read side by side; everything else in this app is
+    // placed for a thumb between sets, and a stretched row of steppers would be
+    // a different layout rather than a bigger one. The width itself is a media
+    // query — this only says which screen is allowed to take it.
+    const wide = screen === 'tabs' && tab === 'plan';
+
     const banner = actionError
         ?? session.error
         ?? block.error
@@ -410,7 +417,7 @@ export function App() {
         : null;
 
     return (
-        <div className="app">
+        <div className={wide ? 'app app--wide' : 'app'}>
             {banner ? (
                 <Banner
                     kind="error"

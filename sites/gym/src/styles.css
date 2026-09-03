@@ -53,6 +53,12 @@
        a 1200px-wide row of steppers is a different layout, not a bigger one. */
     --shell: 448px;
 
+    /* The one exception, at the bottom of this file: the Plan tab on a desktop
+       screen. Planning is the part of this app that is done sitting down at a
+       keyboard, and it is the part that has two things to look at side by side
+       rather than one to tap. */
+    --shell-wide: 1000px;
+
     color-scheme: dark;
 }
 
@@ -909,6 +915,22 @@ button {
     margin: 26px 0 0;
     font: 400 14px/1.5 var(--sans);
     color: var(--fg-40);
+}
+
+/* --------------------------------------------------------- the plan tab -- */
+
+/* Two stacks on a wide screen, one on a phone.
+ *
+ * `display: contents` is what makes the phone layout untouched rather than
+ * merely similar: the wrappers are not boxes until the media query gives them
+ * one, so every margin below lands exactly where it did before they existed.
+ * The split is a prefix and a suffix of the same source order for the same
+ * reason — the editor, then your blocks — so nothing reorders when the columns
+ * collapse.
+ */
+.plan__grid,
+.plan__col {
+    display: contents;
 }
 
 /* -------------------------------------------------------------- session -- */
@@ -1790,4 +1812,72 @@ button {
     font: 400 12px/1 var(--mono);
     letter-spacing: 0.16em;
     color: var(--fg-35);
+}
+
+/* ------------------------------------------------------------ wide plan -- */
+
+/*
+ * The Plan tab, on a screen that is not a phone.
+ *
+ * Nothing else widens, and that is the point rather than a shortcut. Today and
+ * the logging screen are placed for a thumb between sets; a stretched row of
+ * steppers is a different layout, not a bigger one. Planning is the opposite —
+ * it is done sitting down, it is a form, and it has a block map beside a list
+ * of blocks that a phone can only stack. So the shell widens for that one tab
+ * and goes back to a phone column the moment you leave it.
+ *
+ * The chrome fixed to the viewport widens with it: the tab bar and the banner
+ * are centred on the window rather than on the shell, so leaving them at 448px
+ * under a 1000px column would read as a mistake rather than as a dock. The
+ * tabs themselves stay the size of a tab.
+ */
+@media (min-width: 960px) {
+    .app--wide {
+        max-width: var(--shell-wide);
+    }
+
+    .app--wide .tabs {
+        max-width: var(--shell-wide);
+        justify-content: center;
+    }
+
+    .app--wide .tab {
+        flex: 0 1 220px;
+    }
+
+    .app--wide .banner {
+        max-width: calc(var(--shell-wide) - 24px);
+    }
+
+    /* Sheets get some of it too — the day plan editor is the one place in this
+       app where a list is built rather than read — but not all of it: a dialog
+       as wide as the page behind it stops reading as a dialog. */
+    .app--wide .sheet {
+        max-width: 640px;
+    }
+
+    /* The prose above the columns keeps a readable measure rather than running
+       the full width of the shell. */
+    .app--wide .lede {
+        max-width: 64ch;
+    }
+
+    .plan__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+        gap: 0 34px;
+        align-items: start;
+    }
+
+    .plan__col {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Both columns start on the same line. Their first children carry the
+       top margins that space this screen out on a phone, where they follow
+       something; here they follow nothing. */
+    .plan__col > :first-child {
+        margin-top: 22px;
+    }
 }
