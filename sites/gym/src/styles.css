@@ -493,6 +493,55 @@ button {
     outline: none;
 }
 
+/* --------------------------------------------------------- drag handle -- */
+
+.draghandle {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: var(--fg-35);
+
+    /* Without this, the browser treats the handle's first pointermove as a
+       scroll gesture and yanks the row back before the drag can take over. */
+    touch-action: none;
+    cursor: grab;
+}
+
+.draghandle:hover,
+.draghandle:focus-visible {
+    background: var(--fill);
+    color: var(--fg-60);
+}
+
+.draghandle__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 3px);
+    grid-template-rows: repeat(3, 3px);
+    gap: 3px;
+}
+
+.draghandle__grid span {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* The row a drag is currently carrying. Lifted above its neighbours — the
+   z-index a `useDragReorder` row sets while active only takes effect once the
+   row itself is a positioning context, which `.exercise` and `.planned__item`
+   are declared as for exactly this. */
+.dragrow--active {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    cursor: grabbing;
+}
+
 .section-label {
     margin-top: 26px;
     display: block;
@@ -574,6 +623,7 @@ button {
 }
 
 .planned__item {
+    position: relative;
     padding: 14px;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.045);
@@ -583,8 +633,15 @@ button {
 .planned__head {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
+}
+
+/* Takes the space between the handle and the delete button. Without `flex: 1`
+   here, three children in a row with no `space-between` would just bunch up
+   on the left. */
+.planned__body {
+    flex: 1;
+    min-width: 0;
 }
 
 .planned__name {
@@ -915,6 +972,7 @@ button {
 }
 
 .exercise {
+    position: relative;
     border: 1px solid var(--line);
     border-radius: 18px;
     background: var(--card);
@@ -926,8 +984,20 @@ button {
     width: 100%;
     display: flex;
     align-items: center;
+    gap: 4px;
+    padding: 8px 16px 14px 6px;
+}
+
+/* The part of the head that still opens the logger. Everything the button
+   used to be, just no longer the whole row: the handle beside it needs its
+   own hit target, and two nested buttons is not valid HTML. */
+.exercise__toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
     gap: 12px;
-    padding: 16px 16px 14px;
+    padding: 8px 0;
     background: transparent;
     border: none;
     text-align: left;

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
+import { DragHandle } from '../components/DragHandle';
 import { Stepper } from '../components/Stepper';
+import { useDragReorder } from '../hooks/useDragReorder';
 import type { LastSets } from '../hooks/useLastSets';
 import { isRestWeek, repsInTank, setsForWeek } from '../lib/block';
 import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
@@ -43,6 +45,22 @@ function clamp(value: number, low: number, high: number): number {
     return Math.min(high, Math.max(low, value));
 }
 
+/**
+ * Where a position-keyed value ends up after the same drag that moved entry
+ * `from` to `to` — the index-space counterpart of `reordered()`, for the two
+ * pieces of local state that are keyed by position instead of holding the
+ * entry itself.
+ */
+function remapIndex(index: number, from: number, to: number): number {
+    if (index === from) return to;
+
+    if (from < to) {
+        return index > from && index <= to ? index - 1 : index;
+    }
+
+    return index >= to && index < from ? index + 1 : index;
+}
+
 interface Pending {
     weightKg: number;
     reps: number;
@@ -75,6 +93,18 @@ interface SessionScreenProps {
     onAddExercise: () => void;
     onLogSet: (entryIndex: number, set: WorkSet) => void;
     onRemoveSet: (entryIndex: number, setIndex: number) => void;
+
+    /**
+     * Drags an exercise from one position to another. `from` and `to` use the
+     * same splice semantics as `reordered()` in `useDragReorder` — `to` is
+     * where the exercise lands, not a swap partner.
+     *
+     * This is more than a display preference: the order entries are logged in
+     * is read by a separate backend downstream, so it has to reach the server
+     * the same way a set does — one guarded write per drag, not just a local
+     * re-sort the next sync happens to overwrite.
+     */
+    onReorderEntry: (from: number, to: number) => void;
     onFinish: () => void;
     onBack: () => void;
 }
@@ -107,6 +137,7 @@ export function SessionScreen({
     onAddExercise,
     onLogSet,
     onRemoveSet,
+    onReorderEntry,
     onFinish,
     onBack,
 }: SessionScreenProps) {
@@ -201,6 +232,29 @@ export function SessionScreen({
         setPending({ ...pending, [entryIndex]: { ...valuesFor(entryIndex), ...patch } });
     }
 
+    // `activeIndex` and `pending` are keyed by position, and a drag changes
+    // what sits at every position between `from` and `to`. Without this, the
+    // logger left open after a drag would stay open on the *slot*, showing
+    // whatever exercise the drag just moved into it rather than the one the
+    // user actually had open.
+    function reorderEntry(from: number, to: number) {
+        setActiveIndex((current) => (current === null ? null : remapIndex(current, from, to)));
+
+        setPending((current) => {
+            const next: Record<number, Pending> = {};
+
+            for (const [key, value] of Object.entries(current)) {
+                next[remapIndex(Number(key), from, to)] = value;
+            }
+
+            return next;
+        });
+
+        onReorderEntry(from, to);
+    }
+
+    const { rowProps, handleProps } = useDragReorder(workout.entries.length, reorderEntry);
+
     const totals = workout.totals;
 
     return (
@@ -260,36 +314,54 @@ export function SessionScreen({
                         0,
                     );
 
+                    const row = rowProps(entryIndex);
+                    const articleClassName = row.className
+                        ? `exercise ${row.className}`
+                        : 'exercise';
+
                     return (
-                        <article className="exercise" key={`${entry.exerciseName}-${entryIndex}`}>
-                            <button
-                                type="button"
-                                className="exercise__head"
-                                onClick={() => setActiveIndex(isActive ? null : entryIndex)}
-                                aria-expanded={isActive}
-                            >
-                                <span style={{ flex: 1, minWidth: 0 }}>
-                                    <span className="exercise__name">{entry.exerciseName}</span>
-                                    <span className="exercise__eq">
-                                        {equipmentFor(library, entry.exerciseName)}
-                                        {targetSets === undefined
-                                            ? ''
-                                            : ` · target ${targetSets} sets`}
-                                    </span>
-                                </span>
-                                <span
-                                    className={targetSets !== undefined
-                                        && entry.sets.length >= targetSets
-                                        ? 'exercise__summary exercise__summary--met'
-                                        : 'exercise__summary'}
+                        <article
+                            className={articleClassName}
+                            style={row.style}
+                            ref={row.ref}
+                            key={`${entry.exerciseName}-${entryIndex}`}
+                        >
+                            <div className="exercise__head">
+                                <DragHandle
+                                    label={entry.exerciseName}
+                                    {...handleProps(entryIndex)}
+                                />
+                                <button
+                                    type="button"
+                                    className="exercise__toggle"
+                                    onClick={() => setActiveIndex(isActive ? null : entryIndex)}
+                                    aria-expanded={isActive}
                                 >
-                                    {targetSets !== undefined
-                                        ? `${entry.sets.length} of ${targetSets} sets`
-                                        : entry.sets.length > 0
-                                            ? `${entry.sets.length} sets · ${kg(volume)}`
-                                            : 'no sets yet'}
-                                </span>
-                            </button>
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span className="exercise__name">
+                                            {entry.exerciseName}
+                                        </span>
+                                        <span className="exercise__eq">
+                                            {equipmentFor(library, entry.exerciseName)}
+                                            {targetSets === undefined
+                                                ? ''
+                                                : ` · target ${targetSets} sets`}
+                                        </span>
+                                    </span>
+                                    <span
+                                        className={targetSets !== undefined
+                                            && entry.sets.length >= targetSets
+                                            ? 'exercise__summary exercise__summary--met'
+                                            : 'exercise__summary'}
+                                    >
+                                        {targetSets !== undefined
+                                            ? `${entry.sets.length} of ${targetSets} sets`
+                                            : entry.sets.length > 0
+                                                ? `${entry.sets.length} sets · ${kg(volume)}`
+                                                : 'no sets yet'}
+                                    </span>
+                                </button>
+                            </div>
 
                             {entry.sets.length > 0 ? (
                                 <div className="sets">

@@ -471,6 +471,7 @@ export function App() {
                     onRemoveSet={(entryIndex, setIndex) => {
                         void session.removeSet(entryIndex, setIndex);
                     }}
+                    onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
                     onFinish={() => setFinishing(true)}
                     onBack={() => {
                         session.close();

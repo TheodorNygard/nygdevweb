@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
+import { reordered } from './useDragReorder';
 import { ApiError, NetworkError, type GymApi } from '../lib/api';
 import { localDate } from '../lib/format';
 import { computeTotals } from '../lib/totals';
@@ -32,6 +33,14 @@ export interface SessionActions {
     addEntry: (exerciseName: string) => Promise<void>;
     logSet: (entryIndex: number, set: WorkSet) => Promise<void>;
     removeSet: (entryIndex: number, setIndex: number) => Promise<void>;
+
+    /**
+     * Drags an exercise from `from` to `to` — `to` is where it lands, matching
+     * `reordered()`. Order is not cosmetic here: a separate backend reads it
+     * downstream, so this writes to the server the same way a set does rather
+     * than only re-sorting the local array.
+     */
+    reorderEntry: (from: number, to: number) => Promise<void>;
     submit: () => Promise<boolean>;
     dismiss: () => void;
 }
@@ -182,7 +191,11 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
             await send(api, session);
             setSavedAt(Date.now());
         } catch (cause) {
-            if (cause instanceof ApiError && cause.isCountMismatch) {
+            // Two codes, one meaning: the guard this write carried did not
+            // hold, nothing was written, and the fix is a re-read rather than
+            // a rollback. A reorder just has a guard shaped differently from a
+            // count, since a move never changes how many entries there are.
+            if (cause instanceof ApiError && (cause.isCountMismatch || cause.isReorderConflict)) {
                 await resync(session.id);
                 setNotice(staleNotice);
 
@@ -248,6 +261,26 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         );
     }, [write]);
 
+    const reorderEntry = useCallback(async (from: number, to: number): Promise<void> => {
+        const exerciseName = current.current?.entries[from]?.exerciseName;
+        const expectedEntryCount = current.current?.entries.length;
+
+        if (exerciseName === undefined || expectedEntryCount === undefined || from === to) {
+            return;
+        }
+
+        await write(
+            (session) => withEntries(session, reordered(session.entries, from, to)),
+            (client, session) => client.moveEntry(session.id, {
+                from,
+                to,
+                exerciseName,
+                expectedEntryCount,
+            }),
+            'This session had changed elsewhere. Reloaded — drag it again.',
+        );
+    }, [write]);
+
     const submit = useCallback(async (): Promise<boolean> => {
         const session = current.current;
 
@@ -287,6 +320,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         addEntry,
         logSet,
         removeSet,
+        reorderEntry,
         submit,
         dismiss,
     };

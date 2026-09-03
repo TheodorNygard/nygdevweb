@@ -145,6 +145,21 @@ export interface RemoveSetResult {
     setCount: number;
 }
 
+/**
+ * `POST …/entries/move`. `alreadyApplied` is the same rule as `alreadyRecorded`
+ * elsewhere: it means this exact move already landed, not that it failed.
+ *
+ * There is no `order` field anywhere in this API, on this or on a workout or a
+ * plan — array position **is** the order, on the wire and in storage alike, and
+ * a client that wants it reads the `entries` array as it stands.
+ */
+export interface EntryMoveResult {
+    alreadyApplied: boolean;
+    from: number;
+    to: number;
+    entryCount: number;
+}
+
 /** The library published on the CDN, not by the API. */
 export interface ExerciseLibrary {
     version: string;

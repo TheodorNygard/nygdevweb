@@ -2,6 +2,7 @@ import { API_BASE } from './config';
 import type {
     CurrentBlock,
     DayInput,
+    EntryMoveResult,
     EntryResult,
     Mesocycle,
     MesocycleSummary,
@@ -39,6 +40,15 @@ export class ApiError extends Error {
      */
     get isCountMismatch(): boolean {
         return this.code === 'count_mismatch';
+    }
+
+    /**
+     * A drag's guard did not hold — the session moved under it some other way.
+     * Nothing was written, and the fix is the same shape as a stale count: the
+     * session hook re-reads and resyncs rather than showing this as a failure.
+     */
+    get isReorderConflict(): boolean {
+        return this.code === 'reorder_conflict';
     }
 }
 
@@ -302,6 +312,33 @@ export class GymApi {
             method: 'DELETE',
             path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/${entryIndex}`
                 + `/sets/${setIndex}?expectedSetCount=${expectedSetCount}`,
+        });
+    }
+
+    /**
+     * The drag handle. `to` is where the exercise lands, not a swap partner —
+     * same splice semantics as `reordered()` in `hooks/useDragReorder`, so the
+     * pair a drag produces is sent through unchanged.
+     *
+     * `exerciseName` is what the caller believes sits at `from` right now. It
+     * is the guard: unlike a set append, a move cannot be told apart from its
+     * own retry by a count alone, since a move never changes how many entries
+     * there are. The server checks this name against what is actually at
+     * `from`, and — for the retry case — at `to`.
+     */
+    moveEntry(
+        sessionId: string,
+        move: {
+            from: number;
+            to: number;
+            exerciseName: string;
+            expectedEntryCount: number;
+        },
+    ): Promise<EntryMoveResult> {
+        return this.send<EntryMoveResult>({
+            method: 'POST',
+            path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/move`,
+            body: move,
         });
     }
 

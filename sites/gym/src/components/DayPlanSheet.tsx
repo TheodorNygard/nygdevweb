@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
+import { DragHandle } from './DragHandle';
 import { ExercisePicker } from './ExercisePicker';
 import { Sheet } from './Sheet';
 import { Stepper } from './Stepper';
+import { reordered, useDragReorder } from '../hooks/useDragReorder';
 import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise } from '../lib/types';
 
@@ -35,6 +37,12 @@ interface DayPlanSheetProps {
  * target off the position in the block. The plan is not a contract either: it
  * seeds a session's exercises and shows a target, and nothing stops you logging
  * four sets against a three-set plan.
+ *
+ * The order here is what a seeded session opens with, entry for entry, and
+ * order is meaningful downstream — see the note on `useDragReorder` in
+ * `SessionScreen`. Dragging the handle reorders the *draft*, same as every
+ * other edit on this sheet: it saves with the rest of the plan on the Plan
+ * tab's Save, not on its own.
  */
 export function DayPlanSheet({
     label,
@@ -45,6 +53,10 @@ export function DayPlanSheet({
     onClose,
 }: DayPlanSheetProps) {
     const [picking, setPicking] = useState(false);
+
+    const { rowProps, handleProps } = useDragReorder(plan.length, (from, to) => {
+        onChange(reordered(plan, from, to));
+    });
 
     function replace(index: number, patch: Partial<PlannedExercise>) {
         onChange(plan.map((entry, position) => (
@@ -82,39 +94,63 @@ export function DayPlanSheet({
                     </p>
                 ) : (
                     <div className="planned">
-                        {plan.map((entry, index) => (
-                            <div className="planned__item" key={`${entry.exerciseName}-${index}`}>
-                                <div className="planned__head">
-                                    <div>
-                                        <div className="planned__name">{entry.exerciseName}</div>
-                                        <div className="planned__eq">
-                                            {equipmentFor(library, entry.exerciseName)}
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="set__del"
-                                        onClick={() => remove(index)}
-                                        aria-label={`Remove ${entry.exerciseName} from the plan`}
-                                    >
-                                        ×
-                                    </button>
-                                </div>
+                        {plan.map((entry, index) => {
+                            const row = rowProps(index);
+                            const className = row.className
+                                ? `planned__item ${row.className}`
+                                : 'planned__item';
+
+                            return (
                                 <div
-                                    className="stepper-row stepper-row--single"
-                                    style={{ marginTop: 10 }}
+                                    className={className}
+                                    style={row.style}
+                                    ref={row.ref}
+                                    key={`${entry.exerciseName}-${index}`}
                                 >
-                                    <Stepper
-                                        label="SETS"
-                                        value={String(entry.sets)}
-                                        onDecrease={() => replace(index, { sets: entry.sets - 1 })}
-                                        onIncrease={() => replace(index, { sets: entry.sets + 1 })}
-                                        canDecrease={entry.sets > 1}
-                                        canIncrease={entry.sets < MAX_SETS}
-                                    />
+                                    <div className="planned__head">
+                                        <DragHandle
+                                            label={entry.exerciseName}
+                                            {...handleProps(index)}
+                                        />
+                                        <div className="planned__body">
+                                            <div className="planned__name">
+                                                {entry.exerciseName}
+                                            </div>
+                                            <div className="planned__eq">
+                                                {equipmentFor(library, entry.exerciseName)}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="set__del"
+                                            onClick={() => remove(index)}
+                                            aria-label={`Remove ${entry.exerciseName} from the plan`}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                    <div
+                                        className="stepper-row stepper-row--single"
+                                        style={{ marginTop: 10 }}
+                                    >
+                                        <Stepper
+                                            label="SETS"
+                                            value={String(entry.sets)}
+                                            onDecrease={() => replace(
+                                                index,
+                                                { sets: entry.sets - 1 },
+                                            )}
+                                            onIncrease={() => replace(
+                                                index,
+                                                { sets: entry.sets + 1 },
+                                            )}
+                                            canDecrease={entry.sets > 1}
+                                            canIncrease={entry.sets < MAX_SETS}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
