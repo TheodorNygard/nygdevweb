@@ -5,8 +5,9 @@ the free tier.
 
 Two of them — nygdev.dev and run.nygard.dev — have no framework and no build
 step: HTML with styles and SVG icons inlined, one script each, some favicons.
-gym.nygard.dev is a React + TypeScript app built with Vite, because its one
-dependency (MSAL) is large enough that bundling it beats vendoring it by hand.
+gym.nygard.dev is a React + TypeScript app built with Vite, because MSAL and
+two self-hosted typefaces are more than a hand-vendored `vendor/` folder is
+worth maintaining.
 All three still ship as plain static files; only one of them has a step that
 produces those files.
 
@@ -14,7 +15,7 @@ produces those files.
 | --- | --- | --- |
 | [nygdev.dev](https://nygdev.dev) | `sites/nygdev/` | One-page personal site: profile links, a link to my LikeC4 architecture diagram, and a live status button for my self-hosted Foundry VTT server that can start the server when it's down |
 | [run.nygard.dev](https://run.nygard.dev) | `sites/run/` | Marathon prep dashboard: reads a precomputed JSON feed from public blob storage and charts training load, weekly volume, pace by run type and the easy/hard intensity split |
-| [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog's front end, a React + Vite + TypeScript app. Today it is a token inspector: signs in with MSAL against Entra ID and prints the resulting tokens decoded, the way jwt.ms does for one you paste in |
+| [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog: a mesocycle training logger, React + Vite + TypeScript. Signs in with MSAL against Entra ID and logs sets one tap at a time against `func-nygdev-api` |
 
 All three sites live in one repo because the deploy identity is federated to
 this repo — a second repo would need its own federated credential subjects. A
@@ -162,90 +163,166 @@ Two conventions in `sites/run/` are load-bearing rather than cosmetic:
 Every chart ships a table view, and every mark answers to keyboard focus with
 the same readout it gives on hover.
 
-## gym.nygard.dev and the token inspector
+## gym.nygard.dev and GymLog
 
-The page signs in against Entra ID with MSAL and prints what comes back: the
-ID token always, and an access token for whatever resource scope you ask it
-for. Each is shown raw, split into its three segments, then decoded into a
-claims table with the timestamps resolved and a one-line note on what each
-claim is for. It is jwt.ms with the sign-in attached, so the request that
-produced a token is visible next to the token.
+A training logger built around **mesocycles**: a block of 3–8 weeks, each week
+holding 2–6 labelled workout days. Three tabs — **Today** (the current week of
+the block), **Plan** (the block's length, days and labels, with a block map)
+and **History** (submitted sessions grouped by week) — plus the session screen
+that everything else exists to get you to.
 
-There is no backend. Nothing is sent anywhere except to Entra ID, and the CSP
-is what makes that checkable rather than a promise — `connect-src` names
-exactly one origin, so an exfiltration path would have to change a file in this
-repo to exist at all.
+The session screen has one rule, and it is the whole design: **after the first
+set the primary button becomes “Log same again”**, so a working set is one tap
+and an adjustment is a delta from what you just did. Weight moves in 2.5 kg
+steps, reps in 1, RPE on a 5–10 slider in halves with a plain-language note
+(“2 reps left”). Every control is at least 44px and the ones you use mid-set
+are in the lower half of the screen, because the premise is a phone held in one
+hand with a bar in the other.
+
+It is dark only. Graphite is the "gym-at-night" direction of the three the
+design offered — near-black, acid-lime accent, mono digits — and it was chosen
+because a bright screen between sets is the thing that makes a logbook go
+unused. A light variant would be a different design, not a preference.
+
+### Where the screens came from
+
+The app is a build of a Claude Design handoff bundle
+(`gym-session-logger-app/`, alongside this repo): HTML/CSS/JS prototypes plus
+`DATA-MODEL.md` and `API-CHANGES.md`. `GymLog Graphite v2.dc.html` turn **2a**
+is what is implemented here — the palette, radii, type ramp and step sizes in
+`src/styles.css` are transcribed from it rather than approximated.
+
+Two things in the prototype are deliberately *not* reproduced, because the
+backend that was modelled after it cannot support them honestly:
+
+- **Duration.** The prototype shows a per-session duration everywhere. The API
+  stores no timestamp finer than the day, so there is nothing to show on a
+  session opened tomorrow. The stopwatch survives on the live session and on
+  the "Workout logged" screen — where it is genuinely known — and History shows
+  the session's **date** in its place.
+- **Equipment on a logged exercise.** The API stores an entry's name and
+  nothing else, on purpose. The chip under an exercise name is a lookup into
+  the shipped library, and reads `CUSTOM` for a name the user typed.
+
+One screen exists that the prototype does not have: the **duplicate list** on
+the day sheet. See below.
+
+### The API, and the three behaviours built around
+
+Everything but the exercise library comes from `func-nygdev-api`, documented in
+`apifunctionapp/Gym/README.md` in the NygDevAzure repo. Three of its properties
+shape the front end rather than just its request bodies:
+
+**`alreadyRecorded` is success, not a failure.** Every write carries the count
+the client believes the session holds — `expectedSetCount`, `expectedEntryCount`
+— and applies only while that is still true. A request whose response was lost
+and was retried comes back `200 {alreadyRecorded: true}` instead of logging the
+set twice. `useSession` treats that as the success it is, which is what makes
+"Log same again" safe to hammer on gym wifi. A `409 count_mismatch` is the
+other outcome: nothing was written, the local copy is stale, and the hook
+re-reads the workout and says so in a banner.
+
+That guard is also what lets every write apply **locally first**. The row
+appears on the tap rather than 300 ms later, and the only thing that makes that
+safe rather than optimistic is the count the server checks.
+
+**A cell can hold more than one session.** Sessions are keyed on the calendar
+date, not on `(meso, week, dayIndex)`, so tapping Start on a day already logged
+files a *second* session rather than overwriting the first — the API relaxed
+the prototype's overwrite rule because losing a logged workout to a mistyped
+tap is worse than showing two. The front end's half of that bargain is the day
+sheet: the cell shows the most recent session, the others are listed under it,
+and each carries a delete. Without that screen the relaxation would just be a
+leak.
+
+**The date comes from the phone.** `POST /gym/workouts` takes `date` as
+`YYYY-MM-DD` in the *device's* timezone. The API runs in UTC and a 21:00
+session in Oslo is already tomorrow there for half the year, so a server-derived
+date would file evening workouts under the wrong day. `localDate()` in
+`src/lib/format.ts` builds it from the local date parts and specifically not
+from `toISOString()`, which is the same bug wearing a different hat.
+
+### The exercise library is a blob, not a route
+
+`GET /exercises` does not exist. The built-in library is identical for every
+user and changes when the app ships, so it is a static file on the CDN —
+`https://nygdevcdn.blob.core.windows.net/data/gym-exercises.json`, anonymous
+read, cached for a day. The front end fetches it once with no token and no
+function invocation; `gym/exercises.json` in NygDevAzure is the source and
+`gym_exercise_library_url` the authority on the URL.
+
+The fetch sends **no** `Authorization` header, deliberately: adding one would
+turn a simple cross-origin GET into a preflight the blob endpoint has no CORS
+rule for. If it fails anyway — offline, or a missing CORS rule, which fail
+identically as a bare `TypeError` — `src/lib/library.ts` answers with a bundled
+copy of the same twenty names, because a picker with nothing in it would block
+logging entirely. Custom names are typed inline and post with the entry, so
+nothing about a session depends on the library being reachable.
 
 ### Two registrations, and which is which
 
-This is the thing to get straight before touching the portal, because the same
-GUID means different things in different fields.
+The same GUID means different things in different fields, so this is the thing
+to get straight before touching the portal.
 
-| | Front end (this page) | API (`func-nygdev-api`) |
+| | Front end (this app) | API (`func-nygdev-api`) |
 | --- | --- | --- |
-| Registration | **GymLog**, `f6922f08-…` | its own, separate |
+| Registration | **GymLog**, `f6922f08-…` | its own, eventually |
 | Platform | Single-page application | — |
 | Role in the token | `appid` / `azp` — who *obtained* it | `aud` — who it is *for* |
 | Secret | none, and must not have one | — |
 
-The front end signs in **as** GymLog and asks for a scope **on** the API
-registration. That is what makes the resulting access token satisfy both halves
-of the Easy Auth check on the function app: `allowed_audiences` matches the API
-registration, and `allowed_applications` matches GymLog.
+The app signs in **as** GymLog and asks for a scope whose audience the function
+app accepts. Easy Auth checks both halves: `allowed_audiences` is who the token
+was minted for, `allowed_applications` is who obtained it.
 
-> **The terraform in NygDevAzure does not describe this split yet.**
-> `terraform/consumption.tf` currently points `client_id` and
+> **As applied today, both halves are GymLog.**
+> `terraform/consumption.tf` in NygDevAzure points `client_id` and
 > `allowed_audiences` at `var.gymlog_client_id`, from when GymLog was going to
-> be both halves. Once the API registration exists, those two need to name it
-> instead — `allowed_applications` is the one field that stays as it is, since
-> GymLog really is the calling client. Until that change is applied, a token
-> minted for the new API registration is rejected by the function app with a
-> 401, and the inspector will happily show you the perfectly valid token that
-> is being rejected.
+> be both. So `API_SCOPE` in `src/lib/config.ts` asks GymLog for a scope on
+> GymLog. Once a separate API registration exists, those two terraform fields
+> name it instead, `allowed_applications` stays as it is, and the only change
+> here is the scope string.
+
+### The one value that has to be created by hand
+
+`API_SCOPE` in `src/lib/config.ts` defaults to
+`api://f6922f08-…/user_impersonation`. **The scope name has to exist on the
+registration's *Expose an API* blade and match this string exactly.** Nothing
+in this repo can create it — neither registration is managed by terraform,
+because that would mean granting the apply workflow Microsoft Graph application
+permissions.
+
+`VITE_GYM_API_SCOPE` overrides it at build time, so a different scope name (or
+a separate API registration later) is an environment change rather than a code
+change. `VITE_GYM_API_BASE` and `VITE_GYM_LIBRARY_URL` exist for the same
+reason. Getting the scope wrong surfaces as **`AADSTS650053`** on the sign-in
+screen, with the fix printed next to it.
 
 ### Portal setup
-
-Neither registration is managed by terraform — granting the apply workflow's
-identity Microsoft Graph application permissions is a far wider grant than a
-couple of app registrations is worth — so this is a manual checklist.
 
 On **GymLog**, once:
 
 1. **Authentication → Add a platform → Single-page application.**
-2. Redirect URI: the exact string the Configuration panel on the page shows.
-   Copy it from there rather than typing it — Entra matches it as a string, and
-   a trailing slash that disagrees is `AADSTS50011`.
+2. Redirect URI: `https://gym.nygard.dev/` and the Static Web App's own
+   hostname, both with the trailing slash. Entra matches it as a string, and a
+   slash that disagrees is `AADSTS50011`. The
+   `gymlog_spa_redirect_uri` terraform output prints both.
 3. Leave it with no client secret. The SPA platform means authorization code
    with PKCE, and a SPA that sends a secret is a SPA that has leaked one.
+4. **Expose an API → Add a scope**, named to match `API_SCOPE` above.
 
 The SPA platform is the load-bearing choice. Registering the same URI under
-**Web** instead looks identical in the portal and fails at sign-in with
+**Web** looks identical in the portal and fails at sign-in with
 `AADSTS9002326`, because a Web redirect URI makes Entra treat the caller as a
 confidential client and demand the secret a browser cannot keep.
 
-On the **API registration**: expose a scope under **Expose an API**, and put
-`api://<api-client-id>/<scope-name>` in the resource-scope box on the page.
-Both halves have to match what the blade says.
-
-### Signing in without a scope
-
-The page works before any of the API side exists. Sign in with the default
-scopes and you get an ID token, which is enough to confirm the registration,
-the redirect URI and the tenant are right. The resource-scope box is the part
-that needs the API registration, and it is separate for that reason — a broken
-scope produces an error next to a working sign-in rather than one failure that
-could be either.
-
 ### The build, and working on it locally
 
-React 19, TypeScript 7 and Vite 8, with `@azure/msal-browser` 5 as the only
-runtime dependency. `package.json` is the record of what is pinned; the majors
-are named here because each decides something that shows up elsewhere in this
-repo: React 19 for the hooks the app is written in, TypeScript 7 for the strict
-options the port leaned on, Vite 8 for the Node version the deploy workflow
-pins.
-
-Everything is in `sites/gym/`:
+React 19, TypeScript 7 and Vite 8. `@azure/msal-browser` 5 is the only runtime
+dependency with logic in it; `@fontsource/space-grotesk` and
+`@fontsource/jetbrains-mono` are the two typefaces the design specifies, self-
+hosted rather than pulled from Google Fonts so the CSP still names no
+third-party origin.
 
 ```sh
 cd sites/gym
@@ -258,26 +335,25 @@ npm run preview   # serve the built dist/ over HTTP
 
 | Path | What it holds |
 | --- | --- |
-| `index.html` | The shell. One `<div id="root">` and the module script Vite rewrites at build time |
-| `src/lib/` | No React: config storage, JWT decoding, the claim reference table, formatting, the AADSTS error map |
-| `src/hooks/` | `useAuth` (all MSAL interaction), `useTheme`, `useNow` |
-| `src/components/` | The cards, tabs, tables and the SVG sprite |
-| `public/` | Copied to the deployed root untouched: favicons, `404.html` and its stylesheet, and `staticwebapp.config.json` |
+| `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
+| `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library, the identity config, the AADSTS error map |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useBlock`, `useSession` (the guarded writes), `useLibrary`, `useElapsed` |
+| `src/screens/` | Today, Plan, History, Session, Done |
+| `src/components/` | The tab bar, the three bottom sheets, the stepper, the banner, the sign-in gate |
+| `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
 | `dist/` | Build output. Gitignored; produced in CI and uploaded as-is |
 
 `npm run build` runs `tsc --build` before Vite, so a type error fails the
 deploy rather than reaching the browser. The compiler options are strict, and
 deliberately include `noUncheckedIndexedAccess` and
-`exactOptionalPropertyTypes` — both of them caught real things during the port,
-the second because MSAL's request types will not accept an explicit
-`account: undefined` where the pre-TypeScript code passed a possibly-null one.
+`exactOptionalPropertyTypes` — the first is what forces every array index off
+the API's arrays to be checked, which is most of what this app does.
 
 **Neither `npm run dev` nor `npm run preview` carries the CSP.** Those headers
 come from `staticwebapp.config.json`, and only Azure reads that file — Vite
 serves `dist/` without them, and the dev server additionally injects inline
 scripts for hot reload that the policy would reject. Checking a change against
-the real policy means serving `dist/` with those headers attached, which is
-what the deployed site does and what a local check has to imitate.
+the real policy means serving `dist/` with those headers attached.
 
 ### MSAL is bundled, not loaded from a CDN
 
@@ -289,12 +365,15 @@ emits it inside the same hashed, same-origin bundle as the rest of the app.
 
 That is the same security property arrived at with less ceremony: the lockfile
 is the record the vendor README used to be, `npm ci` is what checks it, and
-there is no hand-maintained digest to go stale. Loosening the policy to admit
-a CDN is still the thing not to do — it would mean trusting a third-party
-origin with script execution on the one page in this repo that handles access
-tokens, which is the worst page to make that trade on.
+there is no hand-maintained digest to go stale. Loosening the policy to admit a
+CDN is still the thing not to do — it would mean trusting a third-party origin
+with script execution on the one page in this repo that handles access tokens.
 
-`skip_app_build: true` stays in the deploy workflow, and now matters for a
+The fonts are the same argument in a smaller key. Google Fonts would cost two
+more origins in `style-src` and `font-src`; `@fontsource` costs about 60 kB of
+woff2 served from `'self'`, on a page that has to work on gym wifi anyway.
+
+`skip_app_build: true` stays in the deploy workflow, and matters for a
 different reason. The workflow builds on a Node version it pins, then uploads
 `sites/gym/dist` exactly as built; letting Azure's Oryx builder run instead
 would put a second, unpinned toolchain in charge of what ships.
@@ -308,21 +387,26 @@ change was a silently ignored property and a sign-in that failed at runtime.
 
 ### Where this site's CSP differs from the other two
 
-Three deltas, all of them forced by the sign-in:
-
 | Header | Here | Elsewhere | Why |
 | --- | --- | --- | --- |
-| `connect-src` | `login.microsoftonline.com` | the blob endpoint | Where MSAL fetches OIDC metadata and redeems the code for tokens. |
+| `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the exercise library. Three origins and no more; an exfiltration path would have to change this file to exist. |
 | `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
-| `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup, which is exactly what MSAL's popup flow polls. Redirect is the default here and is unaffected; this is what keeps the popup option from being a trap. |
+| `font-src` | `'self'` | absent | The two self-hosted typefaces. `default-src 'none'` means an unlisted `font-src` is `none`, and the app would silently fall back to system fonts. |
+| `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup. The app signs in by redirect, so this is not load-bearing today — it is what keeps a popup flow from being a trap if one is ever added. |
 
-`style-src` is also different, and that one is not forced by anything — it is
-plain `'self'` here, where the other two sites need `'unsafe-inline'` for their
-inlined `<style>` block. Vite emits the stylesheet as a hashed same-origin
-file, so nothing on this site needs inline styles: the SVG sprite is hidden by
-a class rather than a `style` attribute, and `404.html` links `404.css` instead
-of carrying its own `<style>`. MSAL's hidden renewal iframe is unaffected — it
-sets `element.style.visibility` through the CSSOM, which CSP does not govern.
+The API's CORS list has to agree with the origin, and that list lives in
+terraform (`site_config.cors` in `terraform/consumption.tf`) rather than in the
+function code — the platform stamps the header and the function never sees the
+preflight. Both `https://gym.nygard.dev` and the Static Web App's own hostname
+are on it.
+
+`style-src` is plain `'self'` here, where the other two sites need
+`'unsafe-inline'` for their inlined `<style>` block. Vite emits the stylesheet
+as a hashed same-origin file, and `404.html` links `404.css` rather than
+carrying its own. The handful of inline `style` attributes in the app are
+attributes, not blocks, and CSP does not govern them without
+`style-src-attr` — MSAL's hidden renewal iframe relies on the same thing, since
+it sets `element.style.visibility` through the CSSOM.
 
 `Cross-Origin-Embedder-Policy` is **omitted** here, where the other two sites
 set `credentialless`. It buys this page nothing — there is no
@@ -333,36 +417,38 @@ that only breaks a working path is not a security control.
 
 ### When sign-in fails
 
-The page pulls the `AADSTS` code out of the error and shows it on its own line,
-with the fix for the ones that mean something specific about this setup. The
-`ERROR_FIXES` table in `src/lib/errors.ts` is that list; the codes worth knowing on sight
-are `AADSTS50011` (redirect URI not registered), `AADSTS9002326` (registered
-under Web instead of SPA) and `AADSTS650053` (the scope is not what the API
-registration exposes).
+`SignInGate` pulls the `AADSTS` code out of the error and shows it on its own
+line, with the fix for the ones that mean something specific about this setup.
+The `ERROR_FIXES` table in `src/lib/errors.ts` is that list; the codes worth
+knowing on sight are `AADSTS50011` (redirect URI not registered),
+`AADSTS9002326` (registered under Web instead of SPA) and `AADSTS650053` (the
+scope does not exist on the registration — see above).
 
-### Tokens on screen
+An API failure is a different banner, and it prints the API's own `message`
+unedited: those messages are written to be shown or logged as-is, and they name
+the field, what arrived and what was expected.
 
-The page prints live credentials, which is its job and also its main hazard. A
-token shown here can be replayed by anyone who reads it until it expires, so a
-screenshot of this page is a password. Two things keep the blast radius small
-and both are deliberate:
+### Tokens, storage, and what is on screen
 
-- MSAL caches in **`sessionStorage`**, not `localStorage`. Tokens die with the
-  tab rather than sitting on disk after the window is closed.
-- MSAL's logger is **silenced**. Its verbose levels print tokens, and a token
-  in a console someone screen-shares is a token leaked to everyone watching.
+MSAL caches in **`localStorage`** here. The token inspector this app replaced
+chose `sessionStorage` for a good reason — it existed to *display* credentials,
+so leaving them on disk was the cost rather than the point — and that reason no
+longer applies: this is a logbook opened between sets on a phone that
+backgrounds the tab, and a cache that dies with the tab means a redirect to
+Entra in the middle of a workout. No token is rendered anywhere.
 
-Claim values reach the DOM as JSX text, which React escapes — never through
-`dangerouslySetInnerHTML`, which is not used anywhere in this app. A JWT is
-attacker-influenced input — anyone can sign in, and a display name is whatever
-its owner set it to — so it is rendered as data, not markup. That was
-`textContent` before the rewrite and is the same property by a different
-mechanism.
+MSAL's logger stays **silenced**. Its verbose levels print tokens, and a token
+in a console someone screen-shares from a gym floor is a token leaked to
+everyone watching.
 
-Stored configuration is treated the same way. `localStorage` holds whatever a
-previous version of the page or a typo in devtools left there, so `loadConfig`
-takes each field only when it is the type the rest of the code assumes and
-falls back to the default otherwise.
+Everything the API returns reaches the DOM as JSX text, which React escapes —
+never through `dangerouslySetInnerHTML`, which is not used anywhere in this
+app. Exercise names are user input by design (a custom name is whatever its
+owner typed), so they are rendered as data rather than markup.
+
+**The user is the token.** No route, query string or body in this app carries a
+user id; the Entra object id off the validated principal is the Cosmos
+partition key, and it is the only thing that decides whose log you are reading.
 
 ## Inline scripts and the CSP
 

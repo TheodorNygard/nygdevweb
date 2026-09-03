@@ -1,0 +1,23 @@
+{
+    "name": "GymLog",
+    "short_name": "GymLog",
+    "description": "Log a training block, one tap per set.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0b0c0e",
+    "theme_color": "#0b0c0e",
+    "icons": [
+        {
+            "src": "/favicon-32x32.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        },
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        }
+    ]
+}

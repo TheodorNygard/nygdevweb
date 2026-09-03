@@ -1,62 +1,96 @@
-const timeFormat = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-});
+// The prototype's formatting rules, kept as functions so every screen renders
+// a number the same way. The three that matter — `kg`, `num` and the RPE note —
+// are transcribed from `GymLog Graphite v2.dc.html` rather than reinvented.
 
-// Says "in 42 minutes" in the reader's locale rather than in English.
-const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-
-const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-    ['year', 31536000],
-    ['day', 86400],
-    ['hour', 3600],
-    ['minute', 60],
-    ['second', 1],
-];
-
-export function relativeSeconds(seconds: number): string {
-    const abs = Math.abs(seconds);
-
-    for (const [unit, size] of RELATIVE_UNITS) {
-        if (abs >= size || unit === 'second') {
-            return relativeFormat.format(Math.round(seconds / size), unit);
-        }
-    }
-
-    return '';
+/** Integers plain, halves to one decimal: 100, not 100.0; 7.5, not 7.50. */
+export function num(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-export interface Moment {
-    absolute: string;
-    relative: string;
+/** Volume, in tonnes past a thousand kilos so the number stays four characters. */
+export function kg(value: number): string {
+    return value >= 1000 ? `${(value / 1000).toFixed(1)}t` : `${Math.round(value)}kg`;
 }
 
-// A JWT time claim is seconds since the epoch; Date wants milliseconds. Getting
-// that wrong puts every timestamp in 1970, which is why the raw number stays on
-// screen next to the formatted date rather than being replaced by it.
-export function formatEpoch(value: unknown, now: number = Date.now()): Moment | null {
-    const seconds = Number(value);
-
-    if (!Number.isFinite(seconds)) return null;
-
-    const date = new Date(seconds * 1000);
-
-    if (Number.isNaN(date.getTime())) return null;
-
-    return {
-        absolute: timeFormat.format(date),
-        relative: relativeSeconds(seconds - now / 1000),
-    };
+/** An average RPE, or the em dash the design uses when no set carried one. */
+export function rpeLabel(value: number | null): string {
+    return value === null ? '—' : value.toFixed(1);
 }
 
-export function formatClaimValue(value: unknown): string {
-    if (Array.isArray(value)) return value.join(' ');
-    if (value === null) return 'null';
-    if (typeof value === 'object') return JSON.stringify(value);
+/**
+ * The plain-language half of the RPE slider. Reps in reserve is what the
+ * number means to someone mid-set, and it is the reason the slider is not
+ * simply a number box.
+ */
+export const RPE_NOTE: Record<string, string> = {
+    '5': 'warm-up',
+    '5.5': 'warm-up',
+    '6': 'easy, 4+ left',
+    '6.5': '4 left',
+    '7': '3 reps left',
+    '7.5': '2–3 left',
+    '8': '2 reps left',
+    '8.5': '1–2 left',
+    '9': '1 rep left',
+    '9.5': 'barely 1',
+    '10': 'all out',
+};
 
-    return String(value);
+export function rpeNote(value: number): string {
+    return RPE_NOTE[String(value)] ?? '';
 }
 
-export function formatJson(value: unknown): string {
-    return JSON.stringify(value, null, 2);
+/**
+ * Today, as `YYYY-MM-DD` in the phone's timezone — the one field the API
+ * cannot derive. Built from the local parts rather than `toISOString()`, which
+ * converts to UTC and would file a 21:00 Oslo session under tomorrow for half
+ * the year. That bug is the whole reason this value is sent at all.
+ */
+export function localDate(date: Date = new Date()): string {
+    const pad = (value: number) => String(value).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** `SAT 3 SEP` — the masthead date on Today. */
+export function todayLabel(date: Date = new Date()): string {
+    return date
+        .toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+        .toUpperCase();
+}
+
+/**
+ * The date a session id carries. Ids are `session_YYYY-MM-DD` with an optional
+ * `_2` for a second session on the same date, which is what makes them
+ * constructible — and what lets History show a date the API never sends as a
+ * field of its own.
+ */
+export function sessionDate(sessionId: string): string | null {
+    const match = /^session_(\d{4})-(\d{2})-(\d{2})(?:_(\d+))?$/.exec(sessionId);
+
+    if (!match) return null;
+
+    return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+/** `3 Sep` for a session row, or the raw id if it is not shaped like one. */
+export function sessionDateLabel(sessionId: string): string {
+    const date = sessionDate(sessionId);
+
+    if (!date) return sessionId;
+
+    return new Date(`${date}T00:00:00`)
+        .toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+/** Which session of the day this is: 1 for `session_2026-09-03`, 2 for `…_2`. */
+export function sessionOrdinal(sessionId: string): number {
+    const match = /_(\d+)$/.exec(sessionId);
+
+    return match?.[1] ? Number(match[1]) : 1;
+}
+
+/** `62:10` — the live session's elapsed time, mm:ss. */
+export function elapsedLabel(seconds: number): string {
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
