@@ -9,14 +9,11 @@ interface HistoryScreenProps {
 
 /**
  * Submitted workouts, grouped under their week with the week's volume beside
- * it. The grouping is client-side, off each session's `week` — the API sends
- * one flat list newest first, and a week is a filter over it rather than a
- * shape it stores.
+ * it. The grouping is client-side: the API sends one flat list newest first.
  *
- * Where the prototype showed a duration on each row, this shows the date. The
- * API stores no timestamp finer than the day, so a duration would either be
- * invented or blank; the date is the one thing the session id genuinely
- * carries, and it is the thing you want when a cell holds two of them.
+ * Rows show the date where the prototype showed a duration. The API stores no
+ * timestamp finer than the day, and the date is what you want anyway when a
+ * cell holds two sessions.
  */
 export function HistoryScreen({ block, onOpen }: HistoryScreenProps) {
     const { mesocycle, sessions } = block;

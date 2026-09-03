@@ -3,16 +3,10 @@ import type { CurrentBlock, Mesocycle, SessionSummary } from './types';
 /**
  * The sessions filed against one cell of the block map, newest first.
  *
- * A cell holds more than one now. Sessions are keyed on the calendar date
- * rather than on `(meso, week, dayIndex)`, so tapping Start on a day that has
- * already been logged files a *second* session rather than overwriting the
- * first — the API relaxed that rule deliberately, because silently destroying
- * a logged workout because the wrong day was tapped is a worse failure than a
- * visible duplicate.
- *
- * The screens answer it the way the API's README suggests: the cell shows the
- * most recent session, and the day sheet lists the rest with a way to delete
- * one.
+ * A cell holds more than one now: sessions are keyed on the calendar date
+ * rather than on `(meso, week, dayIndex)`, so Start on an already-logged day
+ * files a *second* session rather than overwriting the first. The cell shows
+ * the most recent; the day sheet lists the rest with a way to delete one.
  */
 export function sessionsFor(
     sessions: SessionSummary[],
@@ -35,11 +29,9 @@ export interface BlockProgress {
 }
 
 /**
- * "12 of 20 workouts logged".
- *
- * Counted in cells rather than in sessions, because the denominator is cells:
- * a day logged twice is one cell of progress through the block, not two, and
- * counting sessions would let a block read 21 of 20.
+ * "12 of 20 workouts logged". Counted in cells rather than in sessions: a day
+ * logged twice is one cell of progress, and counting sessions would let a block
+ * read 21 of 20.
  */
 export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): BlockProgress {
     const cells = new Set<string>();
@@ -62,13 +54,11 @@ export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): Bl
 }
 
 /**
- * Which week Today opens on: the one being trained, taken as the latest week
- * that has anything in it, or the first week of a block with nothing yet.
+ * Which week Today opens on: the latest week with anything in it, or week 1.
  *
- * Not derived from the calendar. Days are labelled, not scheduled — the whole
- * premise is that you log "Upper A" whenever you do it — so there is no date
- * arithmetic that could say which week it is, and guessing from the block's
- * start date would be wrong for anyone who missed a week.
+ * Not derived from the calendar. Days are labelled, not scheduled — you log
+ * "Upper A" whenever you do it — so there is no date arithmetic that could say
+ * which week it is, and a start date would be wrong for anyone who missed one.
  */
 export function currentWeek(block: CurrentBlock): number {
     if (!block.mesocycle) return 1;

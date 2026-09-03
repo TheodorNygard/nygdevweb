@@ -45,12 +45,10 @@ export function useAuth(): AuthState & AuthActions {
     // restart every screen's data load with it.
     const accountRef = useRef<AccountInfo | null>(null);
 
-    const adopt = useCallback((pca: IPublicClientApplication, result: AuthenticationResult) => {
-        if (!result.account) return;
-
-        pca.setActiveAccount(result.account);
-        accountRef.current = result.account;
-        setAccount(result.account);
+    const adopt = useCallback((pca: IPublicClientApplication, next: AccountInfo) => {
+        pca.setActiveAccount(next);
+        accountRef.current = next;
+        setAccount(next);
     }, []);
 
     useEffect(() => {
@@ -68,21 +66,17 @@ export function useAuth(): AuthState & AuthActions {
                 // from a redirect, this is what consumes the response in the
                 // URL fragment. Skipping it leaves the token in the address bar
                 // and the app looking signed out.
-                const redirectResult = await pca.handleRedirectPromise(REDIRECT_HANDLING);
+                const redirected: AuthenticationResult | null =
+                    await pca.handleRedirectPromise(REDIRECT_HANDLING);
 
                 if (cancelled) return;
 
-                if (redirectResult) {
-                    adopt(pca, redirectResult);
-                } else {
-                    const restored = pca.getActiveAccount() ?? pca.getAllAccounts()[0] ?? null;
+                const next = redirected?.account
+                    ?? pca.getActiveAccount()
+                    ?? pca.getAllAccounts()[0]
+                    ?? null;
 
-                    if (restored) {
-                        pca.setActiveAccount(restored);
-                        accountRef.current = restored;
-                        setAccount(restored);
-                    }
-                }
+                if (next) adopt(pca, next);
             } catch (cause) {
                 if (!cancelled) setError(describeAuthError(cause));
             } finally {
@@ -102,11 +96,8 @@ export function useAuth(): AuthState & AuthActions {
         setSigningIn(true);
 
         // Redirect rather than popup: an iOS home-screen app has no popup to
-        // open, and this is a page meant to be added to a home screen.
-        //
-        // The API scope rides along with the sign-in scopes so one round trip
-        // produces both the session and a token for the API. Asking for it
-        // later would mean a second redirect the first time anything loads.
+        // open. The API scope rides along with the sign-in scopes so one round
+        // trip produces both the session and a token for the API.
         void pca
             .loginRedirect({ scopes: [...LOGIN_SCOPES, API_SCOPE] })
             .catch((cause: unknown) => {
@@ -147,10 +138,10 @@ export function useAuth(): AuthState & AuthActions {
             return result.accessToken;
         } catch (cause) {
             // InteractionRequiredAuthError is how Entra says "ask the user
-            // something" — consent, MFA, a Conditional Access rule, or simply
-            // an expired refresh token. It is the one failure worth answering
-            // with a redirect; anything else would put a sign-in screen in
-            // front of the same error.
+            // something" — consent, MFA, Conditional Access, or an expired
+            // refresh token. It is the one failure worth answering with a
+            // redirect; anything else would put a sign-in screen in front of
+            // the same error.
             if (cause instanceof InteractionRequiredAuthError) {
                 // Does not return: the browser navigates away and the app
                 // reloads into handleRedirectPromise above.

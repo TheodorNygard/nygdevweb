@@ -26,8 +26,7 @@ interface Draft {
     weeks: number;
 
     // The whole day, plan included: `days` is replaced wholesale by the PATCH,
-    // so the draft has to carry what it is not editing as well as what it is.
-    // Holding only labels here is how a save would silently clear every plan.
+    // so holding only labels here is how a save would clear every plan.
     days: DayInput[];
 }
 
@@ -90,12 +89,12 @@ interface PlanScreenProps {
 
 /**
  * The Plan tab owns the block: its length, how many days it holds, and what
- * they are called. Editing it is safe by construction — sessions are keyed on
- * their date rather than on their position, so shortening a block hides cells
- * rather than orphaning workouts, and the copy says so.
+ * they are called. Editing is safe by construction — sessions are keyed on
+ * their date rather than their position, so shortening a block hides cells
+ * rather than orphaning workouts.
  *
- * The draft is local until Save. A PATCH per keystroke would be a write per
- * character on a field whose value is only meaningful once it is finished.
+ * The draft is local until Save: a PATCH per keystroke would be a write per
+ * character on a field only meaningful once it is finished.
  */
 export function PlanScreen({
     block,
@@ -117,8 +116,7 @@ export function PlanScreen({
     const [planningDay, setPlanningDay] = useState<number | null>(null);
 
     // The saved block changed under the draft — a create, or another device.
-    // Adopting it is the honest thing: the alternative is showing edits
-    // against a block that no longer exists.
+    // The alternative is showing edits against a block that no longer exists.
     const [adopted, setAdopted] = useState(saved);
 
     if (adopted !== saved) {
@@ -160,10 +158,9 @@ export function PlanScreen({
         });
     }
 
-    // The map is drawn from the *draft*, so dragging weeks up or down shows
-    // what the block will look like before it is saved. Cells outside the new
-    // bounds simply stop being drawn — which is exactly what the API does to
-    // them, rather than deleting anything.
+    // Drawn from the *draft*, so stepping weeks up or down previews the block
+    // before it is saved. Cells outside the new bounds stop being drawn, which
+    // is what the API does to them rather than deleting anything.
     const rows = Array.from({ length: draft.weeks }, (_, index) => {
         const week = index + 1;
 
@@ -225,9 +222,8 @@ export function PlanScreen({
             <span className="section-label">WORKOUT DAYS</span>
             <div className="dayfields">
                 {draft.days.map((day, index) => (
-                    // The index is the identity here, and legitimately: a day
-                    // *is* its position in the block — that position is the
-                    // `dayIndex` every session is filed under.
+                    // The index is the identity, legitimately: a day *is* its
+                    // position — the `dayIndex` sessions are filed under.
                     <div className="dayfield" key={index}>
                         <span className="dayfield__badge">D{index + 1}</span>
                         <input

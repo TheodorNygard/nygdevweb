@@ -11,12 +11,9 @@ interface FinishSheetProps {
 }
 
 /**
- * The confirmation between the last set and a submitted workout.
- *
- * It exists to show the four numbers rather than to ask permission: submit is
- * idempotent and reversible enough — a session can be deleted, and the sets
- * are already stored either way — so the sheet is a last look at what the
- * session added up to, not a warning.
+ * The confirmation between the last set and a submitted workout. It shows the
+ * four numbers rather than asking permission: submit is idempotent and the sets
+ * are already stored either way, so this is a last look, not a warning.
  */
 export function FinishSheet({ label, totals, busy, onSubmit, onClose }: FinishSheetProps) {
     const stats = [

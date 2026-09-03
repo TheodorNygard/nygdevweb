@@ -14,16 +14,13 @@ export interface SessionState {
     /** Shown as a banner. Written by the API where the API had something to say. */
     error: string | null;
 
-    /**
-     * Something that happened but is not a failure — a resumed draft, a resync
-     * after a stale count.
-     */
+    /** Something that happened but is not a failure — a resumed draft, a resync. */
     notice: string | null;
 
     /**
      * When the last write landed, for the "Saved 19:42" line in the session
-     * header. It is what makes "every set saves as you log it" checkable
-     * rather than a claim, which matters on a phone that just lost signal.
+     * header. It is what makes "every set saves as you log it" checkable rather
+     * than a claim, which matters on a phone that just lost signal.
      */
     savedAt: number | null;
 }
@@ -32,12 +29,14 @@ export interface SessionActions {
     start: (week: number, dayIndex: number) => Promise<Workout | null>;
     open: (sessionId: string) => Promise<Workout | null>;
     close: () => void;
-    addEntry: (exerciseName: string) => Promise<number | null>;
+    addEntry: (exerciseName: string) => Promise<void>;
     logSet: (entryIndex: number, set: WorkSet) => Promise<void>;
     removeSet: (entryIndex: number, setIndex: number) => Promise<void>;
     submit: () => Promise<boolean>;
     dismiss: () => void;
 }
+
+const STALE = 'This session had changed elsewhere. Reloaded from the server.';
 
 function withEntries(workout: Workout, entries: SessionEntry[]): Workout {
     return { ...workout, entries, totals: computeTotals(entries) };
@@ -47,22 +46,20 @@ function withEntries(workout: Workout, entries: SessionEntry[]): Workout {
  * The open session, and the four guarded writes that change it.
  *
  * Every write applies locally first and asks the API second. That is not
- * optimism for its own sake: the button being tapped is one a user hits
- * between sets with a bar still in their hands, and a 300 ms round trip
- * between the tap and the row appearing is the difference between a logbook
- * and a form. What makes it safe is the guard the API takes on every call —
- * the count the client believes the session holds — so a retry cannot apply
- * twice and a stale count cannot apply at all.
+ * optimism for its own sake: the button being tapped is one a user hits between
+ * sets with a bar still in their hands, and a 300 ms round trip between the tap
+ * and the row appearing is the difference between a logbook and a form. What
+ * makes it safe is the guard the API takes on every call — the count the client
+ * believes the session holds — so a retry cannot apply twice and a stale count
+ * cannot apply at all.
  *
- * Three outcomes, and all three are handled here rather than on screen:
+ * Three outcomes, all handled here rather than on screen:
  *
- * - `alreadyRecorded` / `alreadyRemoved` is **success**. It means the first
- *   attempt landed and this one was the retry. The local state already shows
- *   it, so there is nothing to do but keep it.
- * - `409 count_mismatch` means the local copy is stale and nothing was
- *   written. The workout is re-read and the local copy replaced with what the
- *   API holds — the one case where a tap visibly does something other than
- *   what it looked like it did, which is why it leaves a notice behind.
+ * - `alreadyRecorded` / `alreadyRemoved` is **success**: the first attempt
+ *   landed and this was the retry, so the local state already shows it.
+ * - `409 count_mismatch` means the local copy is stale and nothing was written.
+ *   The workout is re-read and replaced with what the API holds — the one case
+ *   where a tap visibly does something else, hence the notice.
  * - Anything else rolls the optimistic change back, so the screen never claims
  *   a set is logged when it is not.
  */
@@ -73,9 +70,9 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
     const [notice, setNotice] = useState<string | null>(null);
     const [savedAt, setSavedAt] = useState<number | null>(null);
 
-    // The writes read the current workout to build their guard counts, and
-    // they are called from event handlers that would otherwise close over a
-    // stale render. A ref is the copy that is always current.
+    // The writes read the current workout to build their guard counts, and they
+    // are called from event handlers that would otherwise close over a stale
+    // render. A ref is the copy that is always current.
     const current = useRef<Workout | null>(null);
 
     const put = useCallback((next: Workout | null) => {
@@ -165,110 +162,91 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         setSavedAt(null);
     }, [put]);
 
-    const addEntry = useCallback(async (exerciseName: string): Promise<number | null> => {
+    /**
+     * Apply an optimistic change, then send it. The rollback, the stale-count
+     * resync and the saved-at stamp are the same three answers for every write,
+     * so they live here once.
+     */
+    const write = useCallback(async (
+        next: (session: Workout) => Workout,
+        send: (api: GymApi, session: Workout) => Promise<unknown>,
+        staleNotice: string,
+    ): Promise<void> => {
         const session = current.current;
 
-        if (!api || !session) return null;
+        if (!api || !session) return;
 
-        const expectedEntryCount = session.entries.length;
-        const optimistic: SessionEntry = { exerciseName, sets: [] };
-
-        put(withEntries(session, [...session.entries, optimistic]));
+        put(next(session));
 
         try {
-            const result = await api.addEntry(session.id, exerciseName, expectedEntryCount);
-
+            await send(api, session);
             setSavedAt(Date.now());
-
-            // `alreadyRecorded` included: either way the entry is in the
-            // session at the index the API names, which is what sets are
-            // logged against.
-            return result.entryIndex;
         } catch (cause) {
             if (cause instanceof ApiError && cause.isCountMismatch) {
-                const fresh = await resync(session.id);
+                await resync(session.id);
+                setNotice(staleNotice);
 
-                setNotice('This session had changed elsewhere. Reloaded — add the exercise again.');
-
-                return fresh
-                    ? fresh.entries.findIndex((entry) => entry.exerciseName === exerciseName)
-                    : null;
+                return;
             }
 
             put(session);
             setError(describe(cause));
-
-            return null;
         }
     }, [api, put, resync, describe]);
 
+    const addEntry = useCallback(async (exerciseName: string): Promise<void> => {
+        const expectedEntryCount = current.current?.entries.length ?? 0;
+
+        await write(
+            (session) => withEntries(session, [...session.entries, { exerciseName, sets: [] }]),
+            (client, session) => client.addEntry(session.id, exerciseName, expectedEntryCount),
+            'This session had changed elsewhere. Reloaded — add the exercise again.',
+        );
+    }, [write]);
+
     const logSet = useCallback(async (entryIndex: number, set: WorkSet): Promise<void> => {
-        const session = current.current;
-        const entry = session?.entries[entryIndex];
+        const expectedSetCount = current.current?.entries[entryIndex]?.sets.length;
 
-        if (!api || !session || !entry) return;
+        if (expectedSetCount === undefined) return;
 
-        const expectedSetCount = entry.sets.length;
-        const entries = session.entries.map((existing, index) => (
-            index === entryIndex ? { ...existing, sets: [...existing.sets, set] } : existing
-        ));
-
-        put(withEntries(session, entries));
-
-        try {
-            await api.logSet(session.id, {
+        await write(
+            (session) => withEntries(session, session.entries.map((entry, index) => (
+                index === entryIndex ? { ...entry, sets: [...entry.sets, set] } : entry
+            ))),
+            (client, session) => client.logSet(session.id, {
                 entryIndex,
                 expectedSetCount,
                 weightKg: set.weightKg,
                 reps: set.reps,
                 rpe: set.rpe,
-            });
+            }),
+            STALE,
+        );
+    }, [write]);
 
-            setSavedAt(Date.now());
-        } catch (cause) {
-            if (cause instanceof ApiError && cause.isCountMismatch) {
-                await resync(session.id);
-                setNotice('This session had changed elsewhere. Reloaded from the server.');
+    const removeSet = useCallback(async (
+        entryIndex: number,
+        setIndex: number,
+    ): Promise<void> => {
+        const expectedSetCount = current.current?.entries[entryIndex]?.sets.length;
 
-                return;
-            }
+        if (expectedSetCount === undefined) return;
 
-            put(session);
-            setError(describe(cause));
-        }
-    }, [api, put, resync, describe]);
-
-    const removeSet = useCallback(async (entryIndex: number, setIndex: number): Promise<void> => {
-        const session = current.current;
-        const entry = session?.entries[entryIndex];
-
-        if (!api || !session || !entry) return;
-
-        const expectedSetCount = entry.sets.length;
-        const entries = session.entries.map((existing, index) => (
-            index === entryIndex
-                ? { ...existing, sets: existing.sets.filter((_, position) => position !== setIndex) }
-                : existing
-        ));
-
-        put(withEntries(session, entries));
-
-        try {
-            await api.removeSet(session.id, entryIndex, setIndex, expectedSetCount);
-
-            setSavedAt(Date.now());
-        } catch (cause) {
-            if (cause instanceof ApiError && cause.isCountMismatch) {
-                await resync(session.id);
-                setNotice('This session had changed elsewhere. Reloaded from the server.');
-
-                return;
-            }
-
-            put(session);
-            setError(describe(cause));
-        }
-    }, [api, put, resync, describe]);
+        await write(
+            (session) => withEntries(session, session.entries.map((entry, index) => (
+                index === entryIndex
+                    ? { ...entry, sets: entry.sets.filter((_, at) => at !== setIndex) }
+                    : entry
+            ))),
+            (client, session) => client.removeSet(
+                session.id,
+                entryIndex,
+                setIndex,
+                expectedSetCount,
+            ),
+            STALE,
+        );
+    }, [write]);
 
     const submit = useCallback(async (): Promise<boolean> => {
         const session = current.current;

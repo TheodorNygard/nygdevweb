@@ -11,16 +11,12 @@ interface ExercisePickerProps {
 }
 
 /**
- * The exercise picker.
+ * The exercise picker. The search box doubles as the way to add something the
+ * shipped library does not have: a custom name posts inline with the entry and
+ * lives on the session document.
  *
- * The library is the shipped list from the CDN, and the search box doubles as
- * the way to add something that is not in it: a custom name posts inline with
- * the entry and lives on the session document, because a name the user typed
- * is theirs rather than something the app should adopt into its catalogue.
- *
- * Only the name is sent. The API stores no equipment on an entry, so the chip
- * beside a result is a filter over the library rather than a field that
- * travels with the pick.
+ * Only the name is sent — the API stores no equipment on an entry, so the chip
+ * beside a result filters the library rather than travelling with the pick.
  */
 export function ExercisePicker({ library, busy, onPick, onClose }: ExercisePickerProps) {
     const [query, setQuery] = useState('');

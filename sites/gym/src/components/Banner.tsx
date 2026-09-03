@@ -6,11 +6,10 @@ interface BannerProps {
 }
 
 /**
- * The one place a failure or a resync is reported.
- *
- * It floats over the screen rather than pushing it down: the message usually
- * arrives while a thumb is on the Log button, and reflowing the page under it
- * is how you log a set you did not mean to.
+ * The one place a failure or a resync is reported. It floats over the screen
+ * rather than pushing it down: the message usually arrives while a thumb is on
+ * the Log button, and reflowing under it is how you log a set you did not mean
+ * to.
  */
 export function Banner({ kind, label, message, onDismiss }: BannerProps) {
     return (

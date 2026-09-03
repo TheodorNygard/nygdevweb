@@ -1,29 +1,26 @@
 /*
  * GymLog — the Graphite direction, as built.
  *
- * The values here are transcribed from `GymLog Graphite v2.dc.html` in the
- * design handoff rather than approximated: the palette, the radii, the type
- * ramp and the 44px minimum touch target are all the prototype's. What is not
- * the prototype's is the chrome around them — it was drawn inside a 402×874
- * iPhone frame, so its 58px top padding is a notch the browser reports for
- * itself. Those two places use `env(safe-area-inset-*)` and are marked.
+ * Palette, radii, type ramp and the 44px minimum touch target are transcribed
+ * from `GymLog Graphite v2.dc.html` rather than approximated. The chrome around
+ * them is not the prototype's: it was drawn inside a 402x874 iPhone frame, so
+ * the two places that need a real notch use `env(safe-area-inset-*)`.
  *
- * Dark only. Graphite is "gym-at-night": the direction exists because a
- * near-black screen is the one that does not blind you between sets, so a
- * light variant would be a different design rather than a preference.
+ * Dark only. A near-black screen is the one that does not blind you between
+ * sets, so a light variant would be a different design, not a preference.
  */
 
-/* Self-hosted, not fetched from Google Fonts. The CSP on this site names no
-   third-party origin, and the alternative to bundling would be widening it —
-   which is a worse trade than 60 kB of woff2 for a page that has to work on
-   gym wifi anyway. Only the weights the design uses are imported. */
-@import '@fontsource/space-grotesk/400.css';
-@import '@fontsource/space-grotesk/500.css';
-@import '@fontsource/space-grotesk/600.css';
-@import '@fontsource/space-grotesk/700.css';
-@import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/600.css';
-@import '@fontsource/jetbrains-mono/700.css';
+/* Self-hosted rather than fetched from Google Fonts: the CSP names no
+   third-party origin, and widening it is a worse trade than the woff2. Latin
+   subsets only — the app is English and the other subsets would ship ~50 files
+   no request ever asks for. */
+@import '@fontsource/space-grotesk/latin-400.css';
+@import '@fontsource/space-grotesk/latin-500.css';
+@import '@fontsource/space-grotesk/latin-600.css';
+@import '@fontsource/space-grotesk/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-600.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
 
 :root {
     --bg: #0b0c0e;
@@ -151,12 +148,6 @@ button {
     animation: g-fade 0.2s ease;
 }
 
-.screen--flush {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-}
-
 .eyebrow {
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.16em;
@@ -175,7 +166,7 @@ button {
 }
 
 .masthead__mark {
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     letter-spacing: 0.1em;
     color: var(--fg-35);
     background: none;
@@ -373,7 +364,7 @@ button {
 }
 
 .field-label {
-    font: 500 10px/1 var(--mono);
+    font: 400 10px/1 var(--mono);
     letter-spacing: 0.14em;
     color: var(--fg-40);
 }
@@ -413,7 +404,7 @@ button {
 }
 
 .stepper__label {
-    font: 500 10px/1 var(--mono);
+    font: 400 10px/1 var(--mono);
     letter-spacing: 0.14em;
     color: var(--fg-40);
     text-align: center;
@@ -508,7 +499,7 @@ button {
     border-radius: 12px;
     background: var(--card);
     color: var(--fg-45);
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     letter-spacing: 0.06em;
 }
 
@@ -546,7 +537,7 @@ button {
 }
 
 .planned__eq {
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--fg-40);
@@ -573,7 +564,7 @@ button {
 .map__week {
     flex: none;
     width: 26px;
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     color: var(--fg-35);
 }
 
@@ -679,7 +670,7 @@ button {
 }
 
 .hist__total {
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     color: var(--accent);
 }
 
@@ -874,7 +865,7 @@ button {
 
 .exercise__eq {
     display: block;
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--fg-40);
@@ -923,7 +914,7 @@ button {
 }
 
 .set__rpe {
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     color: var(--accent);
     background: rgba(214, 255, 63, 0.1);
     padding: 5px 8px;
@@ -1247,7 +1238,7 @@ button {
 }
 
 .tile__key {
-    font: 500 10px/1 var(--mono);
+    font: 400 10px/1 var(--mono);
     letter-spacing: 0.14em;
     color: var(--fg-40);
 }
@@ -1283,7 +1274,7 @@ button {
 
 .line__detail {
     flex: none;
-    font: 500 12px/1 var(--mono);
+    font: 400 12px/1 var(--mono);
     color: var(--fg-45);
 }
 
@@ -1430,7 +1421,7 @@ button {
 
 .picker__item-eq {
     flex: none;
-    font: 500 11px/1 var(--mono);
+    font: 400 11px/1 var(--mono);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--fg-40);
@@ -1560,7 +1551,7 @@ button {
     align-items: center;
     justify-content: center;
     min-height: 100dvh;
-    font: 500 12px/1 var(--mono);
+    font: 400 12px/1 var(--mono);
     letter-spacing: 0.16em;
     color: var(--fg-35);
 }

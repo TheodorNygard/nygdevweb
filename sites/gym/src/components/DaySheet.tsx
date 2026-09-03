@@ -26,15 +26,14 @@ interface DaySheetProps {
 }
 
 /**
- * The day card: what is in a cell of the block map, and the one place a
- * workout can be started, resumed or deleted.
+ * The day card: what is in a cell of the block map, and the one place a workout
+ * can be started, resumed or deleted.
  *
- * The duplicate list is the screen the prototype does not have. A cell can now
- * hold more than one session — the API stopped overwriting a re-logged day,
- * because losing a logged workout to a mistyped tap is worse than showing two
- * — and that trade only works if the second one is visible and removable. So
- * the most recent session is what the cell shows, the others are listed under
- * it, and each carries the delete that is the other half of the bargain.
+ * A cell can hold more than one session — the API stopped overwriting a
+ * re-logged day, because losing a workout to a mistyped tap is worse than
+ * showing two — and that trade only works if the second one is visible and
+ * removable. So the newest is what the cell shows, the rest are listed under
+ * it, each with the delete that is the other half of the bargain.
  */
 export function DaySheet({
     week,
@@ -51,9 +50,8 @@ export function DaySheet({
     onDelete,
     onClose,
 }: DaySheetProps) {
-    // Two taps to delete, and the second one is a different button. There is
-    // no undo behind it — the API removes the document — so a mis-tap on a
-    // sheet full of 44px targets should not be able to reach it.
+    // Two taps to delete, on two different buttons. There is no undo behind it,
+    // so a mis-tap on a sheet full of 44px targets should not reach it.
     const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
 
     const selected = sessions.find((session) => session.id === selectedId) ?? sessions[0];

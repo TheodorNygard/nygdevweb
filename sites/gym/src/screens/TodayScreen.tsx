@@ -12,17 +12,16 @@ interface TodayScreenProps {
 
 /**
  * Home is the current week of the block rather than a bare "start session"
- * button — the change mesocycles made to the whole app. What is up next is the
- * first day of the week with nothing submitted against it, and it is the only
- * row carrying an action, so the common case is one tap from opening the app.
+ * button. Up next is the first day of the week with nothing submitted against
+ * it, and it is the only row carrying an action — so the common case is one tap
+ * from opening the app.
  */
 export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScreenProps) {
     const { mesocycle, sessions } = block;
 
     if (!mesocycle) {
-        // A first run, not an error: nobody has planned a block yet. The API
-        // answers `mesocycle: null` for exactly this, and every screen needs a
-        // block to have anything to say.
+        // A first run, not an error: the API answers `mesocycle: null` when
+        // nobody has planned a block yet.
         return (
             <div className="screen">
                 <div className="masthead">
@@ -49,19 +48,23 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
     const rows = days.map((day) => {
         const cell = sessionsFor(sessions, week, day.dayIndex);
         const submitted = cell.filter((session) => session.status === 'submitted');
-        const draft = draftIn(cell);
 
-        return { day, cell, latest: submitted[0], draft, done: submitted.length > 0 };
+        return {
+            day,
+            draft: draftIn(cell),
+            latest: submitted[0],
+            done: submitted.length > 0,
+            extra: submitted.length - 1,
+        };
     });
 
-    // "Up next" is the first day of the week with nothing submitted. A day
-    // that already has a draft open counts as next too — resuming it is the
-    // action, and it is the same tap.
+    // "Up next" is the first day of the week with nothing submitted. A day with
+    // a draft open counts as next too: resuming it is the same tap.
     const nextIndex = rows.findIndex((row) => !row.done);
     const weekDone = nextIndex === -1;
 
-    // Only the weeks the block actually has. Walking past the last one would
-    // show cells the API would refuse a Start on.
+    // Only the weeks the block has: past the last one are cells the API would
+    // refuse a Start on.
     const canPrev = week > 1;
     const canNext = week < mesocycle.weeks;
 
@@ -118,14 +121,12 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
                     if (row.done) classes.push('day--done');
                     if (isNext) classes.push('day--next');
 
-                    const extra = row.cell.filter((session) => session.status === 'submitted').length - 1;
-
                     const sub = row.draft
                         ? `in progress · ${row.draft.setCount} sets logged`
                         : row.latest
                             ? `${row.latest.setCount} sets · ${kg(row.latest.volumeKg)}`
                                 + ` · RPE ${rpeLabel(row.latest.avgRpe)}`
-                                + (extra > 0 ? ` · +${extra} more` : '')
+                                + (row.extra > 0 ? ` · +${row.extra} more` : '')
                             : isNext
                                 ? 'up next · nothing logged'
                                 : 'planned';

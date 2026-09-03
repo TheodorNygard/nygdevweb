@@ -1,6 +1,5 @@
-// The prototype's formatting rules, kept as functions so every screen renders
-// a number the same way. The three that matter — `kg`, `num` and the RPE note —
-// are transcribed from `GymLog Graphite v2.dc.html` rather than reinvented.
+// The prototype's formatting rules, kept as functions so every screen renders a
+// number the same way. Transcribed from `GymLog Graphite v2.dc.html`.
 
 /** Integers plain, halves to one decimal: 100, not 100.0; 7.5, not 7.50. */
 export function num(value: number): string {
@@ -18,11 +17,10 @@ export function rpeLabel(value: number | null): string {
 }
 
 /**
- * The plain-language half of the RPE slider. Reps in reserve is what the
- * number means to someone mid-set, and it is the reason the slider is not
- * simply a number box.
+ * The plain-language half of the RPE slider. Reps in reserve is what the number
+ * means to someone mid-set, and it is why the slider is not a number box.
  */
-export const RPE_NOTE: Record<string, string> = {
+const RPE_NOTE: Record<string, string> = {
     '5': 'warm-up',
     '5.5': 'warm-up',
     '6': 'easy, 4+ left',
@@ -41,10 +39,9 @@ export function rpeNote(value: number): string {
 }
 
 /**
- * Today, as `YYYY-MM-DD` in the phone's timezone — the one field the API
- * cannot derive. Built from the local parts rather than `toISOString()`, which
- * converts to UTC and would file a 21:00 Oslo session under tomorrow for half
- * the year. That bug is the whole reason this value is sent at all.
+ * Today as `YYYY-MM-DD` in the phone's timezone — the one field the API cannot
+ * derive. Built from the local parts rather than `toISOString()`, which
+ * converts to UTC and would file a 21:00 Oslo session under tomorrow.
  */
 export function localDate(date: Date = new Date()): string {
     const pad = (value: number) => String(value).padStart(2, '0');
@@ -61,11 +58,10 @@ export function todayLabel(date: Date = new Date()): string {
 
 /**
  * The date a session id carries. Ids are `session_YYYY-MM-DD` with an optional
- * `_2` for a second session on the same date, which is what makes them
- * constructible — and what lets History show a date the API never sends as a
- * field of its own.
+ * `_2` for a second session that day, which is what lets History show a date
+ * the API never sends as a field of its own.
  */
-export function sessionDate(sessionId: string): string | null {
+function sessionDate(sessionId: string): string | null {
     const match = /^session_(\d{4})-(\d{2})-(\d{2})(?:_(\d+))?$/.exec(sessionId);
 
     if (!match) return null;

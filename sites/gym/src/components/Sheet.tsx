@@ -9,13 +9,10 @@ interface SheetProps {
 }
 
 /**
- * The bottom sheet all three modals are built from — the day card, the
- * exercise picker and the submit confirmation.
- *
- * It rises from the bottom because that is where the thumb is. The scrim above
- * it is a button rather than a div with an onClick: a tap-to-dismiss target
- * that a keyboard cannot reach is a modal a keyboard cannot leave, and Escape
- * alone is not enough for a touch device with a hardware keyboard attached.
+ * The bottom sheet every modal is built from. It rises from the bottom because
+ * that is where the thumb is. The scrim is a button rather than a div with an
+ * onClick: a tap-to-dismiss target a keyboard cannot reach is a modal a
+ * keyboard cannot leave.
  */
 export function Sheet({ label, onClose, tall = false, children }: SheetProps) {
     useEffect(() => {

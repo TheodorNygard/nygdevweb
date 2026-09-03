@@ -26,9 +26,9 @@ interface SessionScreenProps {
     library: ExerciseLibrary | null;
 
     /**
-     * What this day prescribes, from the block rather than from the session.
-     * The targets are not copied onto a session — they live in one place so
-     * editing the plan cannot leave a stale number on a logged workout.
+     * What this day prescribes, from the block rather than the session. Targets
+     * live in one place so editing the plan cannot leave a stale number on a
+     * logged workout.
      */
     plan: PlannedExercise[];
     elapsed: number;
@@ -44,15 +44,12 @@ interface SessionScreenProps {
  * The logging screen, and the reason the whole app exists.
  *
  * Its one rule: after the first set the primary button becomes **“Log same
- * again”**, so a working set is one tap and an adjustment is a delta from what
- * you just did rather than a number typed from scratch. Everything else on the
- * screen is arranged around not getting in the way of that button — the
- * steppers sit above it, the set list sits above them, and nothing moves when
- * a set lands.
+ * again”**, so a working set is one tap and an adjustment is a delta rather
+ * than a number typed from scratch. Everything else is arranged around not
+ * getting in the way of that button, and nothing moves when a set lands.
  *
- * Only one exercise is expanded at a time. Two open loggers is two "Log same
- * again" buttons on screen, and at that point the tap is no longer safe to
- * make without reading.
+ * One exercise expanded at a time: two open loggers is two "Log same again"
+ * buttons, and the tap is no longer safe to make without reading.
  */
 export function SessionScreen({
     workout,
@@ -67,15 +64,15 @@ export function SessionScreen({
     onFinish,
     onBack,
 }: SessionScreenProps) {
-    // The exercise whose logger is open. Defaults to the last one added, which
-    // is the one the picker was just used for.
+    // The exercise whose logger is open — the last one added, which is the one
+    // the picker was just used for.
     const [activeIndex, setActiveIndex] = useState<number | null>(
         workout.entries.length > 0 ? workout.entries.length - 1 : null,
     );
 
     // Per-entry stepper values, only for entries the user has touched. An
-    // untouched entry reads its defaults from its own last set instead, so
-    // coming back to an exercise later opens on what you last lifted on it.
+    // untouched entry reads its defaults from its own last set, so coming back
+    // to an exercise opens on what you last lifted.
     const [pending, setPending] = useState<Record<number, Pending>>({});
 
     // A new exercise was added while this screen was open: focus it, because
@@ -89,15 +86,10 @@ export function SessionScreen({
     }
 
     /**
-     * The target for one entry, or none.
-     *
-     * By position first, because a seeded session's entries are the plan in
-     * order and that survives anything the session can do to itself — exercises
-     * are only ever appended, and there is no route that removes one. The name
-     * check is what keeps the position from being trusted blindly: an exercise
-     * added by hand before the planned ones would otherwise borrow a target
-     * that belongs to something else. Falling back to a name lookup covers the
-     * planned exercise that ended up somewhere unexpected.
+     * The target for one entry, or none. By position first, because a seeded
+     * session's entries are the plan in order and exercises are only appended.
+     * The name check keeps that position from being trusted blindly; the name
+     * lookup behind it covers a planned exercise that ended up out of order.
      */
     function targetFor(entryIndex: number): PlannedExercise | undefined {
         const entry = workout.entries[entryIndex];
@@ -119,14 +111,13 @@ export function SessionScreen({
         const sets = workout.entries[entryIndex]?.sets ?? [];
         const last = sets[sets.length - 1];
 
-        // What you last lifted on this exercise beats what the plan asked for:
-        // the plan opens the session, the previous set continues it.
+        // What you last lifted beats what the plan asked for: the plan opens
+        // the session, the previous set continues it.
         if (last) {
             return { weightKg: last.weightKg, reps: last.reps, rpe: last.rpe ?? OPENING.rpe };
         }
 
-        // Nothing logged yet, so the prescribed rep count is the better opening
-        // number than a generic eight — it is the one the plan just asked for.
+        // Nothing logged yet, so the prescribed rep count beats a generic eight.
         const target = targetFor(entryIndex);
 
         return { ...OPENING, ...(target ? { reps: target.reps } : {}) };

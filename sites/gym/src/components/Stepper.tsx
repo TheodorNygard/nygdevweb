@@ -8,14 +8,12 @@ interface StepperProps {
 }
 
 /**
- * A −/value/+ control. Four of them in the app: weight, reps, block weeks and
- * days per week.
+ * A minus/value/plus control: weight, reps, block weeks, days per week.
  *
- * Steppers rather than a number field, and this is the design decision rather
+ * Steppers rather than a number field, and that is a design decision rather
  * than a component detail: a numeric keypad over the bottom half of the screen
  * hides the set list you are logging against, and 2.5 kg is one tap where
- * "72.5" is four plus a dismiss. The buttons are 44px because that is the
- * one-handed reach rule the whole direction is built on.
+ * "72.5" is four plus a dismiss. 44px buttons, the one-handed reach rule.
  */
 export function Stepper({
     label,

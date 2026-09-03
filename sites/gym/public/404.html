@@ -11,12 +11,10 @@
     <meta name="theme-color" content="#f8f9fa">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Keeps Azure's stock 404 off the domain: that one is served from
-         Microsoft's edge with an inline script and none of the headers in
-         staticwebapp.config.json. Script-free on purpose — the theme follows
-         the OS, so `script-src 'self'` has nothing to object to. The styles
-         are a same-origin file for the matching reason: it is what lets
-         `style-src` stay plain 'self', with no 'unsafe-inline' in the policy. -->
+    <!-- Keeps Azure's stock 404 off the domain: that one carries an inline
+         script and none of the headers in staticwebapp.config.json. Script-free,
+         and the styles are a same-origin file, so `script-src`/`style-src` stay
+         plain 'self' with no 'unsafe-inline'. -->
     <link rel="stylesheet" href="/404.css">
 </head>
 <body>
@@ -24,7 +22,7 @@
         <h1>404</h1>
         <div class="underline"></div>
         <p>There is nothing at this address.</p>
-        <a class="home" href="/">Back to the token inspector</a>
+        <a class="home" href="/">Back to GymLog</a>
     </div>
 </body>
 </html>

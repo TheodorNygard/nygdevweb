@@ -10,7 +10,7 @@ function extractAadsts(message: string): string | null {
 // Failures that mean something specific about *this* setup, with the fix
 // rather than a restatement. Anything unlisted falls through to the raw
 // message, which beats a wrong guess.
-export const ERROR_FIXES: Record<string, string> = {
+const ERROR_FIXES: Record<string, string> = {
     AADSTS50011: 'The redirect URI this page sent is not registered on the app. Copy the value from the Configuration panel above and add it under App registrations → Authentication → Add a platform → Single-page application. It has to match as a string, trailing slash included.',
     AADSTS9002326: 'The redirect URI is registered under the "Web" platform instead of "Single-page application". A SPA uses PKCE and sends no client secret, and Entra refuses that combination on a Web redirect URI. Move the URI to the SPA platform — the same string, a different platform block.',
     AADSTS700016: 'No application with this client ID exists in the tenant being signed in to. Check the client ID in the Configuration panel, and check the tenant: a single-tenant app is invisible from any directory but its own.',
@@ -34,8 +34,7 @@ export interface AuthErrorDetail {
 }
 
 // MSAL throws AuthError, but a failure can also arrive as a DOMException or a
-// plain Error, so the fields are read defensively rather than narrowed to a
-// class that cannot be guaranteed.
+// plain Error, so the fields are read defensively.
 export function describeAuthError(error: unknown): AuthErrorDetail {
     const source = (typeof error === 'object' && error !== null
         ? (error as Record<string, unknown>)

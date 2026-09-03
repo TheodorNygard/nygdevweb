@@ -421,7 +421,7 @@ npm run preview   # serve the built dist/ over HTTP
 | --- | --- |
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
 | `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library, the identity config, the AADSTS error map |
-| `src/hooks/` | `useAuth` (all MSAL interaction), `useBlock`, `useSession` (the guarded writes), `useLibrary`, `useElapsed` |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useLibrary`, `useElapsed` |
 | `src/screens/` | Today, Plan, History, Session, Done |
 | `src/components/` | The tab bar, the three bottom sheets, the stepper, the banner, the sign-in gate |
 | `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
@@ -432,6 +432,13 @@ deploy rather than reaching the browser. The compiler options are strict, and
 deliberately include `noUncheckedIndexedAccess` and
 `exactOptionalPropertyTypes` — the first is what forces every array index off
 the API's arrays to be checked, which is most of what this app does.
+
+Two build settings are there for what ships rather than for what compiles.
+Everything from `node_modules` goes into one `vendor` chunk, so an app edit
+reships ~50 kB instead of invalidating the ~435 kB MSAL and React sit in; and
+`/assets/*` is served `immutable` for a year from `staticwebapp.config.json`,
+which is safe because every file under it is content-hashed. `index.html` is
+`no-cache` for the same reason — it is the one file that names the hashes.
 
 **Neither `npm run dev` nor `npm run preview` carries the CSP.** Those headers
 come from `staticwebapp.config.json`, and only Azure reads that file — Vite
@@ -454,8 +461,10 @@ CDN is still the thing not to do — it would mean trusting a third-party origin
 with script execution on the one page in this repo that handles access tokens.
 
 The fonts are the same argument in a smaller key. Google Fonts would cost two
-more origins in `style-src` and `font-src`; `@fontsource` costs about 60 kB of
-woff2 served from `'self'`, on a page that has to work on gym wifi anyway.
+more origins in `style-src` and `font-src`; `@fontsource` costs a handful of
+woff2 files served from `'self'`, on a page that has to work on gym wifi
+anyway. `styles.css` imports the **latin** subsets only — the app is English,
+and the full imports shipped 60 font files where 14 are ever asked for.
 
 `skip_app_build: true` stays in the deploy workflow, and matters for a
 different reason. The workflow builds on a Node version it pins, then uploads

@@ -26,18 +26,14 @@ interface DayPlanSheetProps {
 /**
  * What a day prescribes: which exercises, and how many sets of how many reps.
  *
- * Editing is local to the Plan tab's draft, like everything else on that
- * screen — nothing here writes until Save. That matters more than usual for a
- * plan, because `days` is replaced wholesale by the PATCH: a write per stepper
- * tap would be a write per rep.
+ * Editing is local to the Plan tab's draft — nothing writes until Save. That
+ * matters more than usual here, because `days` is replaced wholesale by the
+ * PATCH: a write per stepper tap would be a write per rep.
  *
- * There is no target weight, and that is the design rather than an omission.
- * Sets and reps are what a programme prescribes; the weight is what the session
- * discovers, and one written down here would be wrong the moment it is beaten.
- *
- * The plan is not a contract either. It seeds a session's exercises and shows a
- * target next to them; nothing stops you logging four sets against a three-set
- * plan, or ignoring an exercise entirely.
+ * No target weight, by design: a programme prescribes volume, the session
+ * discovers the weight. The plan is not a contract either — it seeds a
+ * session's exercises and shows a target; nothing stops you logging four sets
+ * against a three-set plan.
  */
 export function DayPlanSheet({
     label,

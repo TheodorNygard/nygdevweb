@@ -6,12 +6,11 @@ import type { SessionEntry, SessionTotals } from './types';
  * Volume and average RPE are derived rather than stored, so after a set is
  * logged optimistically there is nothing to fetch: recomputing here is what
  * makes the session header move on the tap rather than on the response. The
- * server stays the authority — a resync replaces these numbers with its own —
- * so this is a copy of the formula, not a second source of truth.
+ * server stays the authority — a resync replaces these numbers with its own.
  *
- * `Math.round(…, 2)` in the C# is reproduced for the same reason it is there:
- * kilogram-reps land on halves at worst, but accumulating a few hundred of
- * them as doubles is how you end up rendering 8419.999999999998.
+ * The rounding mirrors `Math.round(…, 2)` in the C# for the same reason it is
+ * there: accumulating a few hundred kilogram-reps as doubles is how you end up
+ * rendering 8419.999999999998.
  */
 export function computeTotals(entries: SessionEntry[]): SessionTotals {
     let setCount = 0;

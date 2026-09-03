@@ -60,9 +60,9 @@ export function App() {
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
     const [dayLoading, setDayLoading] = useState(false);
 
-    // The block whose sheet is open, and the volume logged in it. The volume
-    // is fetched rather than listed because it needs the sets — see
-    // `GET /gym/mesocycles`, which carries counts and deliberately not this.
+    // The block whose sheet is open, and the volume logged in it. The volume is
+    // fetched rather than listed because it needs the sets, which
+    // `GET /gym/mesocycles` deliberately does not carry.
     const [openBlock, setOpenBlock] = useState<MesocycleSummary | null>(null);
     const [blockVolume, setBlockVolume] = useState<number | null>(null);
 
@@ -83,9 +83,9 @@ export function App() {
         if (block.block && week === null) setWeek(currentWeek(block.block));
     }, [block.block, week]);
 
-    // The day sheet's detail: the entries behind a session's totals. Fetched
-    // rather than held, because `/mesocycles/current` sends summaries only —
-    // and it is one read for a sheet that is opened deliberately.
+    // The entries behind a session's totals. Fetched rather than held, because
+    // `/mesocycles/current` sends summaries only — and it is one read for a
+    // sheet that is opened deliberately.
     useEffect(() => {
         if (!api || !daySessionId) {
             setDayDetail(null);
@@ -194,11 +194,6 @@ export function App() {
         }
     }
 
-    async function addExercise(exerciseName: string) {
-        setPicking(false);
-        await session.addEntry(exerciseName);
-    }
-
     async function submitWorkout() {
         const workout = session.workout;
 
@@ -252,8 +247,8 @@ export function App() {
             blocks.reload();
 
             // The week is derived from the sessions in the block, so it has to
-            // be re-derived rather than carried across: week 4 of the block you
-            // just left is not week 4 of this one.
+            // be re-derived: week 4 of the block you just left is not week 4 of
+            // this one.
             setWeek(null);
             setTab('today');
         } catch (cause) {
@@ -269,16 +264,12 @@ export function App() {
         setPlanBusy(true);
 
         try {
-            // The API has no copy route and needs none: create takes the same
-            // three fields the source is made of, and creating is also
-            // switching. Nothing is copied out of the source but its shape —
-            // the sessions stay where they were logged.
+            // No copy route needed: create takes the same three fields the
+            // source is made of, plans included, and creating is also
+            // switching. The sessions stay where they were logged.
             await api.createMesocycle(
                 `${source.name} (copy)`,
                 source.weeks,
-                // Plans come with it. Copying a block for its shape and losing
-                // what each day prescribes would leave the least interesting
-                // half — the labels — and drop the part worth reusing.
                 source.days.map((day) => ({ label: day.label, plan: day.plan })),
             );
 
@@ -288,8 +279,8 @@ export function App() {
             setWeek(1);
 
             // Stays on Plan rather than jumping to Today: a copy is almost
-            // always renamed straight afterwards, and the field to do it in is
-            // at the top of this screen.
+            // always renamed straight afterwards, in the field at the top of
+            // this screen.
         } catch (cause) {
             describe(cause);
         } finally {
@@ -339,8 +330,8 @@ export function App() {
 
     // A token failure while already signed in is a setup problem, not a
     // sign-out — the scope does not exist, or consent was revoked — and its
-    // AADSTS fix is the useful half of it, so it is carried into the banner
-    // rather than left on a screen nobody reaches once signed in.
+    // AADSTS fix is the useful half, so it is carried into the banner rather
+    // than left on a screen nobody reaches once signed in.
     const authFailure = auth.error
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
@@ -351,6 +342,11 @@ export function App() {
     const cell = openDay !== null && block.block
         ? sessionsFor(block.block.sessions, activeWeek, openDay)
         : [];
+
+    // Only the Done screen reads it, and it walks every session in the block.
+    const progress = screen === 'done' && meso && block.block
+        ? progressOf(meso, block.block.sessions)
+        : null;
 
     return (
         <div className="app">
@@ -473,8 +469,8 @@ export function App() {
                     dayLabel={completed.dayLabel}
                     week={completed.week}
                     weeks={meso?.weeks ?? completed.week}
-                    doneCount={meso ? progressOf(meso, block.block.sessions).doneCount : 0}
-                    totalCount={meso ? progressOf(meso, block.block.sessions).totalCount : 0}
+                    doneCount={progress?.doneCount ?? 0}
+                    totalCount={progress?.totalCount ?? 0}
                     elapsed={completed.elapsed}
                     totals={completed.totals}
                     onHome={() => {
@@ -520,7 +516,10 @@ export function App() {
                 <ExercisePicker
                     library={library}
                     busy={session.busy}
-                    onPick={(name) => { void addExercise(name); }}
+                    onPick={(name) => {
+                        setPicking(false);
+                        void session.addEntry(name);
+                    }}
                     onClose={() => setPicking(false)}
                 />
             ) : null}

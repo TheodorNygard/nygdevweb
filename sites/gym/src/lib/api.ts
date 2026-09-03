@@ -40,19 +40,6 @@ export class ApiError extends Error {
     get isCountMismatch(): boolean {
         return this.code === 'count_mismatch';
     }
-
-    /** No validated principal reached the function. Sign in again. */
-    get isSignedOut(): boolean {
-        return this.code === 'not_signed_in' || this.status === 401 || this.status === 403;
-    }
-
-    /**
-     * Worth one retry: a timeout is over the ten-second budget rather than a
-     * refusal, and every write in this API is safe to retry by construction.
-     */
-    get isRetryable(): boolean {
-        return this.code === 'timed_out' || this.code === 'storage_error' || this.status >= 500;
-    }
 }
 
 /** Reaching the network failed — offline, DNS, a blocked CORS preflight. */
@@ -101,9 +88,9 @@ export class GymApi {
                 method,
                 headers,
 
-                // No cookies on the call, and none wanted: every request
-                // carries its own bearer token, and support_credentials is off
-                // in the function app's CORS block for the same reason.
+                // No cookies, and none wanted: every request carries its own
+                // bearer token, and support_credentials is off in the function
+                // app's CORS block for the same reason.
                 credentials: 'omit',
                 ...(body === undefined ? {} : { body: JSON.stringify(body) }),
             });
@@ -113,8 +100,7 @@ export class GymApi {
 
         // Every response this API gives is JSON, errors included. A body that
         // does not parse is the platform answering rather than the function —
-        // an Easy Auth rejection, or a gateway — so it is reported as what the
-        // status says rather than as a parse failure.
+        // most often Easy Auth rejecting the token before any code ran.
         let payload: unknown;
 
         try {
@@ -146,22 +132,16 @@ export class GymApi {
     }
 
     /** Everything Today and the block map need, in one call. */
-    async currentBlock(): Promise<CurrentBlock> {
-        const body = await this.send<{ mesocycle: Mesocycle | null; sessions: SessionSummary[] }>({
-            method: 'GET',
-            path: '/gym/mesocycles/current',
-        });
-
-        return { mesocycle: body.mesocycle, sessions: body.sessions };
+    currentBlock(): Promise<CurrentBlock> {
+        return this.send<CurrentBlock>({ method: 'GET', path: '/gym/mesocycles/current' });
     }
 
     /**
      * Every block this user has planned, newest first.
      *
      * Separate from `currentBlock()` rather than folded into it: only the Plan
-     * tab reads this, and Today reloads after every submitted session. Making
-     * one call out of the two would put the list's cost on the hot path for
-     * data no screen on it shows.
+     * tab reads this, and Today reloads after every submitted session. One call
+     * out of the two would put the list's cost on the hot path.
      */
     async mesocycles(): Promise<MesocycleSummary[]> {
         const body = await this.send<{ mesocycles: MesocycleSummary[] }>({
@@ -189,28 +169,22 @@ export class GymApi {
     /**
      * Deletes a block **and every session logged in it**.
      *
-     * The one call in this client that destroys training history. Everything
-     * else here is guarded so a retry cannot do damage; this is guarded only by
-     * the confirmation in front of it, because there is no undo and no soft
-     * delete on the other end. `BlockSheet` is where that confirmation lives,
-     * and it names the count before it offers the button.
+     * The one call here that destroys training history. Everything else is
+     * guarded so a retry cannot do damage; this is guarded only by the
+     * confirmation in front of it, because there is no undo on the other end.
+     * `BlockSheet` names the count before it offers the button.
      *
      * `currentMesoId` is where the pointer landed — null both when nothing
      * moved and when no block is left, which is why the caller reloads rather
      * than reasoning about it.
      */
-    async deleteMesocycle(
+    deleteMesocycle(
         mesoId: string,
     ): Promise<{ sessionsDeleted: number; currentMesoId: string | null }> {
-        const body = await this.send<{
-            sessionsDeleted: number;
-            currentMesoId: string | null;
-        }>({
+        return this.send({
             method: 'DELETE',
             path: `/gym/mesocycles/${encodeURIComponent(mesoId)}`,
         });
-
-        return { sessionsDeleted: body.sessionsDeleted, currentMesoId: body.currentMesoId };
     }
 
     /** Creating is also switching — the new block is current in the same transaction. */
@@ -224,7 +198,6 @@ export class GymApi {
         return body.mesocycle;
     }
 
-    /** All three fields optional; an absent one is left alone. */
     /**
      * All three fields optional; an absent one is left alone. `days` is
      * replaced wholesale when sent, plans included — which is why the Plan tab
@@ -248,14 +221,12 @@ export class GymApi {
      * UTC, so a 21:00 session in Oslo is already tomorrow there for half the
      * year and a server-derived date would file it under the wrong day.
      */
-    async startWorkout(date: string, week: number, dayIndex: number): Promise<StartedWorkout> {
-        const body = await this.send<{ resumed: boolean; workout: Workout }>({
+    startWorkout(date: string, week: number, dayIndex: number): Promise<StartedWorkout> {
+        return this.send<StartedWorkout>({
             method: 'POST',
             path: '/gym/workouts',
             body: { date, week, dayIndex },
         });
-
-        return { resumed: body.resumed, workout: body.workout };
     }
 
     async workout(sessionId: string): Promise<Workout> {
@@ -317,9 +288,9 @@ export class GymApi {
     }
 
     /**
-     * `expectedSetCount` is required here for a sharper reason than elsewhere:
-     * an unguarded remove-by-index is the one call a retry could turn into
-     * deleting a set the user did do.
+     * `expectedSetCount` matters more here than elsewhere: an unguarded
+     * remove-by-index is the one call a retry could turn into deleting a set
+     * the user did do.
      */
     removeSet(
         sessionId: string,

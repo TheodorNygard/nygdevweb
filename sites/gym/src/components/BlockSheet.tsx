@@ -8,9 +8,9 @@ interface BlockSheetProps {
     block: MesocycleSummary;
 
     /**
-     * Total volume logged in this block, summed from its sessions. Null while
-     * it is still being read — the delete stays disabled until it arrives, so
-     * the confirmation never understates what it is about to take.
+     * Total volume logged in this block. Null while it is still being read —
+     * the delete stays disabled until it arrives, so the confirmation never
+     * understates what it is about to take.
      */
     volumeKg: number | null;
 
@@ -24,17 +24,14 @@ interface BlockSheetProps {
 /**
  * One block, and the three things you can do to it.
  *
- * The delete is why this is a sheet rather than a row of buttons. It cascades —
- * the block and every session in it, with no undo and no soft delete on the
- * other end — so it is two taps, the second one a different button, and it
- * cannot be armed until the count and the volume it would destroy are on
- * screen. Everywhere else this app goes out of its way not to lose a logged
- * workout; this is the one place that can, so the confirmation is the whole
- * safety mechanism rather than a formality.
+ * The delete is why this is a sheet rather than a row of buttons: it cascades,
+ * with no undo on the other end, so it is two taps on two different buttons and
+ * cannot be armed until the count and volume it would destroy are on screen.
+ * This is the one place in the app that can lose a logged workout, so the
+ * confirmation is the whole safety mechanism.
  *
- * Copy is the cheap half of the same screen: `POST /gym/mesocycles` already
- * takes a name, a week count and day labels, so copying is sending back the
- * shape you are looking at. There is no copy route and does not need to be one.
+ * Copy needs no route: `POST /gym/mesocycles` already takes a name, a week
+ * count and day labels, so copying is sending back the shape you are looking at.
  */
 export function BlockSheet({
     block,

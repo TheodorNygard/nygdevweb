@@ -15,10 +15,9 @@ interface DoneScreenProps {
 /**
  * The end of a session: what it added up to, and where that leaves the block.
  *
- * Duration is on this screen and nowhere else, because this is the only place
- * it is known — it is the stopwatch this page has been running, not a stored
- * field. A session opened tomorrow has no duration to show, which is why
- * History shows a date in its place.
+ * Duration is here and nowhere else, because this is the only place it is known
+ * — the stopwatch this page ran, not a stored field. A session opened tomorrow
+ * has none, which is why History shows a date in its place.
  */
 export function DoneScreen({
     dayLabel,

@@ -1,8 +1,6 @@
 // The wire shapes of func-nygdev-api's /gym routes, transcribed from
 // `apifunctionapp/Gym/README.md` and `GymModel.cs` in the NygDevAzure repo.
-//
-// They are written as the API answers them rather than as the screens want
-// them: the mapping into what a screen renders lives in the screen, so a
+// Written as the API answers them rather than as the screens want them, so a
 // change on the wire shows up here as a type error rather than as a value that
 // is quietly the wrong thing three files away.
 
@@ -11,15 +9,14 @@ export interface WorkSet {
     weightKg: number;
     reps: number;
 
-    // Optional on purpose — the API takes `rpe` absent or null, and a warm-up
-    // logged without one is not the same as one logged at 5.
+    // Optional on purpose: a warm-up logged without an RPE is not the same as
+    // one logged at 5.
     rpe: number | null;
 }
 
 /**
- * One exercise inside a session. No equipment: the API stores the name only
- * (`GymModel.cs` says so in as many words), so the chip under the name in the
- * design is looked up in the shipped library rather than read off the session.
+ * One exercise inside a session. No equipment — the API stores the name only,
+ * so the chip under the name is looked up in the shipped library.
  */
 export interface SessionEntry {
     exerciseName: string;
@@ -62,11 +59,9 @@ export interface SessionSummary {
 }
 
 /**
- * One exercise a day prescribes, and how much of it.
- *
- * Sets and reps, and deliberately no target weight: sets and reps are what a
- * programme prescribes, the weight is what the session discovers, and a
- * prescribed weight is wrong the moment it is beaten.
+ * One exercise a day prescribes. Sets and reps, and deliberately no target
+ * weight: a programme prescribes volume, the session discovers the weight, and
+ * a prescribed weight is wrong the moment it is beaten.
  */
 export interface PlannedExercise {
     exerciseName: string;
@@ -75,12 +70,9 @@ export interface PlannedExercise {
 }
 
 /**
- * A labelled day of the block, and what it plans.
- *
- * The plan hangs off the day rather than off a cell, so every week's "Upper A"
- * shares it — days are labelled, not scheduled. `plan` is empty on a day that
- * prescribes nothing, which is every day of a block written before planning
- * existed.
+ * A labelled day of the block, and what it plans. The plan hangs off the day
+ * rather than off a cell, so every week's "Upper A" shares it — days are
+ * labelled, not scheduled. `plan` is empty on a day that prescribes nothing.
  */
 export interface MesoDay {
     dayIndex: number;
@@ -102,14 +94,10 @@ export interface Mesocycle {
 }
 
 /**
- * A block as the Plan tab's list sees it: the plan, whether it is the one being
- * trained, and how much is in it.
- *
- * The counts are what make the row readable and the delete answerable — a
- * cascade that cannot say what it is about to take is not a confirmation. There
- * is no volume here on purpose: it needs the sets, so the delete confirmation
- * fetches it for the one block it is asking about rather than every row paying
- * for it on every list.
+ * A block as the Plan tab's list sees it. The counts are what make the row
+ * readable and the delete answerable. No volume here on purpose: it needs the
+ * sets, so the delete confirmation fetches it for the one block it is asking
+ * about rather than every row paying for it on every list.
  */
 export interface MesocycleSummary extends Mesocycle {
     isCurrent: boolean;

@@ -7,15 +7,13 @@ interface SignInGateProps {
 }
 
 /**
- * Everything in this app is one user's training log, and the user *is* the
- * token — nothing takes a user id, and the Entra object id off the validated
- * principal is the Cosmos partition key. So there is nothing to show before
- * sign-in, and this screen does not pretend otherwise with a preview.
+ * The user *is* the token: nothing takes a user id, and the Entra object id off
+ * the validated principal is the Cosmos partition key. So there is nothing to
+ * show before sign-in, and no preview pretends otherwise.
  *
- * The error block is the reason this is a screen rather than a button. The
- * failures here are setup failures, and each one has a fix that is a specific
- * thing to do in the portal; printing the AADSTS code with that fix next to it
- * is the difference between a five-minute problem and an afternoon.
+ * The error block is why this is a screen rather than a button. These are setup
+ * failures, and printing the AADSTS code with its fix is the difference between
+ * a five-minute problem and an afternoon.
  */
 export function SignInGate({ signingIn, error, onSignIn }: SignInGateProps) {
     return (
