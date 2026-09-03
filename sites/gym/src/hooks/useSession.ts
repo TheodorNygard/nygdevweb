@@ -185,7 +185,9 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
         if (!api || !session) return;
 
-        put(next(session));
+        const optimistic = next(session);
+
+        put(optimistic);
 
         try {
             await send(api, session);
@@ -202,8 +204,19 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                 return;
             }
 
-            put(session);
             setError(describe(cause));
+
+            // Roll back only if nothing has been logged since. Two quick taps
+            // are two writes in flight, and restoring the first one's
+            // snapshot would erase the second's row — which may well have
+            // landed. When the state has moved on, the server is the only
+            // copy that knows which of them did, so ask it; if that fails too
+            // the error above is already on screen.
+            if (current.current === optimistic) {
+                put(session);
+            } else {
+                await resync(session.id);
+            }
         }
     }, [api, put, resync, describe]);
 

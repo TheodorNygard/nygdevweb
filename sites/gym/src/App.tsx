@@ -10,7 +10,6 @@ import { TabBar, type Tab } from './components/TabBar';
 import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
 import { useBlocks } from './hooks/useBlocks';
-import { useElapsed } from './hooks/useElapsed';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
@@ -88,11 +87,12 @@ export function App() {
     const [planBusy, setPlanBusy] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
 
-    // The stopwatch in the session header. Client-side: the API stores no
-    // timestamp finer than the day, so there is nothing to count from but the
-    // moment this screen opened.
+    // When the session screen opened, for its stopwatch. Client-side: the API
+    // stores no timestamp finer than the day, so there is nothing to count
+    // from but this moment. The ticking itself lives in SessionScreen — a
+    // one-second interval here would re-render every sheet and tab in the app
+    // along with it.
     const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
-    const elapsed = useElapsed(sessionStartedAt);
 
     useEffect(() => {
         if (block.block && week === null) setWeek(currentWeek(block.block));
@@ -221,7 +221,9 @@ export function App() {
         setCompleted({
             dayLabel: dayLabel(meso, workout.dayIndex),
             week: workout.week,
-            elapsed,
+            elapsed: sessionStartedAt === null
+                ? 0
+                : Math.max(0, Math.floor((Date.now() - sessionStartedAt) / 1000)),
             totals: workout.totals,
         });
         setFinishing(false);
@@ -464,7 +466,7 @@ export function App() {
                     plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
                     weeks={meso?.weeks ?? session.workout.week}
                     lastSets={lastSets}
-                    elapsed={elapsed}
+                    startedAt={sessionStartedAt}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}
                     onLogSet={(entryIndex, set) => { void session.logSet(entryIndex, set); }}

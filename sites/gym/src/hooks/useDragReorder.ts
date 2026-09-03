@@ -67,6 +67,13 @@ export function useDragReorder(
         null,
     );
 
+    // Where the carried row is hovering, readable from `end` without going
+    // through a state updater. Committing from inside `setVisual`'s updater
+    // would fire `onReorder` twice under StrictMode, which double-invokes
+    // updaters — and the second call would move whatever the first had just
+    // put at `from`.
+    const over = useRef<number | null>(null);
+
     const setRow = useCallback((index: number, element: HTMLElement | null) => {
         if (element) rows.current.set(index, element);
         else rows.current.delete(index);
@@ -87,15 +94,15 @@ export function useDragReorder(
 
     const end = useCallback((commit: boolean) => {
         const active = drag.current;
+        const landed = over.current;
 
         drag.current = null;
-        setVisual((current) => {
-            if (commit && active && current && current.over !== active.from) {
-                onReorderRef.current(active.from, current.over);
-            }
+        over.current = null;
+        setVisual(null);
 
-            return null;
-        });
+        if (commit && active && landed !== null && landed !== active.from) {
+            onReorderRef.current(active.from, landed);
+        }
     }, []);
 
     const handlePointerMove = useCallback((event: PointerEvent) => {
@@ -109,9 +116,10 @@ export function useDragReorder(
         // than a free floating stack: the carried row snaps to where it would
         // land, which is the only outcome a release can ever produce.
         const shift = Math.round(deltaY / active.rowHeight);
-        const over = Math.min(count - 1, Math.max(0, active.from + shift));
+        const slot = Math.min(count - 1, Math.max(0, active.from + shift));
 
-        setVisual({ from: active.from, over, deltaY });
+        over.current = slot;
+        setVisual({ from: active.from, over: slot, deltaY });
     }, [count]);
 
     const handlePointerUp = useCallback((event: PointerEvent) => {
@@ -154,6 +162,7 @@ export function useDragReorder(
             rowHeight: row.getBoundingClientRect().height + gap,
         };
 
+        over.current = index;
         setVisual({ from: index, over: index, deltaY: 0 });
 
         window.addEventListener('pointermove', handlePointerMove);

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { DragHandle } from '../components/DragHandle';
 import { Stepper } from '../components/Stepper';
 import { useDragReorder } from '../hooks/useDragReorder';
+import { useElapsed } from '../hooks/useElapsed';
 import type { LastSets } from '../hooks/useLastSets';
 import { isRestWeek, repsInTank, setsForWeek } from '../lib/block';
 import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
@@ -88,7 +89,9 @@ interface SessionScreenProps {
      * means the logger opens on nothing for it.
      */
     lastSets: LastSets;
-    elapsed: number;
+
+    /** When this screen opened, for the stopwatch; null stops it at 0:00. */
+    startedAt: number | null;
     savedAt: number | null;
     onAddExercise: () => void;
     onLogSet: (entryIndex: number, set: WorkSet) => void;
@@ -132,7 +135,7 @@ export function SessionScreen({
     plan,
     weeks,
     lastSets,
-    elapsed,
+    startedAt,
     savedAt,
     onAddExercise,
     onLogSet,
@@ -254,6 +257,10 @@ export function SessionScreen({
     }
 
     const { rowProps, handleProps } = useDragReorder(workout.entries.length, reorderEntry);
+
+    // Ticks here rather than in App, so the once-a-second render stays on
+    // this screen instead of rippling through every tab and sheet above it.
+    const elapsed = useElapsed(startedAt);
 
     const totals = workout.totals;
 
