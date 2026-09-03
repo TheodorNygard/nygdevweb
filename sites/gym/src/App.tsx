@@ -10,6 +10,7 @@ import { TabBar, type Tab } from './components/TabBar';
 import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
 import { useBlocks } from './hooks/useBlocks';
+import { useHistory } from './hooks/useHistory';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
@@ -41,6 +42,20 @@ interface Completed {
 /** A stable empty list, so the lookup below does not churn before the block lands. */
 const NO_SESSIONS: SessionSummary[] = [];
 
+/**
+ * The cell whose day sheet is open.
+ *
+ * `block` is null for the block being trained, which is every cell reached from
+ * Today, and is the block itself for one reached from History. It has to be
+ * carried rather than derived: a session knows its week and its day index, and
+ * those mean nothing without knowing which block's week 3 is meant.
+ */
+interface OpenDay {
+    week: number;
+    dayIndex: number;
+    block: MesocycleSummary | null;
+}
+
 export function App() {
     const auth = useAuth();
 
@@ -57,6 +72,10 @@ export function App() {
     const session = useSession(api);
     const library = useLibrary();
 
+    // The sessions of blocks other than the one being trained — History's
+    // second half. Read per block, when the block is opened.
+    const history = useHistory(api);
+
     // What the open session's exercises were last done with. Keyed off the
     // session rather than fetched by the screen, so it is in hand by the time
     // the first logger opens.
@@ -69,7 +88,7 @@ export function App() {
     // sessions in it, and guessing 1 first would flash the wrong week.
     const [week, setWeek] = useState<number | null>(null);
 
-    const [openDay, setOpenDay] = useState<number | null>(null);
+    const [openDay, setOpenDay] = useState<OpenDay | null>(null);
     const [daySessionId, setDaySessionId] = useState<string | null>(null);
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
     const [dayLoading, setDayLoading] = useState(false);
@@ -200,10 +219,21 @@ export function App() {
     async function removeSession(sessionId: string) {
         if (!api) return;
 
+        // Which list the row came out of, before closing the sheet takes it
+        // with it. A session deleted out of a block being read in History is
+        // gone from that block's list, not from the one Today is holding.
+        const from = openDay?.block?.id ?? null;
+
         try {
             await api.deleteWorkout(sessionId);
             closeDay();
-            block.reload();
+
+            if (from) {
+                history.reload(from);
+                blocks.reload();
+            } else {
+                block.reload();
+            }
         } catch (cause) {
             describe(cause);
         }
@@ -353,12 +383,26 @@ export function App() {
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
 
-    const banner = actionError ?? session.error ?? block.error ?? blocks.error ?? authFailure;
+    const banner = actionError
+        ?? session.error
+        ?? block.error
+        ?? blocks.error
+        ?? history.error
+        ?? authFailure;
     const bannerIsNotice = !banner && session.notice !== null;
 
-    const cell = openDay !== null && block.block
-        ? sessionsFor(block.block.sessions, activeWeek, openDay)
-        : [];
+    // The sessions behind the open cell, out of the block that cell belongs
+    // to: what Today holds for the current block, what History read for any
+    // other.
+    const openBlockSessions = openDay === null
+        ? NO_SESSIONS
+        : openDay.block
+            ? history.sessions[openDay.block.id] ?? NO_SESSIONS
+            : block.block?.sessions ?? NO_SESSIONS;
+
+    const cell = openDay === null
+        ? []
+        : sessionsFor(openBlockSessions, openDay.week, openDay.dayIndex);
 
     // Only the Done screen reads it, and it walks every session in the block.
     const progress = screen === 'done' && meso && block.block
@@ -407,7 +451,11 @@ export function App() {
                                             dayIndex,
                                         );
 
-                                        setOpenDay(dayIndex);
+                                        setOpenDay({
+                                            week: activeWeek,
+                                            dayIndex,
+                                            block: null,
+                                        });
                                         setDaySessionId(sessions[0]?.id ?? null);
                                     }}
                                     onPlan={() => setTab('plan')}
@@ -432,9 +480,25 @@ export function App() {
                             {tab === 'history' ? (
                                 <HistoryScreen
                                     block={block.block}
-                                    onOpen={(summary) => {
-                                        setWeek(summary.week);
-                                        setOpenDay(summary.dayIndex);
+                                    blocks={blocks.blocks}
+                                    blocksLoading={blocks.loading}
+                                    sessions={history.sessions}
+                                    loadingMesoId={history.loading}
+                                    onLoadBlock={history.load}
+                                    onOpen={(summary, mesocycle) => {
+                                        const isCurrent = mesocycle.id === meso?.id;
+
+                                        // Only a cell of the block being
+                                        // trained moves Today's week with it —
+                                        // week 4 of another block is not week 4
+                                        // of this one.
+                                        if (isCurrent) setWeek(summary.week);
+
+                                        setOpenDay({
+                                            week: summary.week,
+                                            dayIndex: summary.dayIndex,
+                                            block: isCurrent ? null : mesocycle,
+                                        });
                                         setDaySessionId(summary.id);
                                     }}
                                 />
@@ -473,6 +537,7 @@ export function App() {
                     onRemoveSet={(entryIndex, setIndex) => {
                         void session.removeSet(entryIndex, setIndex);
                     }}
+                    onRemoveEntry={(entryIndex) => { void session.removeEntry(entryIndex); }}
                     onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
                     onFinish={() => setFinishing(true)}
                     onBack={() => {
@@ -504,16 +569,17 @@ export function App() {
 
             {openDay !== null && screen === 'tabs' ? (
                 <DaySheet
-                    week={activeWeek}
-                    dayIndex={openDay}
-                    label={dayLabel(meso, openDay)}
+                    week={openDay.week}
+                    dayIndex={openDay.dayIndex}
+                    label={dayLabel(openDay.block ?? meso, openDay.dayIndex)}
                     sessions={cell}
                     selectedId={daySessionId}
                     detail={dayDetail}
                     loading={dayLoading}
+                    canLog={openDay.block === null}
                     busy={session.busy}
                     onSelect={setDaySessionId}
-                    onStart={() => { void startOn(openDay); }}
+                    onStart={() => { void startOn(openDay.dayIndex); }}
                     onResume={(sessionId) => { void resume(sessionId); }}
                     onDelete={(sessionId) => { void removeSession(sessionId); }}
                     onClose={closeDay}

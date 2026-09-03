@@ -146,6 +146,21 @@ export interface RemoveSetResult {
 }
 
 /**
+ * `DELETE …/entries/{i}`. Same rule again: `alreadyRemoved` means the first
+ * attempt landed.
+ *
+ * Only an entry with no sets can be removed — an exercise that was lifted is a
+ * logged workout, and no call here deletes one as a side effect. That is where
+ * the screen's rule comes from rather than the other way round: the × appears
+ * on an exercise once its last set is gone.
+ */
+export interface RemoveEntryResult {
+    alreadyRemoved: boolean;
+    entryIndex: number;
+    entryCount: number;
+}
+
+/**
  * `POST …/entries/move`. `alreadyApplied` is the same rule as `alreadyRecorded`
  * elsewhere: it means this exact move already landed, not that it failed.
  *

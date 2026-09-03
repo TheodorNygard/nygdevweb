@@ -796,6 +796,32 @@ button {
     gap: 22px;
 }
 
+/* One block of training, open or closed. History is grouped by block before it
+   is grouped by week, because a week number only means something inside the
+   block it belongs to. */
+.hist__block {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* The weeks of an open block, indented under its header so the nesting reads
+   without a second border. */
+.hist__weeks {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+    margin-left: 4px;
+}
+
+.hist__note {
+    margin: 0 0 0 16px;
+    font: 400 13px/1.5 var(--sans);
+    color: var(--fg-40);
+}
+
 .hist__head {
     display: flex;
     align-items: baseline;
@@ -1030,6 +1056,20 @@ button {
    the accent and not a tick. */
 .exercise__summary--met {
     color: var(--accent);
+}
+
+/* Taking the exercise itself back out, and only while it holds no sets. Same
+   size and the same muted × as the one on a set row, because it is the same
+   gesture one level up — but it is absent rather than disabled the moment
+   something is logged, since an exercise that was lifted is not a mis-tap. */
+.exercise__del {
+    flex: none;
+    width: 40px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--fg-28);
+    font: 400 19px/1 var(--sans);
 }
 
 .sets {

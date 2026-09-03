@@ -98,6 +98,14 @@ interface SessionScreenProps {
     onRemoveSet: (entryIndex: number, setIndex: number) => void;
 
     /**
+     * Takes an exercise out of the session — offered only once it holds no
+     * sets, which is what the API allows and what the control means. A picked
+     * exercise that was never lifted is a mis-tap; one with sets against it is
+     * a logged workout, and the sets come off first.
+     */
+    onRemoveEntry: (entryIndex: number) => void;
+
+    /**
      * Drags an exercise from one position to another. `from` and `to` use the
      * same splice semantics as `reordered()` in `useDragReorder` — `to` is
      * where the exercise lands, not a swap partner.
@@ -140,14 +148,18 @@ export function SessionScreen({
     onAddExercise,
     onLogSet,
     onRemoveSet,
+    onRemoveEntry,
     onReorderEntry,
     onFinish,
     onBack,
 }: SessionScreenProps) {
-    // The exercise whose logger is open — the last one added, which is the one
-    // the picker was just used for.
+    // The exercise whose logger is open. The session opens at the top of the
+    // workout: the entries are in the order the day plans them, and the first
+    // one is the one about to be done — on a fresh session and on a draft
+    // resumed mid-workout alike, where the top is still where you read from.
+    // Adding one later moves the focus to it; see `entryCount` below.
     const [activeIndex, setActiveIndex] = useState<number | null>(
-        workout.entries.length > 0 ? workout.entries.length - 1 : null,
+        workout.entries.length > 0 ? 0 : null,
     );
 
     // Per-entry stepper values, only for entries the user has touched. An
@@ -156,13 +168,18 @@ export function SessionScreen({
     const [pending, setPending] = useState<Record<number, Pending>>({});
 
     // A new exercise was added while this screen was open: focus it, because
-    // adding one is always immediately followed by logging against it.
+    // adding one is always immediately followed by logging against it. Only
+    // when the list *grew* — a removal changes the count too, and jumping the
+    // logger to the last exercise is the opposite of what taking one out
+    // means.
     const [entryCount, setEntryCount] = useState(workout.entries.length);
 
     if (entryCount !== workout.entries.length) {
+        const grew = workout.entries.length > entryCount;
+
         setEntryCount(workout.entries.length);
 
-        if (workout.entries.length > 0) setActiveIndex(workout.entries.length - 1);
+        if (grew) setActiveIndex(workout.entries.length - 1);
     }
 
     // One target for the whole session: how deep into each set to go, read off
@@ -254,6 +271,36 @@ export function SessionScreen({
         });
 
         onReorderEntry(from, to);
+    }
+
+    /**
+     * The same problem a drag has, in its simpler form: everything after the
+     * removed entry shifts down a place, and `activeIndex` and `pending` are
+     * keyed by place. The logger open on the exercise being removed closes,
+     * because the thing it was open on is gone.
+     */
+    function removeEntry(entryIndex: number) {
+        setActiveIndex((index) => {
+            if (index === null || index === entryIndex) return null;
+
+            return index > entryIndex ? index - 1 : index;
+        });
+
+        setPending((held) => {
+            const next: Record<number, Pending> = {};
+
+            for (const [key, value] of Object.entries(held)) {
+                const index = Number(key);
+
+                if (index === entryIndex) continue;
+
+                next[index > entryIndex ? index - 1 : index] = value;
+            }
+
+            return next;
+        });
+
+        onRemoveEntry(entryIndex);
     }
 
     const { rowProps, handleProps } = useDragReorder(workout.entries.length, reorderEntry);
@@ -368,6 +415,16 @@ export function SessionScreen({
                                                 : 'no sets yet'}
                                     </span>
                                 </button>
+                                {entry.sets.length === 0 ? (
+                                    <button
+                                        type="button"
+                                        className="exercise__del"
+                                        onClick={() => removeEntry(entryIndex)}
+                                        aria-label={`Remove ${entry.exerciseName}`}
+                                    >
+                                        ×
+                                    </button>
+                                ) : null}
                             </div>
 
                             {entry.sets.length > 0 ? (

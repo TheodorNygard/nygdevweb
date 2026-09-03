@@ -17,6 +17,14 @@ interface DaySheetProps {
     detail: Workout | null;
     loading: boolean;
 
+    /**
+     * Whether this cell can be trained. False for a day of a block that is not
+     * the current one: Start files a session against whatever block the user is
+     * pointed at, so offering it here would log today's workout into the block
+     * being read rather than the one being read about.
+     */
+    canLog: boolean;
+
     busy: boolean;
     onSelect: (sessionId: string) => void;
     onStart: () => void;
@@ -34,6 +42,11 @@ interface DaySheetProps {
  * showing two — and that trade only works if the second one is visible and
  * removable. So the newest is what the cell shows, the rest are listed under
  * it, each with the delete that is the other half of the bargain.
+ *
+ * It also opens over a day of a block that is no longer being trained, which is
+ * what History taps into. That one is read-only in the one way that matters:
+ * Start logs against the block the user is pointed at, so a cell of another
+ * block shows what was done and does not offer to add to it.
  */
 export function DaySheet({
     week,
@@ -43,6 +56,7 @@ export function DaySheet({
     selectedId,
     detail,
     loading,
+    canLog,
     busy,
     onSelect,
     onStart,
@@ -148,20 +162,26 @@ export function DaySheet({
                 </>
             ) : null}
 
-            <button
-                type="button"
-                className="sheet__action"
-                disabled={busy}
-                onClick={() => (draft ? onResume(draft.id) : onStart())}
-            >
-                {busy
-                    ? 'Working…'
-                    : draft
-                        ? 'Resume the open draft'
-                        : sessions.length > 0
-                            ? 'Log this day again'
-                            : 'Start this workout'}
-            </button>
+            {canLog ? (
+                <button
+                    type="button"
+                    className="sheet__action"
+                    disabled={busy}
+                    onClick={() => (draft ? onResume(draft.id) : onStart())}
+                >
+                    {busy
+                        ? 'Working…'
+                        : draft
+                            ? 'Resume the open draft'
+                            : sessions.length > 0
+                                ? 'Log this day again'
+                                : 'Start this workout'}
+                </button>
+            ) : (
+                <p className="day__sub stack-18">
+                    A block you are not training. Open it from Plan to log against it again.
+                </p>
+            )}
 
             {selected && selected.status === 'submitted' ? (
                 confirmingDelete === selected.id ? (

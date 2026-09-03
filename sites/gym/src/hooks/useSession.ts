@@ -35,6 +35,13 @@ export interface SessionActions {
     removeSet: (entryIndex: number, setIndex: number) => Promise<void>;
 
     /**
+     * Takes an exercise out of the session. Offered only once its last set is
+     * gone: the API refuses to remove an entry that still holds sets, because
+     * an exercise that was lifted is a logged workout rather than a mis-tap.
+     */
+    removeEntry: (entryIndex: number) => Promise<void>;
+
+    /**
      * Drags an exercise from `from` to `to` — `to` is where it lands, matching
      * `reordered()`. Order is not cosmetic here: a separate backend reads it
      * downstream, so this writes to the server the same way a set does rather
@@ -193,11 +200,14 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
             await send(api, session);
             setSavedAt(Date.now());
         } catch (cause) {
-            // Two codes, one meaning: the guard this write carried did not
-            // hold, nothing was written, and the fix is a re-read rather than
-            // a rollback. A reorder just has a guard shaped differently from a
-            // count, since a move never changes how many entries there are.
-            if (cause instanceof ApiError && (cause.isCountMismatch || cause.isReorderConflict)) {
+            // Three codes, one meaning: the guard this write carried did
+            // not hold, nothing was written, and the fix is a re-read rather
+            // than a rollback. The two that are not a count are guards shaped
+            // differently because they had to be — a move never changes how
+            // many entries there are, and a removal has to know which exercise
+            // it meant.
+            if (cause instanceof ApiError
+                && (cause.isCountMismatch || cause.isReorderConflict || cause.isEntryConflict)) {
                 await resync(session.id);
                 setNotice(staleNotice);
 
@@ -274,6 +284,33 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         );
     }, [write]);
 
+    const removeEntry = useCallback(async (entryIndex: number): Promise<void> => {
+        const entry = current.current?.entries[entryIndex];
+        const expectedEntryCount = current.current?.entries.length;
+
+        if (!entry || expectedEntryCount === undefined) return;
+
+        // The screen only offers the control on an empty exercise, and this
+        // checks it again rather than trusting that. The API's own refusal is
+        // a 409, which would land in the banner as a failure — and a user who
+        // was never shown a button has nothing to make of one.
+        if (entry.sets.length > 0) return;
+
+        await write(
+            (session) => withEntries(
+                session,
+                session.entries.filter((_, index) => index !== entryIndex),
+            ),
+            (client, session) => client.removeEntry(
+                session.id,
+                entryIndex,
+                entry.exerciseName,
+                expectedEntryCount,
+            ),
+            'This session had changed elsewhere. Reloaded — remove it again.',
+        );
+    }, [write]);
+
     const reorderEntry = useCallback(async (from: number, to: number): Promise<void> => {
         const exerciseName = current.current?.entries[from]?.exerciseName;
         const expectedEntryCount = current.current?.entries.length;
@@ -303,8 +340,20 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         setError(null);
 
         try {
-            await api.submit(session.id);
+            const planned = await api.submit(session.id);
+
             put({ ...session, status: 'submitted' });
+
+            if (planned) {
+                // The day had nothing planned against it and now has this. Said
+                // out loud because it changes what next week's Start hands
+                // back, and because it is the one thing a submit does besides
+                // flipping a status.
+                setNotice(
+                    'This day had no plan. What you just logged is now what it prescribes — '
+                    + 'next week starts with these exercises already in it.',
+                );
+            }
 
             return true;
         } catch (cause) {
@@ -333,6 +382,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         addEntry,
         logSet,
         removeSet,
+        removeEntry,
         reorderEntry,
         submit,
         dismiss,

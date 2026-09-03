@@ -6,6 +6,7 @@ import type {
     EntryResult,
     Mesocycle,
     MesocycleSummary,
+    RemoveEntryResult,
     RemoveSetResult,
     SessionSummary,
     SetResult,
@@ -49,6 +50,15 @@ export class ApiError extends Error {
      */
     get isReorderConflict(): boolean {
         return this.code === 'reorder_conflict';
+    }
+
+    /**
+     * A removal's guard did not hold — the session holds a different number of
+     * exercises, or a different one at that index. Nothing was written, and
+     * like the two above the fix is a re-read rather than a message.
+     */
+    get isEntryConflict(): boolean {
+        return this.code === 'entry_conflict';
     }
 }
 
@@ -316,6 +326,33 @@ export class GymApi {
     }
 
     /**
+     * Takes an exercise back out of the session — the picker's undo.
+     *
+     * Guarded by two things rather than one. The count is the same guard every
+     * write here carries; the name is what an index alone cannot say once the
+     * list has been added to or dragged, and it is what lets a retry after a
+     * lost response come back `alreadyRemoved` instead of removing a second
+     * exercise.
+     *
+     * The API refuses this for an entry that still holds sets — a lifted
+     * exercise is a logged workout, and nothing deletes one as a side effect —
+     * so the screen only offers it once the last set is gone.
+     */
+    removeEntry(
+        sessionId: string,
+        entryIndex: number,
+        exerciseName: string,
+        expectedEntryCount: number,
+    ): Promise<RemoveEntryResult> {
+        return this.send<RemoveEntryResult>({
+            method: 'DELETE',
+            path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/${entryIndex}`
+                + `?expectedEntryCount=${expectedEntryCount}`
+                + `&exerciseName=${encodeURIComponent(exerciseName)}`,
+        });
+    }
+
+    /**
      * The drag handle. `to` is where the exercise lands, not a swap partner —
      * same splice semantics as `reordered()` in `hooks/useDragReorder`, so the
      * pair a drag produces is sent through unchanged.
@@ -342,12 +379,22 @@ export class GymApi {
         });
     }
 
-    /** draft → submitted. One patch, idempotent, safe to retry. */
-    async submit(sessionId: string): Promise<void> {
-        await this.send({
+    /**
+     * draft → submitted. One patch, idempotent, safe to retry.
+     *
+     * Answers whether this workout became the day's plan. A day can be left
+     * unplanned when a block is written, and the first session submitted
+     * against one is what fills it in — the exercises that were lifted, with
+     * the sets they got — so the week after opens seeded rather than empty.
+     * False on every submit after that, which is nearly all of them.
+     */
+    async submit(sessionId: string): Promise<boolean> {
+        const body = await this.send<{ planned?: boolean }>({
             method: 'POST',
             path: `/gym/workouts/${encodeURIComponent(sessionId)}/submit`,
         });
+
+        return body.planned === true;
     }
 
     /** The answer to the duplicate a cell can now collect. */
