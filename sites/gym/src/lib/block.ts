@@ -82,8 +82,21 @@ export function dayLabel(mesocycle: Mesocycle | null, dayIndex: number): string 
 /** What a rest week asks you to leave behind: effectively everything. */
 export const REST_TANK = 8;
 
-/** The most a training week asks you to leave behind. */
-const MAX_TANK = 3;
+/**
+ * The ramp, read backwards from the end of the block: what to leave in the tank
+ * with this many *training* weeks still to come after the current one.
+ *
+ * Written as the shape rather than as arithmetic because the shape is the whole
+ * decision, and the doubled 2 is the part arithmetic would hide — the second
+ * week of the ramp repeats, so a block spends two weeks working at two in
+ * reserve before it starts closing on failure. Past the end of the list the
+ * last value holds, which is what a long block wants: more weeks at the top,
+ * not a higher top.
+ */
+const TANK_RAMP = [0, 1, 2, 2, 3];
+
+/** What the ramp opens on, and holds at for any week earlier than it covers. */
+const OPENING_TANK = 3;
 
 /**
  * The deload: the last week of a block is a rest week rather than a training
@@ -109,10 +122,11 @@ export function isRestWeek(week: number, weeks: number): boolean {
  * and where you stop is then read off the bar rather than off a plan written
  * weeks ago.
  *
- * Counted back from the last *training* week, which is the one before the rest
- * week: nothing left in the tank there, one the week before, two before that.
- * Held at three earlier than that rather than counting up forever, because a
- * long block would otherwise open on a target indistinguishable from a warm-up.
+ * Counted back from the last *training* week rather than forwards from the
+ * first, so the hard end of the block is fixed and it is the easy end that
+ * gives when a block is shorter: six weeks run 3 · 2 · 2 · 1 · 0 · rest, and
+ * four weeks are the last of those — 2 · 1 · 0 · rest — rather than the same
+ * five weeks squeezed. See `TANK_RAMP` for the shape.
  */
 export function repsInTank(week: number, weeks: number): number {
     if (isRestWeek(week, weeks)) return REST_TANK;
@@ -120,5 +134,30 @@ export function repsInTank(week: number, weeks: number): number {
     // `weeks - 1` is the last training week, so this is training weeks left
     // after this one. Clamped below for a week outside the block, which the
     // week arrows cannot reach but a stale session can carry.
-    return Math.min(MAX_TANK, Math.max(0, weeks - 1 - week));
+    const remaining = Math.max(0, weeks - 1 - week);
+
+    return TANK_RAMP[Math.min(remaining, TANK_RAMP.length - 1)] ?? OPENING_TANK;
+}
+
+/** What share of a day's planned sets the rest week keeps. */
+const REST_SET_SHARE = 0.5;
+
+/**
+ * How many sets of a planned exercise a given week actually asks for.
+ *
+ * Every week runs the same exercises — the plan hangs off the day, and a
+ * deload that swapped the movements would stop being the same block, which is
+ * the only thing making the week before it and the week after it comparable.
+ * What the rest week takes off is the volume: half the sets, rounded up so a
+ * single-set exercise survives it rather than disappearing.
+ *
+ * A training week gets what the plan says, untouched. The reduction is not
+ * written into the plan for the same reason the tank target is not: it is a
+ * fact about where the week sits, and storing it would be a second copy of
+ * something the block already knows.
+ */
+export function setsForWeek(planned: number, week: number, weeks: number): number {
+    if (!isRestWeek(week, weeks)) return planned;
+
+    return Math.max(1, Math.ceil(planned * REST_SET_SHARE));
 }

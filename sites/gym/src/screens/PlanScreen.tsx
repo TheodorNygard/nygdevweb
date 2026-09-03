@@ -264,11 +264,14 @@ export function PlanScreen({
                             ))}
                         </span>
                         {/* The ramp, which is the only thing that distinguishes one
-                            week of the block from another now that days are shared. */}
+                            week of the block from another now that days are shared.
+                            The rest week keeps the units rather than reading REST:
+                            its eight is the top of the same scale, and a word in a
+                            column of numbers reads as a gap in the ramp. */}
                         <span
                             className={row.rest ? 'map__tank map__tank--rest' : 'map__tank'}
                         >
-                            {row.rest ? 'REST' : `${row.tank} LEFT`}
+                            {row.tank} LEFT
                         </span>
                     </div>
                 ))}
@@ -279,7 +282,9 @@ export function PlanScreen({
                 </div>
                 <p className="map__note">
                     The number is reps left in the tank: how much you should have in reserve when
-                    a set ends. It tightens week by week and resets in the rest week.
+                    a set ends. It tightens as the block goes on and reaches nothing left in the
+                    last training week. The final week is the rest week — the same exercises at
+                    half the sets, nowhere near failure.
                 </p>
             </div>
 

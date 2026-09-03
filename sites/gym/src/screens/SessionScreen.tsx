@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Stepper } from '../components/Stepper';
-import { isRestWeek, repsInTank } from '../lib/block';
+import { isRestWeek, repsInTank, setsForWeek } from '../lib/block';
 import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise, WorkSet, Workout } from '../lib/types';
@@ -129,6 +129,17 @@ export function SessionScreen({
         return plan.find((planned) => planned.exerciseName === entry.exerciseName);
     }
 
+    /**
+     * How many sets this week wants of one entry, or none if it is not planned.
+     * The plan's count in a training week; half of it in the rest week, which
+     * is the whole of what the deload changes — same exercises, less of them.
+     */
+    function targetSetsFor(entryIndex: number): number | undefined {
+        const target = targetFor(entryIndex);
+
+        return target ? setsForWeek(target.sets, workout.week, weeks) : undefined;
+    }
+
     function valuesFor(entryIndex: number): Pending {
         const held = pending[entryIndex];
 
@@ -193,7 +204,7 @@ export function SessionScreen({
                 </div>
                 <p className="tank__note">
                     {rest
-                        ? 'Deload. Same movements, half the load — leave the tank full and let '
+                        ? 'Deload. Same exercises, half the sets — leave the tank full and let '
                             + 'the block finish itself.'
                         : tank === 0
                             ? 'Last training week. Take each set to the last rep you can hold '
@@ -207,7 +218,7 @@ export function SessionScreen({
                 {workout.entries.map((entry, entryIndex) => {
                     const isActive = entryIndex === activeIndex;
                     const values = valuesFor(entryIndex);
-                    const target = targetFor(entryIndex);
+                    const targetSets = targetSetsFor(entryIndex);
                     const volume = entry.sets.reduce(
                         (total, set) => total + set.weightKg * set.reps,
                         0,
@@ -225,16 +236,19 @@ export function SessionScreen({
                                     <span className="exercise__name">{entry.exerciseName}</span>
                                     <span className="exercise__eq">
                                         {equipmentFor(library, entry.exerciseName)}
-                                        {target ? ` · target ${target.sets} sets` : ''}
+                                        {targetSets === undefined
+                                            ? ''
+                                            : ` · target ${targetSets} sets`}
                                     </span>
                                 </span>
                                 <span
-                                    className={target && entry.sets.length >= target.sets
+                                    className={targetSets !== undefined
+                                        && entry.sets.length >= targetSets
                                         ? 'exercise__summary exercise__summary--met'
                                         : 'exercise__summary'}
                                 >
-                                    {target
-                                        ? `${entry.sets.length} of ${target.sets} sets`
+                                    {targetSets !== undefined
+                                        ? `${entry.sets.length} of ${targetSets} sets`
                                         : entry.sets.length > 0
                                             ? `${entry.sets.length} sets · ${kg(volume)}`
                                             : 'no sets yet'}

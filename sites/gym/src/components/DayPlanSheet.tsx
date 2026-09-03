@@ -71,7 +71,8 @@ export function DayPlanSheet({
                 <div className="sheet__title">{label}</div>
                 <p className="day__sub" style={{ marginTop: 8 }}>
                     Applies to {label} in every week of this block. Sets only — how hard each one
-                    should be comes from the week you are in.
+                    should be comes from the week you are in, and the rest week runs the same
+                    exercises at half these sets.
                 </p>
 
                 {plan.length === 0 ? (

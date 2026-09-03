@@ -123,7 +123,7 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
 
             <p className="weeknote">
                 {rest
-                    ? `Deload — target ${tankLabel(tank)}. Same days, much less bar.`
+                    ? `Rest week — same exercises at half the sets, ${tankLabel(tank)}.`
                     : `Target ${tankLabel(tank)} on every working set.`}
             </p>
 
