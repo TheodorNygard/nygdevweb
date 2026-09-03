@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Banner } from './components/Banner';
+import { BlockSheet } from './components/BlockSheet';
 import { DaySheet } from './components/DaySheet';
 import { ExercisePicker } from './components/ExercisePicker';
 import { FinishSheet } from './components/FinishSheet';
@@ -8,6 +9,7 @@ import { SignInGate } from './components/SignInGate';
 import { TabBar, type Tab } from './components/TabBar';
 import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
+import { useBlocks } from './hooks/useBlocks';
 import { useElapsed } from './hooks/useElapsed';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
@@ -18,7 +20,7 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { TodayScreen } from './screens/TodayScreen';
-import type { SessionTotals, Workout } from './lib/types';
+import type { MesocycleSummary, SessionTotals, Workout } from './lib/types';
 
 /** Which of the three full-screen states is showing. Sheets layer over these. */
 type Screen = 'tabs' | 'session' | 'done';
@@ -42,6 +44,7 @@ export function App() {
     );
 
     const block = useBlock(api);
+    const blocks = useBlocks(api);
     const session = useSession(api);
     const library = useLibrary();
 
@@ -56,6 +59,12 @@ export function App() {
     const [daySessionId, setDaySessionId] = useState<string | null>(null);
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
     const [dayLoading, setDayLoading] = useState(false);
+
+    // The block whose sheet is open, and the volume logged in it. The volume
+    // is fetched rather than listed because it needs the sets — see
+    // `GET /gym/mesocycles`, which carries counts and deliberately not this.
+    const [openBlock, setOpenBlock] = useState<MesocycleSummary | null>(null);
+    const [blockVolume, setBlockVolume] = useState<number | null>(null);
 
     const [picking, setPicking] = useState(false);
     const [finishing, setFinishing] = useState(false);
@@ -96,6 +105,36 @@ export function App() {
 
         return () => { cancelled = true; };
     }, [api, daySessionId]);
+
+    // What a block delete would destroy, in kilos. Read when the sheet opens
+    // rather than when the confirmation is armed: the delete button stays
+    // disabled until this lands, so fetching it early is what keeps a
+    // deliberate tap from waiting on a request it did not know it started.
+    useEffect(() => {
+        if (!api || !openBlock) {
+            setBlockVolume(null);
+
+            return;
+        }
+
+        let cancelled = false;
+
+        void api
+            .sessions(openBlock.id)
+            .then((sessions) => {
+                if (cancelled) return;
+
+                setBlockVolume(sessions.reduce((total, one) => total + one.volumeKg, 0));
+            })
+            .catch(() => {
+                // Leaving this null keeps the delete disabled, which is the
+                // right failure: a cascade should not be confirmable against a
+                // number nobody could read.
+                if (!cancelled) setBlockVolume(null);
+            });
+
+        return () => { cancelled = true; };
+    }, [api, openBlock]);
 
     const closeDay = useCallback(() => {
         setOpenDay(null);
@@ -189,10 +228,87 @@ export function App() {
         try {
             await api.updateMesocycle(meso.id, patch);
             block.reload();
+            blocks.reload();
 
             // A shortened block can leave Today on a week that no longer
             // exists, and the arrows would not let you back.
             setWeek((value) => Math.min(value ?? 1, patch.weeks));
+        } catch (cause) {
+            describe(cause);
+        } finally {
+            setPlanBusy(false);
+        }
+    }
+
+    async function switchBlock(mesoId: string) {
+        if (!api) return;
+
+        setPlanBusy(true);
+
+        try {
+            await api.switchMesocycle(mesoId);
+            setOpenBlock(null);
+            block.reload();
+            blocks.reload();
+
+            // The week is derived from the sessions in the block, so it has to
+            // be re-derived rather than carried across: week 4 of the block you
+            // just left is not week 4 of this one.
+            setWeek(null);
+            setTab('today');
+        } catch (cause) {
+            describe(cause);
+        } finally {
+            setPlanBusy(false);
+        }
+    }
+
+    async function copyBlock(source: MesocycleSummary) {
+        if (!api) return;
+
+        setPlanBusy(true);
+
+        try {
+            // The API has no copy route and needs none: create takes the same
+            // three fields the source is made of, and creating is also
+            // switching. Nothing is copied out of the source but its shape —
+            // the sessions stay where they were logged.
+            await api.createMesocycle(
+                `${source.name} (copy)`,
+                source.weeks,
+                source.days.map((day) => day.label),
+            );
+
+            setOpenBlock(null);
+            block.reload();
+            blocks.reload();
+            setWeek(1);
+
+            // Stays on Plan rather than jumping to Today: a copy is almost
+            // always renamed straight afterwards, and the field to do it in is
+            // at the top of this screen.
+        } catch (cause) {
+            describe(cause);
+        } finally {
+            setPlanBusy(false);
+        }
+    }
+
+    async function removeBlock(mesoId: string) {
+        if (!api) return;
+
+        setPlanBusy(true);
+
+        try {
+            await api.deleteMesocycle(mesoId);
+            setOpenBlock(null);
+
+            // Both lists, and the week with them: deleting the current block
+            // repoints the pointer at whatever is newest, so what Today shows
+            // is a different block than it was a moment ago.
+            block.reload();
+            blocks.reload();
+            setWeek(null);
         } catch (cause) {
             describe(cause);
         } finally {
@@ -208,6 +324,7 @@ export function App() {
         try {
             await api.createMesocycle(plan.name, plan.weeks, plan.days);
             block.reload();
+            blocks.reload();
             setWeek(1);
             setTab('today');
         } catch (cause) {
@@ -225,7 +342,7 @@ export function App() {
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
 
-    const banner = actionError ?? session.error ?? block.error ?? authFailure;
+    const banner = actionError ?? session.error ?? block.error ?? blocks.error ?? authFailure;
     const bannerIsNotice = !banner && session.notice !== null;
 
     const cell = openDay !== null && block.block
@@ -284,6 +401,9 @@ export function App() {
                             {tab === 'plan' ? (
                                 <PlanScreen
                                     block={block.block}
+                                    blocks={blocks.blocks}
+                                    blocksLoading={blocks.loading}
+                                    onOpenBlock={setOpenBlock}
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
@@ -376,6 +496,18 @@ export function App() {
                     onResume={(sessionId) => { void resume(sessionId); }}
                     onDelete={(sessionId) => { void removeSession(sessionId); }}
                     onClose={closeDay}
+                />
+            ) : null}
+
+            {openBlock && screen === 'tabs' ? (
+                <BlockSheet
+                    block={openBlock}
+                    volumeKg={blockVolume}
+                    busy={planBusy}
+                    onSwitch={(mesoId) => { void switchBlock(mesoId); }}
+                    onCopy={(source) => { void copyBlock(source); }}
+                    onDelete={(mesoId) => { void removeBlock(mesoId); }}
+                    onClose={() => setOpenBlock(null)}
                 />
             ) : null}
 

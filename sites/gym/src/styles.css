@@ -657,6 +657,21 @@ button {
     font: 500 15px/1.2 var(--sans);
 }
 
+/* The "which block am I in" marker on a list row. A chip rather than a colour
+   change on the name: the name is the thing being read, and recolouring it
+   would make one row's title mean something different from the rest. */
+.row__tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: rgba(214, 255, 63, 0.14);
+    color: var(--accent);
+    font: 600 9px/1 var(--mono);
+    letter-spacing: 0.12em;
+    vertical-align: 1px;
+}
+
 .row__sub {
     display: block;
     font: 400 12px/1.2 var(--mono);

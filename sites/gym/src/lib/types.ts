@@ -73,6 +73,22 @@ export interface Mesocycle {
     days: MesoDay[];
 }
 
+/**
+ * A block as the Plan tab's list sees it: the plan, whether it is the one being
+ * trained, and how much is in it.
+ *
+ * The counts are what make the row readable and the delete answerable — a
+ * cascade that cannot say what it is about to take is not a confirmation. There
+ * is no volume here on purpose: it needs the sets, so the delete confirmation
+ * fetches it for the one block it is asking about rather than every row paying
+ * for it on every list.
+ */
+export interface MesocycleSummary extends Mesocycle {
+    isCurrent: boolean;
+    sessionCount: number;
+    submittedCount: number;
+}
+
 /** `GET /gym/mesocycles/current`. A null mesocycle is a first run, not a fault. */
 export interface CurrentBlock {
     mesocycle: Mesocycle | null;

@@ -167,9 +167,10 @@ the same readout it gives on hover.
 
 A training logger built around **mesocycles**: a block of 3–8 weeks, each week
 holding 2–6 labelled workout days. Three tabs — **Today** (the current week of
-the block), **Plan** (the block's length, days and labels, with a block map)
-and **History** (submitted sessions grouped by week) — plus the session screen
-that everything else exists to get you to.
+the block), **Plan** (the block's length, days and labels, a block map, and the
+list of every block you have planned) and **History** (submitted sessions
+grouped by week) — plus the session screen that everything else exists to get
+you to.
 
 The session screen has one rule, and it is the whole design: **after the first
 set the primary button becomes “Log same again”**, so a working set is one tap
@@ -183,6 +184,45 @@ It is dark only. Graphite is the "gym-at-night" direction of the three the
 design offered — near-black, acid-lime accent, mono digits — and it was chosen
 because a bright screen between sets is the thing that makes a logbook go
 unused. A light variant would be a different design, not a preference.
+
+### The block list, and the one destructive button in the app
+
+The Plan tab lists every block, newest first, marks the one being trained and
+opens each into a sheet with three actions.
+
+**Switch** is a `PUT /gym/mesocycles/current`. It exists because creating a
+block already switched to it, so until there was a list to switch *from* there
+was nothing to add — and a block you can see but cannot open is worse than one
+you cannot see. Switching resets the displayed week to null so Today re-derives
+it: week 4 of the block you left is not week 4 of this one.
+
+**Copy** is not a route. `POST /gym/mesocycles` already takes a name, a week
+count and day labels, so copying is the client sending back the shape it is
+looking at, and creating is also switching. Only the shape is copied — the
+sessions stay where they were logged. The app then stays on Plan rather than
+jumping to Today, because a copy is almost always renamed straight afterwards
+and the field to do it in is at the top of that screen.
+
+**Delete cascades**, and it is the one call in this app that can destroy
+training history. Everywhere else the API goes out of its way not to lose a
+logged workout — re-logging a day files a second session rather than
+overwriting the first. This is the deliberate exception, because refusing while
+a block holds anything would make clearing a mis-created block a
+session-by-session chore. There is no undo and no soft delete on the other end,
+so the confirmation *is* the safety mechanism:
+
+- two taps, the second a different button;
+- the button names the count (`sessionCount` comes down with the list);
+- and it stays **disabled until the volume has been read**, through
+  `GET /gym/workouts?mesoId=`, so the confirmation can never understate what it
+  is about to take. A failed volume read leaves it disabled, which is the right
+  failure — a cascade should not be confirmable against a number nobody could
+  read.
+
+The list is its own hook rather than part of `useBlock`. That one reloads after
+every submitted session and every back-out of the logging screen; sharing a
+reload would put the list's cost on the app's hottest path for data no screen
+there shows.
 
 ### Where the screens came from
 

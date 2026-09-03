@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
 import { draftIn, sessionsFor } from '../lib/block';
-import type { CurrentBlock, Mesocycle } from '../lib/types';
+import type { CurrentBlock, Mesocycle, MesocycleSummary } from '../lib/types';
 
 /** The API's bounds, and the prototype's: 3–8 weeks of 2–6 workout days. */
 const MIN_WEEKS = 3;
@@ -41,6 +41,11 @@ function sameDraft(a: Draft, b: Draft): boolean {
 
 interface PlanScreenProps {
     block: CurrentBlock;
+
+    /** Every block this user has planned, newest first. */
+    blocks: MesocycleSummary[];
+    blocksLoading: boolean;
+    onOpenBlock: (block: MesocycleSummary) => void;
     busy: boolean;
     onSave: (patch: { name: string; weeks: number; days: string[] }) => void;
     onCreate: (plan: { name: string; weeks: number; days: string[] }) => void;
@@ -59,6 +64,9 @@ interface PlanScreenProps {
  */
 export function PlanScreen({
     block,
+    blocks,
+    blocksLoading,
+    onOpenBlock,
     busy,
     onSave,
     onCreate,
@@ -237,6 +245,40 @@ export function PlanScreen({
                     </button>
                 </div>
             ) : null}
+
+            <span className="section-label">ALL BLOCKS</span>
+            {blocksLoading && blocks.length === 0 ? (
+                <p className="empty">Reading your blocks…</p>
+            ) : blocks.length === 0 ? (
+                <p className="empty">
+                    Nothing planned yet. The block you create above will be the first.
+                </p>
+            ) : (
+                <div className="rows" style={{ marginTop: 12 }}>
+                    {blocks.map((entry) => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            className="row"
+                            onClick={() => onOpenBlock(entry)}
+                        >
+                            <span>
+                                <span className="row__label">
+                                    {entry.name}
+                                    {entry.isCurrent ? <span className="row__tag">CURRENT</span> : null}
+                                </span>
+                                <span className="row__sub">
+                                    {entry.weeks} weeks · {entry.days.length} days
+                                </span>
+                            </span>
+                            <span className="row__right">
+                                <span className="row__value">{entry.submittedCount}</span>
+                                <span className="row__unit">logged</span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="stack-22">
                 <p className="empty">Signed in as {account}.</p>

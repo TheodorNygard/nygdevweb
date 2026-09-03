@@ -3,6 +3,7 @@ import type {
     CurrentBlock,
     EntryResult,
     Mesocycle,
+    MesocycleSummary,
     RemoveSetResult,
     SessionSummary,
     SetResult,
@@ -62,7 +63,7 @@ export class NetworkError extends Error {
     }
 }
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface Call {
     method: Method;
@@ -151,6 +152,64 @@ export class GymApi {
         });
 
         return { mesocycle: body.mesocycle, sessions: body.sessions };
+    }
+
+    /**
+     * Every block this user has planned, newest first.
+     *
+     * Separate from `currentBlock()` rather than folded into it: only the Plan
+     * tab reads this, and Today reloads after every submitted session. Making
+     * one call out of the two would put the list's cost on the hot path for
+     * data no screen on it shows.
+     */
+    async mesocycles(): Promise<MesocycleSummary[]> {
+        const body = await this.send<{ mesocycles: MesocycleSummary[] }>({
+            method: 'GET',
+            path: '/gym/mesocycles',
+        });
+
+        return body.mesocycles;
+    }
+
+    /**
+     * Opens an existing block. Idempotent — switching to the one you are
+     * already on writes what is already there.
+     */
+    async switchMesocycle(mesoId: string): Promise<Mesocycle> {
+        const body = await this.send<{ mesocycle: Mesocycle }>({
+            method: 'PUT',
+            path: '/gym/mesocycles/current',
+            body: { mesoId },
+        });
+
+        return body.mesocycle;
+    }
+
+    /**
+     * Deletes a block **and every session logged in it**.
+     *
+     * The one call in this client that destroys training history. Everything
+     * else here is guarded so a retry cannot do damage; this is guarded only by
+     * the confirmation in front of it, because there is no undo and no soft
+     * delete on the other end. `BlockSheet` is where that confirmation lives,
+     * and it names the count before it offers the button.
+     *
+     * `currentMesoId` is where the pointer landed — null both when nothing
+     * moved and when no block is left, which is why the caller reloads rather
+     * than reasoning about it.
+     */
+    async deleteMesocycle(
+        mesoId: string,
+    ): Promise<{ sessionsDeleted: number; currentMesoId: string | null }> {
+        const body = await this.send<{
+            sessionsDeleted: number;
+            currentMesoId: string | null;
+        }>({
+            method: 'DELETE',
+            path: `/gym/mesocycles/${encodeURIComponent(mesoId)}`,
+        });
+
+        return { sessionsDeleted: body.sessionsDeleted, currentMesoId: body.currentMesoId };
     }
 
     /** Creating is also switching — the new block is current in the same transaction. */
