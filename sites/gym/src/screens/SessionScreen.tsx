@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { Stepper } from '../components/Stepper';
+import type { LastSets } from '../hooks/useLastSets';
 import { isRestWeek, repsInTank, setsForWeek } from '../lib/block';
 import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
@@ -12,8 +13,20 @@ const REP_STEP = 1;
 const RPE_MIN = 5;
 const RPE_MAX = 10;
 
-/** What a fresh exercise opens on before anything has been logged against it. */
-const OPENING = { weightKg: 60, reps: 8, rpe: 7 };
+/** The API's bounds, so a typed number cannot compose a set it would refuse. */
+const MAX_WEIGHT_KG = 1000;
+const MAX_REPS = 200;
+
+/**
+ * What an exercise opens on when nothing is known about it: no weight at all.
+ *
+ * Nothing rather than a plausible 60 kg, because a plausible number is the one
+ * that gets logged by accident. Zero is visibly not a weight you lifted, so it
+ * has to be answered — and the answer is one tap on the number, not
+ * twenty-four taps on the plus. An exercise that has been done before does not
+ * reach this: it opens on what it was last done with.
+ */
+const OPENING = { weightKg: 0, reps: 8, rpe: 7 };
 
 /**
  * The RPE a reps-in-the-tank target is, since the slider is the control that
@@ -23,6 +36,11 @@ const OPENING = { weightKg: 60, reps: 8, rpe: 7 };
  */
 function rpeForTank(tank: number): number {
     return Math.min(RPE_MAX, Math.max(RPE_MIN, 10 - tank));
+}
+
+/** A typed number, held inside the bounds the API would accept. */
+function clamp(value: number, low: number, high: number): number {
+    return Math.min(high, Math.max(low, value));
 }
 
 interface Pending {
@@ -45,6 +63,13 @@ interface SessionScreenProps {
 
     /** How long the block is, which is what turns `workout.week` into a target. */
     weeks: number;
+
+    /**
+     * What each exercise was last done with, from the previous session on this
+     * day. Empty is ordinary — a first week, or an exercise never logged — and
+     * means the logger opens on nothing for it.
+     */
+    lastSets: LastSets;
     elapsed: number;
     savedAt: number | null;
     onAddExercise: () => void;
@@ -76,6 +101,7 @@ export function SessionScreen({
     library,
     plan,
     weeks,
+    lastSets,
     elapsed,
     savedAt,
     onAddExercise,
@@ -145,19 +171,29 @@ export function SessionScreen({
 
         if (held) return held;
 
-        const sets = workout.entries[entryIndex]?.sets ?? [];
+        const entry = workout.entries[entryIndex];
+        const sets = entry?.sets ?? [];
         const last = sets[sets.length - 1];
 
-        // What you last lifted beats what the plan asked for: the plan opens
-        // the session, the previous set continues it.
+        // What you lifted a minute ago beats everything: this set continues the
+        // one before it.
         if (last) {
             return { weightKg: last.weightKg, reps: last.reps, rpe: last.rpe ?? OPENING.rpe };
         }
 
-        // Nothing logged yet. Reps open on a generic eight — the plan no longer
-        // prescribes one, and a target that names a number is the thing this
-        // screen stopped doing. The RPE opens on the week's target instead,
-        // which is where the intensity now comes from.
+        // Nothing logged against it today, so open on the last time it was
+        // done at all. The weight and the reps carry over; the RPE does not,
+        // because the week asks for something different from what last week
+        // did and that is the whole shape of the block.
+        const previous = entry ? lastSets[entry.exerciseName] : undefined;
+
+        if (previous) {
+            return { weightKg: previous.weightKg, reps: previous.reps, rpe: targetRpe };
+        }
+
+        // Never done. No weight to guess at, a generic eight reps, and the
+        // week's intensity target — which is where intensity now comes from,
+        // since the plan no longer names a rep count.
         return { ...OPENING, rpe: targetRpe };
     }
 
@@ -301,9 +337,16 @@ export function SessionScreen({
                                                 ),
                                             })}
                                             onIncrease={() => adjust(entryIndex, {
-                                                weightKg: values.weightKg + WEIGHT_STEP,
+                                                weightKg: Math.min(
+                                                    MAX_WEIGHT_KG,
+                                                    values.weightKg + WEIGHT_STEP,
+                                                ),
                                             })}
                                             canDecrease={values.weightKg > 0}
+                                            canIncrease={values.weightKg < MAX_WEIGHT_KG}
+                                            onValue={(weightKg) => adjust(entryIndex, {
+                                                weightKg: clamp(weightKg, 0, MAX_WEIGHT_KG),
+                                            })}
                                         />
                                         <Stepper
                                             label="REPS"
@@ -312,9 +355,14 @@ export function SessionScreen({
                                                 reps: Math.max(1, values.reps - REP_STEP),
                                             })}
                                             onIncrease={() => adjust(entryIndex, {
-                                                reps: values.reps + REP_STEP,
+                                                reps: Math.min(MAX_REPS, values.reps + REP_STEP),
                                             })}
                                             canDecrease={values.reps > 1}
+                                            canIncrease={values.reps < MAX_REPS}
+                                            keypad="numeric"
+                                            onValue={(reps) => adjust(entryIndex, {
+                                                reps: clamp(Math.round(reps), 1, MAX_REPS),
+                                            })}
                                         />
                                     </div>
 

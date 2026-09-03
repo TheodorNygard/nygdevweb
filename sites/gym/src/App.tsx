@@ -11,6 +11,7 @@ import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
 import { useBlocks } from './hooks/useBlocks';
 import { useElapsed } from './hooks/useElapsed';
+import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
 import { GymApi } from './lib/api';
@@ -20,7 +21,13 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { TodayScreen } from './screens/TodayScreen';
-import type { DayInput, MesocycleSummary, SessionTotals, Workout } from './lib/types';
+import type {
+    DayInput,
+    MesocycleSummary,
+    SessionSummary,
+    SessionTotals,
+    Workout,
+} from './lib/types';
 
 /** Which of the three full-screen states is showing. Sheets layer over these. */
 type Screen = 'tabs' | 'session' | 'done';
@@ -31,6 +38,9 @@ interface Completed {
     elapsed: number;
     totals: SessionTotals;
 }
+
+/** A stable empty list, so the lookup below does not churn before the block lands. */
+const NO_SESSIONS: SessionSummary[] = [];
 
 export function App() {
     const auth = useAuth();
@@ -47,6 +57,11 @@ export function App() {
     const blocks = useBlocks(api);
     const session = useSession(api);
     const library = useLibrary();
+
+    // What the open session's exercises were last done with. Keyed off the
+    // session rather than fetched by the screen, so it is in hand by the time
+    // the first logger opens.
+    const lastSets = useLastSets(api, block.block?.sessions ?? NO_SESSIONS, session.workout);
 
     const [screen, setScreen] = useState<Screen>('tabs');
     const [tab, setTab] = useState<Tab>('today');
@@ -448,6 +463,7 @@ export function App() {
                     library={library}
                     plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
                     weeks={meso?.weeks ?? session.workout.week}
+                    lastSets={lastSets}
                     elapsed={elapsed}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}

@@ -451,6 +451,48 @@ button {
     letter-spacing: -0.03em;
 }
 
+/* The value when it opens a keypad. Underlined rather than boxed: it has to
+   read as tappable without becoming a second control competing with the two
+   44px buttons either side of it, which are still the fast path. */
+.stepper__value--typable {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 6px;
+    border: none;
+    background: none;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--fg-28);
+    text-underline-offset: 5px;
+    text-decoration-thickness: 1px;
+}
+
+.stepper__value--typable:hover {
+    text-decoration-color: var(--accent);
+}
+
+/* Sized and weighted exactly like the value it replaces, so opening the keypad
+   does not move anything on the row. */
+.stepper__input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0 4px;
+    padding: 0 4px;
+    border: none;
+    border-bottom: 2px solid var(--accent);
+    border-radius: 0;
+    background: none;
+    color: var(--fg);
+    font: 700 26px/1 var(--mono);
+    letter-spacing: -0.03em;
+    text-align: center;
+}
+
+.stepper__input:focus {
+    outline: none;
+}
+
 .section-label {
     margin-top: 26px;
     display: block;
