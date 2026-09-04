@@ -1,5 +1,6 @@
 import { dayLabel, draftIn, isRestWeek, progressOf, repsInTank, sessionsFor } from '../lib/block';
 import { kg, rpeLabel, tankLabel, todayLabel } from '../lib/format';
+import { IntroScreen } from './IntroScreen';
 import type { CurrentBlock } from '../lib/types';
 
 interface TodayScreenProps {
@@ -21,25 +22,9 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
 
     if (!mesocycle) {
         // A first run, not an error: the API answers `mesocycle: null` when
-        // nobody has planned a block yet.
-        return (
-            <div className="screen">
-                <div className="masthead">
-                    <span className="eyebrow eyebrow--wide">{todayLabel()}</span>
-                    <span className="masthead__mark">LOGBOOK</span>
-                </div>
-                <h1 className="title">No block yet.</h1>
-                <p className="lede">
-                    A mesocycle is 3–8 weeks of 2–6 workout days. Name one and give its days
-                    labels, and this screen becomes the week you are training.
-                </p>
-                <div className="stack-22">
-                    <button type="button" className="primary" onClick={onPlan}>
-                        Plan a mesocycle
-                    </button>
-                </div>
-            </div>
-        );
+        // nobody has planned a block yet. It is also the only moment anyone
+        // will read what a mesocycle is, so that is what the screen is.
+        return <IntroScreen onPlan={onPlan} />;
     }
 
     const progress = progressOf(mesocycle, sessions);

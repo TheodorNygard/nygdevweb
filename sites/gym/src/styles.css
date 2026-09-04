@@ -186,6 +186,141 @@ button {
     color: var(--fg-50);
 }
 
+/* ------------------------------------------------------------- the intro -- */
+
+/* What Today is before a block exists: the shape of a mesocycle, drawn. Sized
+   to sit above the fold on a 402pt phone alongside the title and the lede, so
+   the graph is seen rather than scrolled to. */
+
+.ramp {
+    margin: 22px 0 0;
+    padding: 16px 14px 12px;
+    border-radius: 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+.ramp__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ramp__key {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font: 400 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--fg-35);
+}
+
+.ramp__key .ramp__dot:not(:first-child) {
+    margin-left: 6px;
+}
+
+.ramp__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.ramp__dot--rest {
+    background: var(--bg);
+    border: 1px solid var(--fg-35);
+}
+
+.ramp__plot {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-top: 10px;
+
+    /* The plot is drawn edge to edge in six equal columns; the two label rows
+       below are six- and two-column grids over the same width, which is what
+       keeps W2 under the second dot at every screen size. */
+    overflow: visible;
+}
+
+.ramp__weeks {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.ramp__week {
+    text-align: center;
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.1em;
+    color: var(--fg-50);
+}
+
+.ramp__week--rest {
+    color: var(--fg-28);
+}
+
+.ramp__blocks {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.ramp__block {
+    text-align: center;
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.12em;
+    color: var(--fg-40);
+}
+
+/* The three moves a block makes. A list rather than prose: they happen in
+   order, and the order is the thing being taught. */
+
+.primer {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.primer__step {
+    display: grid;
+    grid-template-columns: 66px 1fr;
+    gap: 12px;
+    align-items: baseline;
+}
+
+.primer__label {
+    font: 600 10px/1.6 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--accent);
+}
+
+.primer__body {
+    margin: 0;
+    font: 400 14px/1.5 var(--sans);
+    color: var(--fg-60);
+}
+
+/* The one number anyone needs before opening the planner, in the panel style
+   the planner's own notes use. */
+
+.note {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--fill-soft);
+    border: 1px solid var(--line);
+}
+
+.note__body {
+    margin: 10px 0 0;
+    font: 400 13px/1.6 var(--sans);
+    color: var(--fg-60);
+}
+
 /* ------------------------------------------------------------ block card -- */
 
 .block {
