@@ -1,10 +1,6 @@
 import { EffortGraph } from '../components/EffortGraph';
 import { todayLabel } from '../lib/format';
 
-interface IntroScreenProps {
-    onPlan: () => void;
-}
-
 /** The three moves a block makes, in the order it makes them. */
 const STEPS = [
     {
@@ -27,13 +23,17 @@ const STEPS = [
 /**
  * What the first tab shows before there is anything to train.
  *
- * A first run has no week to open on, and an empty screen with a button on it
- * teaches nothing — least of all to someone who has never planned a block and
- * is about to be asked how many weeks it should be. So the empty state is the
- * explanation instead: what a mesocycle is, the shape it makes, and how long to
- * make one. The button at the bottom is the same button either way.
+ * A first run has no week to open on, and an empty screen teaches nothing —
+ * least of all to someone who has never planned a block and is about to be
+ * asked how many weeks it should be. So the empty state is the explanation
+ * instead: what a mesocycle is, the shape it makes, and how long to make one.
+ *
+ * It carries no call to action of its own. Plan is the second tab, pinned to
+ * the bottom of every screen including this one, so a button here would be a
+ * second door onto the same room — and one that pushes the reader past the
+ * thing they are here to read.
  */
-export function IntroScreen({ onPlan }: IntroScreenProps) {
+export function IntroScreen() {
     return (
         <div className="screen">
             <div className="masthead">
@@ -67,12 +67,6 @@ export function IntroScreen({ onPlan }: IntroScreenProps) {
                     Three is the shortest block worth calling one; past eight you are deloading
                     late. Blocks here run 3 to 8 weeks, 2 to 6 workouts a week.
                 </p>
-            </div>
-
-            <div className="stack-22">
-                <button type="button" className="primary" onClick={onPlan}>
-                    Plan a mesocycle
-                </button>
             </div>
         </div>
     );

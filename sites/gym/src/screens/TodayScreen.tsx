@@ -24,7 +24,7 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
         // A first run, not an error: the API answers `mesocycle: null` when
         // nobody has planned a block yet. It is also the only moment anyone
         // will read what a mesocycle is, so that is what the screen is.
-        return <IntroScreen onPlan={onPlan} />;
+        return <IntroScreen />;
     }
 
     const progress = progressOf(mesocycle, sessions);
