@@ -194,189 +194,179 @@ export function PlanScreen({
                 never touches sessions you have already logged.
             </p>
 
-            <div className="plan__grid">
-                <div className="plan__col">
-                    <section className="panel">
-                        <div className="field-label">BLOCK NAME</div>
+            <section className="panel">
+                <div className="field-label">BLOCK NAME</div>
+                <input
+                    className="text-input"
+                    value={draft.name}
+                    onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                    aria-label="Block name"
+                    maxLength={80}
+                />
+
+                <div className="stepper-row">
+                    <Stepper
+                        label="WEEKS"
+                        value={String(draft.weeks)}
+                        onDecrease={() => setDraft({ ...draft, weeks: draft.weeks - 1 })}
+                        onIncrease={() => setDraft({ ...draft, weeks: draft.weeks + 1 })}
+                        canDecrease={draft.weeks > MIN_WEEKS}
+                        canIncrease={draft.weeks < MAX_WEEKS}
+                    />
+                    <Stepper
+                        label="DAYS / WEEK"
+                        value={String(draft.days.length)}
+                        onDecrease={() => setDays(draft.days.length - 1)}
+                        onIncrease={() => setDays(draft.days.length + 1)}
+                        canDecrease={draft.days.length > MIN_DAYS}
+                        canIncrease={draft.days.length < MAX_DAYS}
+                    />
+                </div>
+            </section>
+
+            <span className="section-label">WORKOUT DAYS</span>
+            <div className="dayfields">
+                {draft.days.map((day, index) => (
+                    // The index is the identity, legitimately: a day *is* its
+                    // position — the `dayIndex` sessions are filed under.
+                    <div className="dayfield" key={index}>
+                        <span className="dayfield__badge">D{index + 1}</span>
                         <input
-                            className="text-input"
-                            value={draft.name}
-                            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                            aria-label="Block name"
-                            maxLength={80}
+                            className="dayfield__input"
+                            value={day.label}
+                            onChange={(event) => rename(index, event.target.value)}
+                            aria-label={`Label for day ${index + 1}`}
+                            maxLength={40}
                         />
-
-                        <div className="stepper-row">
-                            <Stepper
-                                label="WEEKS"
-                                value={String(draft.weeks)}
-                                onDecrease={() => setDraft({ ...draft, weeks: draft.weeks - 1 })}
-                                onIncrease={() => setDraft({ ...draft, weeks: draft.weeks + 1 })}
-                                canDecrease={draft.weeks > MIN_WEEKS}
-                                canIncrease={draft.weeks < MAX_WEEKS}
-                            />
-                            <Stepper
-                                label="DAYS / WEEK"
-                                value={String(draft.days.length)}
-                                onDecrease={() => setDays(draft.days.length - 1)}
-                                onIncrease={() => setDays(draft.days.length + 1)}
-                                canDecrease={draft.days.length > MIN_DAYS}
-                                canIncrease={draft.days.length < MAX_DAYS}
-                            />
-                        </div>
-                    </section>
-
-                    <span className="section-label">WORKOUT DAYS</span>
-                    <div className="dayfields">
-                        {draft.days.map((day, index) => (
-                            // The index is the identity, legitimately: a day *is* its
-                            // position — the `dayIndex` sessions are filed under.
-                            <div className="dayfield" key={index}>
-                                <span className="dayfield__badge">D{index + 1}</span>
-                                <input
-                                    className="dayfield__input"
-                                    value={day.label}
-                                    onChange={(event) => rename(index, event.target.value)}
-                                    aria-label={`Label for day ${index + 1}`}
-                                    maxLength={40}
-                                />
-                                <button
-                                    type="button"
-                                    className="dayfield__plan"
-                                    onClick={() => setPlanningDay(index)}
-                                    aria-label={`Plan ${day.label}`}
-                                >
-                                    {day.plan.length === 0 ? 'plan' : `${day.plan.length} ex`}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-
-                    <span className="section-label">BLOCK MAP</span>
-                    <div className="map">
-                        {rows.map((row) => (
-                            <div className="map__row" key={row.week}>
-                                <span className="map__week">W{row.week}</span>
-                                <span className="map__cells">
-                                    {row.cells.map((cell) => (
-                                        <span
-                                            key={cell.dayIndex}
-                                            className={cell.state === 'planned'
-                                            ? 'map__cell'
-                                            : `map__cell map__cell--${cell.state}`}
-                                        />
-                                    ))}
-                                </span>
-                                {/* The ramp, which is the only thing that distinguishes one
-                                    week of the block from another now that days are shared.
-                                    The rest week keeps the units rather than reading REST:
-                                    its eight is the top of the same scale, and a word in a
-                                    column of numbers reads as a gap in the ramp. */}
-                                <span
-                                    className={row.rest ? 'map__tank map__tank--rest' : 'map__tank'}
-                                >
-                                    {row.tank} LEFT
-                                </span>
-                            </div>
-                        ))}
-                        <div className="map__key">
-                            <span>■ logged</span>
-                            <span>▨ in progress</span>
-                            <span>□ planned</span>
-                        </div>
-                        <p className="map__note">
-                            The number is reps left in the tank: how much you should have in
-                            reserve when a set ends. It tightens as the block goes on and reaches
-                            nothing left in the last training week. The final week is the rest
-                            week — the same exercises at half the sets, nowhere near failure.
-                        </p>
-                    </div>
-
-                    <div className="stack-22">
                         <button
                             type="button"
-                            className="primary"
-                            disabled={busy || !canSave || (exists && !dirty)}
-                            onClick={() => {
-                                const patch = {
-                                    name: draft.name.trim(),
-                                    weeks: draft.weeks,
-                                    days: draft.days.map((day) => ({
-                                        label: day.label.trim(),
-                                        plan: day.plan,
-                                    })),
-                                };
-
-                                if (exists) onSave(patch);
-                                else onCreate(patch);
-                            }}
+                            className="dayfield__plan"
+                            onClick={() => setPlanningDay(index)}
+                            aria-label={`Plan ${day.label}`}
                         >
-                            {busy
-                                ? 'Saving…'
-                                : exists
-                                    ? dirty ? 'Save changes' : 'Plan saved'
-                                    : 'Create mesocycle'}
+                            {day.plan.length === 0 ? 'plan' : `${day.plan.length} ex`}
                         </button>
                     </div>
+                ))}
+            </div>
 
-                    {exists ? (
-                        <div className="stack-8">
-                            <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => setConfirmFresh(true)}
-                                disabled={busy}
-                            >
-                                Start a fresh mesocycle
-                            </button>
-                        </div>
-                    ) : null}
-                </div>
-
-                <div className="plan__col">
-                    <span className="section-label">ALL BLOCKS</span>
-                    {blocksLoading && blocks.length === 0 ? (
-                        <p className="empty">Reading your blocks…</p>
-                    ) : blocks.length === 0 ? (
-                        <p className="empty">
-                            Nothing planned yet. The block you create above will be the first.
-                        </p>
-                    ) : (
-                        <div className="rows" style={{ marginTop: 12 }}>
-                            {blocks.map((entry) => (
-                                <button
-                                    key={entry.id}
-                                    type="button"
-                                    className="row"
-                                    onClick={() => onOpenBlock(entry)}
-                                >
-                                    <span>
-                                        <span className="row__label">
-                                            {entry.name}
-                                            {entry.isCurrent ? (
-                                                <span className="row__tag">CURRENT</span>
-                                            ) : null}
-                                        </span>
-                                        <span className="row__sub">
-                                            {entry.weeks} weeks · {entry.days.length} days
-                                        </span>
-                                    </span>
-                                    <span className="row__right">
-                                        <span className="row__value">{entry.submittedCount}</span>
-                                        <span className="row__unit">logged</span>
-                                    </span>
-                                </button>
+            <span className="section-label">BLOCK MAP</span>
+            <div className="map">
+                {rows.map((row) => (
+                    <div className="map__row" key={row.week}>
+                        <span className="map__week">W{row.week}</span>
+                        <span className="map__cells">
+                            {row.cells.map((cell) => (
+                                <span
+                                    key={cell.dayIndex}
+                                    className={`map__cell${cell.state === 'planned' ? '' : ` map__cell--${cell.state}`}`}
+                                />
                             ))}
-                        </div>
-                    )}
-
-                    <div className="stack-22">
-                        <p className="empty">Signed in as {account}.</p>
-                        <button type="button" className="ghost" onClick={onSignOut}>
-                            Sign out
-                        </button>
+                        </span>
+                        {/* The ramp, which is the only thing that distinguishes one
+                            week of the block from another now that days are shared.
+                            The rest week keeps the units rather than reading REST:
+                            its eight is the top of the same scale, and a word in a
+                            column of numbers reads as a gap in the ramp. */}
+                        <span
+                            className={row.rest ? 'map__tank map__tank--rest' : 'map__tank'}
+                        >
+                            {row.tank} LEFT
+                        </span>
                     </div>
+                ))}
+                <div className="map__key">
+                    <span>■ logged</span>
+                    <span>▨ in progress</span>
+                    <span>□ planned</span>
                 </div>
+                <p className="map__note">
+                    The number is reps left in the tank: how much you should have in reserve when
+                    a set ends. It tightens as the block goes on and reaches nothing left in the
+                    last training week. The final week is the rest week — the same exercises at
+                    half the sets, nowhere near failure.
+                </p>
+            </div>
+
+            <div className="stack-22">
+                <button
+                    type="button"
+                    className="primary"
+                    disabled={busy || !canSave || (exists && !dirty)}
+                    onClick={() => {
+                        const patch = {
+                            name: draft.name.trim(),
+                            weeks: draft.weeks,
+                            days: draft.days.map((day) => ({
+                                label: day.label.trim(),
+                                plan: day.plan,
+                            })),
+                        };
+
+                        if (exists) onSave(patch);
+                        else onCreate(patch);
+                    }}
+                >
+                    {busy
+                        ? 'Saving…'
+                        : exists
+                            ? dirty ? 'Save changes' : 'Plan saved'
+                            : 'Create mesocycle'}
+                </button>
+            </div>
+
+            {exists ? (
+                <div className="stack-8">
+                    <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => setConfirmFresh(true)}
+                        disabled={busy}
+                    >
+                        Start a fresh mesocycle
+                    </button>
+                </div>
+            ) : null}
+
+            <span className="section-label">ALL BLOCKS</span>
+            {blocksLoading && blocks.length === 0 ? (
+                <p className="empty">Reading your blocks…</p>
+            ) : blocks.length === 0 ? (
+                <p className="empty">
+                    Nothing planned yet. The block you create above will be the first.
+                </p>
+            ) : (
+                <div className="rows" style={{ marginTop: 12 }}>
+                    {blocks.map((entry) => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            className="row"
+                            onClick={() => onOpenBlock(entry)}
+                        >
+                            <span>
+                                <span className="row__label">
+                                    {entry.name}
+                                    {entry.isCurrent ? <span className="row__tag">CURRENT</span> : null}
+                                </span>
+                                <span className="row__sub">
+                                    {entry.weeks} weeks · {entry.days.length} days
+                                </span>
+                            </span>
+                            <span className="row__right">
+                                <span className="row__value">{entry.submittedCount}</span>
+                                <span className="row__unit">logged</span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <div className="stack-22">
+                <p className="empty">Signed in as {account}.</p>
+                <button type="button" className="ghost" onClick={onSignOut}>
+                    Sign out
+                </button>
             </div>
 
             {planningDay !== null && draft.days[planningDay] ? (
