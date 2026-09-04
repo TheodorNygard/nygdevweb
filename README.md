@@ -343,6 +343,47 @@ copy of the same twenty names, because a picker with nothing in it would block
 logging entirely. Custom names are typed inline and post with the entry, so
 nothing about a session depends on the library being reachable.
 
+### Day templates come from both places at once
+
+A **template** is a named plan — Push, Lower A — that the Plan tab drops into a
+day of a block. There are two kinds and they arrive by different routes, which
+is the whole design rather than an accident of history:
+
+| | Built-in | Saved |
+| --- | --- | --- |
+| Where it lives | `gym-templates.json` on the CDN, beside the exercise library | `type = "template"` documents in `db/gym` |
+| Id | `builtin_push` | `template_01k4…` |
+| Costs | no token, no function call, no RU | a call and a few RU, on one screen |
+| Editable | no — it ships with the app | yes: `POST`/`PUT`/`DELETE /gym/templates` |
+
+The split falls out of who owns them. The built-in list is identical for every
+user and changes when the app ships, so serving it per account would be a
+function invocation and an RU spent handing back the same ten objects; the saved
+ones are somebody's, so they cannot be a blob. `src/lib/templates.ts` fetches the
+first, `GymApi.templates()` the second, and `useTemplates` hands the sheet both
+lists separately — separately, because only one of them has a delete on its rows.
+
+Unlike the exercise library, the CDN half has **no bundled fallback** and falls
+back to an empty list. The difference is deliberate: a picker with no exercises
+in it blocks logging, and logging happens in a basement with no signal, but
+planning happens at a desk and a day with no template offered is still a day you
+can plan by hand in the same sheet. A second copy of a shipped file that can
+drift from the one on the CDN is the worse trade here.
+
+**Applying a template is not an API call.** It assigns the day's `plan` in the
+Plan tab's local draft, which then saves with the block through the PATCH that
+was going to happen anyway — so a template is a *copy*, never a link. Nothing on
+a block records which template filled a day, which is what makes renaming or
+deleting one safe with no confirmation and no cascade: what is destroyed is the
+shortcut, never a plan or a workout. It also means applying one is undone by
+leaving the Plan tab without saving, the same as every other edit on that screen.
+
+Saving works the other way round: the sheet captures the day as it stands, named
+after the day by default. Typing a name you already have turns Save into
+`Replace “…”`, so re-saving a template keeps its id instead of filing a
+near-duplicate beside it. That is the *client's* reading — the API allows two
+templates to share a name, because the id is the identity.
+
 ### Two registrations, and which is which
 
 The same GUID means different things in different fields, so this is the thing
@@ -420,10 +461,10 @@ npm run preview   # serve the built dist/ over HTTP
 | Path | What it holds |
 | --- | --- |
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
-| `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library, the identity config, the AADSTS error map |
-| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useLibrary`, `useElapsed` |
+| `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library and the built-in day templates, the identity config, the AADSTS error map |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useTemplates` (the two template lists and their writes), `useLibrary`, `useElapsed` |
 | `src/screens/` | Today, Plan, History, Session, Done |
-| `src/components/` | The tab bar, the three bottom sheets, the stepper, the banner, the sign-in gate |
+| `src/components/` | The tab bar, the bottom sheets — day, block, day plan, templates, exercise picker, finish — the stepper, the drag handle, the banner, the sign-in gate |
 | `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
 | `dist/` | Build output. Gitignored; produced in CI and uploaded as-is |
 
@@ -482,7 +523,7 @@ change was a silently ignored property and a sign-in that failed at runtime.
 
 | Header | Here | Elsewhere | Why |
 | --- | --- | --- | --- |
-| `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the exercise library. Three origins and no more; an exfiltration path would have to change this file to exist. |
+| `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the two CDN files — the exercise library and the built-in day templates. Three origins and no more; an exfiltration path would have to change this file to exist. |
 | `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
 | `font-src` | `'self'` | absent | The two self-hosted typefaces. `default-src 'none'` means an unlisted `font-src` is `none`, and the app would silently fall back to system fonts. |
 | `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup. The app signs in by redirect, so this is not load-bearing today — it is what keeps a popup flow from being a trap if one is ever added. |

@@ -181,3 +181,28 @@ export interface ExerciseLibrary {
     equipment: string[];
     exercises: { name: string; equipment: string }[];
 }
+
+/**
+ * A saved day plan: a name, and the exercises it drops into a day.
+ *
+ * The same shape as a day's `plan` and deliberately not a richer one, because
+ * applying a template is a copy into the Plan tab's draft and nothing else.
+ * Nothing on a block records where a day's exercises came from, so renaming or
+ * deleting a template never reaches back into a block filled from it.
+ *
+ * Both halves of the picker are this type. A built-in one has an id like
+ * `builtin_push` and comes from the CDN; a saved one has `template_01k4…` and
+ * comes from the API. They stay in separate lists rather than being merged and
+ * sorted out again by their prefix, because only one of the two can be edited.
+ */
+export interface DayTemplate {
+    id: string;
+    name: string;
+    plan: PlannedExercise[];
+}
+
+/** The built-in templates published on the CDN, not by the API. */
+export interface TemplateLibrary {
+    version: string;
+    templates: DayTemplate[];
+}

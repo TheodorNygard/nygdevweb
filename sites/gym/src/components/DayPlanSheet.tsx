@@ -4,7 +4,9 @@ import { DragHandle } from './DragHandle';
 import { ExercisePicker } from './ExercisePicker';
 import { Sheet } from './Sheet';
 import { Stepper } from './Stepper';
+import { TemplateSheet } from './TemplateSheet';
 import { reordered, useDragReorder } from '../hooks/useDragReorder';
+import type { TemplatesState } from '../hooks/useTemplates';
 import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise } from '../lib/types';
 
@@ -20,6 +22,10 @@ interface DayPlanSheetProps {
     dayIndex: number;
     plan: PlannedExercise[];
     library: ExerciseLibrary | null;
+
+    /** The saved and built-in day plans this sheet can fill the day from. */
+    templates: TemplatesState;
+
     onChange: (plan: PlannedExercise[]) => void;
     onClose: () => void;
 }
@@ -43,16 +49,23 @@ interface DayPlanSheetProps {
  * `SessionScreen`. Dragging the handle reorders the *draft*, same as every
  * other edit on this sheet: it saves with the rest of the plan on the Plan
  * tab's Save, not on its own.
+ *
+ * Templates are the exception that proves that rule. Applying one is another
+ * edit to the draft and writes nothing; *saving* one is a write, but to a
+ * document of its own rather than to the block, which is why the two can sit
+ * behind the same button without one being able to half-finish the other.
  */
 export function DayPlanSheet({
     label,
     dayIndex,
     plan,
     library,
+    templates,
     onChange,
     onClose,
 }: DayPlanSheetProps) {
     const [picking, setPicking] = useState(false);
+    const [templating, setTemplating] = useState(false);
 
     const { rowProps, handleProps } = useDragReorder(plan.length, (from, to) => {
         onChange(reordered(plan, from, to));
@@ -86,6 +99,15 @@ export function DayPlanSheet({
                     should be comes from the week you are in, and the rest week runs the same
                     exercises at half these sets.
                 </p>
+
+                <button
+                    type="button"
+                    className="add-exercise stack-18"
+                    style={{ width: '100%' }}
+                    onClick={() => setTemplating(true)}
+                >
+                    {plan.length === 0 ? 'Start from a template' : 'Templates'}
+                </button>
 
                 {plan.length === 0 ? (
                     <p className="empty">
@@ -177,6 +199,16 @@ export function DayPlanSheet({
                     busy={false}
                     onPick={add}
                     onClose={() => setPicking(false)}
+                />
+            ) : null}
+
+            {templating ? (
+                <TemplateSheet
+                    dayLabel={label}
+                    plan={plan}
+                    templates={templates}
+                    onApply={onChange}
+                    onClose={() => setTemplating(false)}
                 />
             ) : null}
         </>

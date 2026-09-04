@@ -52,3 +52,14 @@ export const API_BASE = import.meta.env['VITE_GYM_API_BASE']
  */
 export const EXERCISE_LIBRARY_URL = import.meta.env['VITE_GYM_LIBRARY_URL']
     ?? 'https://nygdevcdn.blob.core.windows.net/data/gym-exercises.json';
+
+/**
+ * The built-in day templates — the named plans the Plan tab drops into a day.
+ * A blob beside the exercise library and for the same reason: identical for
+ * every user, so it changes when the app ships rather than when anyone trains.
+ *
+ * The user's own saved templates are not here. They are somebody's, so they
+ * come from the API — `GET /gym/templates` — and the picker shows both.
+ */
+export const TEMPLATE_LIBRARY_URL = import.meta.env['VITE_GYM_TEMPLATES_URL']
+    ?? 'https://nygdevcdn.blob.core.windows.net/data/gym-templates.json';

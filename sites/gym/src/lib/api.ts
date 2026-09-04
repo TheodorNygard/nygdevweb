@@ -2,10 +2,12 @@ import { API_BASE } from './config';
 import type {
     CurrentBlock,
     DayInput,
+    DayTemplate,
     EntryMoveResult,
     EntryResult,
     Mesocycle,
     MesocycleSummary,
+    PlannedExercise,
     RemoveEntryResult,
     RemoveSetResult,
     SessionSummary,
@@ -234,6 +236,70 @@ export class GymApi {
         });
 
         return body.mesocycle;
+    }
+
+    /**
+     * The day templates this user has saved, newest first.
+     *
+     * Only the saved ones. The built-in templates are a CDN blob — see
+     * `lib/templates` — and the sheet shows both lists together.
+     *
+     * There is no call for *applying* a template and there should not be:
+     * dropping one into a day is an assignment on the Plan tab's local draft,
+     * which `updateMesocycle` then saves along with everything else on that
+     * screen. A route for it would be a second way to write `days`.
+     */
+    async templates(): Promise<DayTemplate[]> {
+        const body = await this.send<{ templates: DayTemplate[] }>({
+            method: 'GET',
+            path: '/gym/templates',
+        });
+
+        return body.templates;
+    }
+
+    /** Saves a day plan under a name. The API answers with the id it minted. */
+    async saveTemplate(name: string, plan: PlannedExercise[]): Promise<DayTemplate> {
+        const body = await this.send<{ template: DayTemplate }>({
+            method: 'POST',
+            path: '/gym/templates',
+            body: { name, plan },
+        });
+
+        return body.template;
+    }
+
+    /**
+     * Re-saves a template in place. Both fields are always sent — a template is
+     * two of them — and `plan` replaces wholesale.
+     *
+     * No block changes as a result. A day filled from this template copied the
+     * exercises at the time, which is what makes re-saving safe to do without
+     * asking what it might disturb.
+     */
+    async replaceTemplate(
+        templateId: string,
+        name: string,
+        plan: PlannedExercise[],
+    ): Promise<DayTemplate> {
+        const body = await this.send<{ template: DayTemplate }>({
+            method: 'PUT',
+            path: `/gym/templates/${encodeURIComponent(templateId)}`,
+            body: { name, plan },
+        });
+
+        return body.template;
+    }
+
+    /**
+     * Removes a saved template. Nothing cascades: what is destroyed is the
+     * shortcut, never a planned day or a logged session.
+     */
+    deleteTemplate(templateId: string): Promise<{ id: string; deleted: boolean }> {
+        return this.send({
+            method: 'DELETE',
+            path: `/gym/templates/${encodeURIComponent(templateId)}`,
+        });
     }
 
     /**

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { DayPlanSheet } from '../components/DayPlanSheet';
 import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
+import type { TemplatesState } from '../hooks/useTemplates';
 import { draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
 import type {
     CurrentBlock,
@@ -79,6 +80,9 @@ interface PlanScreenProps {
 
     /** For the equipment chip beside a planned exercise, and the picker. */
     library: ExerciseLibrary | null;
+
+    /** Saved and built-in day plans, for the template sheet inside the day's. */
+    templates: TemplatesState;
     busy: boolean;
     onSave: (patch: { name: string; weeks: number; days: DayInput[] }) => void;
     onCreate: (plan: { name: string; weeks: number; days: DayInput[] }) => void;
@@ -101,6 +105,7 @@ export function PlanScreen({
     blocksLoading,
     onOpenBlock,
     library,
+    templates,
     busy,
     onSave,
     onCreate,
@@ -375,6 +380,7 @@ export function PlanScreen({
                     dayIndex={planningDay}
                     plan={draft.days[planningDay].plan}
                     library={library}
+                    templates={templates}
                     onChange={(plan) => replan(planningDay, plan)}
                     onClose={() => setPlanningDay(null)}
                 />

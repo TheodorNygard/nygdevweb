@@ -1804,6 +1804,86 @@ button {
     color: var(--fg-40);
 }
 
+/* ----------------------------------------------------------- templates --- */
+
+/* A template row is not a `.row`, because `.row` is itself the button and this
+   one has a second control on it. Same ground and same rhythm; the `.rows`
+   wrapper still supplies the hairlines and the rounded ends. */
+.tpl {
+    display: flex;
+    align-items: center;
+    background: var(--row);
+}
+
+.tpl:hover {
+    background: var(--row-hover);
+}
+
+.tpl__apply {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    padding: 15px 16px;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
+}
+
+.tpl__name {
+    display: block;
+    font: 500 15px/1.2 var(--sans);
+}
+
+.tpl__sub {
+    display: block;
+    font: 400 12px/1.2 var(--mono);
+    color: var(--fg-40);
+    margin-top: 5px;
+}
+
+/* The inline delete confirmation, in place of the row it is asking about — so
+   the name being deleted stays where the thumb already is, and no sheet opens
+   over the sheet. */
+.tpl--confirming {
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px 11px 16px;
+}
+
+.tpl__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.tpl__keep,
+.tpl__delete {
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 9px;
+    font: 500 13px/1 var(--sans);
+}
+
+.tpl__keep {
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--fg-40);
+}
+
+.tpl__delete {
+    border: 1px solid rgba(255, 120, 110, 0.35);
+    background: transparent;
+    color: #ff8b82;
+}
+
+.tpl__error {
+    margin: 14px 0 0;
+    font: 400 13px/1.5 var(--sans);
+    color: #ff8b82;
+}
+
 /* ------------------------------------------------------------- banners --- */
 
 .banner {

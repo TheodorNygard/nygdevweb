@@ -14,6 +14,7 @@ import { useHistory } from './hooks/useHistory';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
+import { useTemplates } from './hooks/useTemplates';
 import { GymApi } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { DoneScreen } from './screens/DoneScreen';
@@ -71,6 +72,12 @@ export function App() {
     const blocks = useBlocks(api);
     const session = useSession(api);
     const library = useLibrary();
+
+    // The saved and built-in day plans the Plan tab drops into a day. Its own
+    // errors stay inside its sheet rather than joining the banner chain below:
+    // nothing else in the app reads this, and a day can still be planned by
+    // hand while it is failing.
+    const templates = useTemplates(api);
 
     // The sessions of blocks other than the one being trained — History's
     // second half. Read per block, when the block is opened.
@@ -469,6 +476,7 @@ export function App() {
                                     blocksLoading={blocks.loading}
                                     onOpenBlock={setOpenBlock}
                                     library={library}
+                                    templates={templates}
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
