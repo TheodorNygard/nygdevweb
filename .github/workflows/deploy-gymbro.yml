@@ -1,0 +1,122 @@
+name: Deploy gymbro.nygard.dev
+
+# Manual-only, like the other three site workflows: deploy on demand from the
+# Actions tab. Auto-deploy on push/PR is intentionally off.
+on:
+  workflow_dispatch:
+
+# OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
+# id-token: write is for azure/login only; like the gym.nygard.dev workflow this
+# one hands no OIDC token to the deploy action (see Build And Deploy).
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          lfs: false
+
+      # The uploaded artifact is produced here rather than checked in. Node 22
+      # is what Vite 8 asks for (^20.19 || >=22.12); pinning it keeps a runner
+      # image bump from silently changing the toolchain.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sites/gymbro/package-lock.json
+
+      # `npm ci`, not `npm install`: it installs exactly what the lockfile pins
+      # and fails if package.json disagrees, which is what makes it reproducible.
+      - name: Install dependencies
+        working-directory: sites/gymbro
+        run: npm ci
+
+      # `npm run build` runs tsc before vite, so this is the type gate as well
+      # as the bundle: type errors fail here rather than in the browser.
+      #
+      # This build reads sites/gym/src as well as its own — the wire types, the
+      # block maths and the MSAL wiring are shared through the `@gym` alias, so
+      # a change to the logger's domain layer is type-checked here too. Nothing
+      # extra is needed for that: the checkout above is the whole repository,
+      # and the alias resolves against the working tree rather than a package.
+      - name: Build
+        working-directory: sites/gymbro
+        run: npm run build
+
+      - name: Az CLI login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve target Static Web App
+        env:
+          SWA_NAME: ${{ vars.AZURE_SWA_NAME_GYMBRO }}
+          SWA_RG: ${{ vars.AZURE_SWA_RESOURCE_GROUP_GYMBRO }}
+          SWA_RG_SHARED: ${{ vars.AZURE_SWA_RESOURCE_GROUP }}
+        run: |
+          # An unset repository variable expands to an empty string, which the Az
+          # CLI reports as a bare "expected one argument" usage error. Fail here
+          # instead, naming the variable that needs setting.
+          if [ -z "$SWA_NAME" ]; then
+            echo "::error::Repository variable AZURE_SWA_NAME_GYMBRO is not set (Settings -> Secrets and variables -> Actions -> Variables). It must hold the Azure resource name of the gymbro.nygard.dev Static Web App."
+            exit 1
+          fi
+
+          # Usually shared with the other three apps, so fall back to
+          # AZURE_SWA_RESOURCE_GROUP when no _GYMBRO override is set.
+          if [ -z "$SWA_RG" ]; then
+            SWA_RG="$SWA_RG_SHARED"
+          fi
+          if [ -z "$SWA_RG" ]; then
+            echo "::error::Neither AZURE_SWA_RESOURCE_GROUP_GYMBRO nor AZURE_SWA_RESOURCE_GROUP is set."
+            exit 1
+          fi
+
+          echo "Deploying to Static Web App '$SWA_NAME' in resource group '$SWA_RG'"
+          echo "SWA_NAME=$SWA_NAME" >> "$GITHUB_ENV"
+          echo "SWA_RG=$SWA_RG" >> "$GITHUB_ENV"
+
+      - name: Retrieve Static Web Apps deployment token
+        run: |
+          # Fetched just-in-time over the federated identity rather than kept as
+          # a long-lived GitHub secret. The deploy identity needs a role granting
+          # Microsoft.Web/staticSites/listSecrets (e.g. Contributor).
+          TOKEN=$(az staticwebapp secrets list \
+            --name "$SWA_NAME" \
+            --resource-group "$SWA_RG" \
+            --query "properties.apiKey" \
+            --output tsv)
+          echo "::add-mask::$TOKEN"
+          echo "SWA_DEPLOYMENT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      # skip_app_build keeps Azure's Oryx builder out of the way, so
+      # sites/gymbro/dist uploads exactly as built above — index.html, auth.html,
+      # hashed assets, favicons, the first-party 404 page and
+      # staticwebapp.config.json. Letting Oryx build would put a second,
+      # unpinned toolchain in charge of what ships.
+      #
+      # No github_id_token, for the same reason as the other two token-authorized
+      # workflows: that path resolves the target app from a workflow filename
+      # registered at provisioning time, and this app has no such registration.
+      # Needs the app's authorization policy set to "Deployment token" (portal:
+      # Static Web App -> Settings -> Deployment configuration).
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ env.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "sites/gymbro/dist"
+          api_location: ""
+          output_location: "."
+          skip_app_build: true

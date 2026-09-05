@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>gymbro</title>
+    <meta name="description" content="Plan a training block on a screen with room for it.">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#d6ff3f">
+
+    <!-- Graphite is dark only, and the browser chrome has to agree: a white
+         title bar above a near-black screen undoes the whole direction. -->
+    <meta name="theme-color" content="#0b0c0e">
+    <meta name="color-scheme" content="dark">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <!-- Vite rewrites this to the hashed, same-origin bundle, so `script-src
+         'self'` covers it. MSAL is bundled rather than loaded from a CDN, so the
+         CSP never admits a third-party origin to the page that holds tokens. -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

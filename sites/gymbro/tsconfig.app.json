@@ -1,0 +1,38 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "types": ["vite/client"],
+
+        // Vite transpiles; tsc only type-checks. tsbuildinfo is what makes
+        // `tsc --build` incremental, so it needs a home even with nothing
+        // else emitted.
+        "noEmit": true,
+        "incremental": true,
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+        // The wire contract and the block maths live once, in the logger, and
+        // are read from here rather than transcribed a second time — see the
+        // header of `src/lib/gym.ts`. The alias has to be declared in
+        // `vite.config.ts` as well; tsc resolves it for the type check and
+        // Vite resolves it for the bundle, and neither reads the other's copy.
+        "paths": {
+            "@gym/*": ["../gym/src/*"]
+        },
+
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "exactOptionalPropertyTypes": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "erasableSyntaxOnly": true,
+        "verbatimModuleSyntax": true,
+        "isolatedModules": true,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
+}

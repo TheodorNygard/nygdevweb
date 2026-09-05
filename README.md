@@ -1,14 +1,14 @@
 # nygdevweb
 
-Source for three static sites, each deployed to its own Azure Static Web App on
+Source for four static sites, each deployed to its own Azure Static Web App on
 the free tier.
 
 Two of them — nygdev.dev and run.nygard.dev — have no framework and no build
 step: HTML with styles and SVG icons inlined, one script each, some favicons.
-gym.nygard.dev is a React + TypeScript app built with Vite, because MSAL and
-two self-hosted typefaces are more than a hand-vendored `vendor/` folder is
-worth maintaining.
-All three still ship as plain static files; only one of them has a step that
+gym.nygard.dev and gymbro.nygard.dev are React + TypeScript apps built with
+Vite, because MSAL and two self-hosted typefaces are more than a hand-vendored
+`vendor/` folder is worth maintaining.
+All four still ship as plain static files; two of them have a step that
 produces those files.
 
 | Site | Folder | What it is |
@@ -16,18 +16,26 @@ produces those files.
 | [nygdev.dev](https://nygdev.dev) | `sites/nygdev/` | One-page personal site: profile links, a link to my LikeC4 architecture diagram, and a live status button for my self-hosted Foundry VTT server that can start the server when it's down |
 | [run.nygard.dev](https://run.nygard.dev) | `sites/run/` | Marathon prep dashboard: reads a precomputed JSON feed from public blob storage and charts training load, weekly volume, pace by run type and the easy/hard intensity split |
 | [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog: a mesocycle training logger, React + Vite + TypeScript. Signs in with MSAL against Entra ID and logs sets one tap at a time against `func-nygdev-api` |
+| [gymbro.nygard.dev](https://gymbro.nygard.dev) | `sites/gymbro/` | The desktop planner for the same training log. Same API, same account, same block — a screen with room to write the plan on, and to read what came back off it |
 
-All three sites live in one repo because the deploy identity is federated to
+All four sites live in one repo because the deploy identity is federated to
 this repo — a second repo would need its own federated credential subjects. A
 Static Web App has one content root and routes on path only, with no host-based
-routing, so three subdomains with different content need three SWA resources.
+routing, so four subdomains with different content need four SWA resources.
 
 Each site folder is self-contained and holds its own
 `staticwebapp.config.json` (security headers: CSP, HSTS, frame options,
 referrer policy, cross-origin isolation). SWA serves `app_location` as the site
-root, so a site's public paths match its folder contents — for `sites/gym/`
-that root is `dist/`, and the config file lives in `public/` so the build
-copies it there.
+root, so a site's public paths match its folder contents — for `sites/gym/` and
+`sites/gymbro/` that root is `dist/`, and the config file lives in `public/` so
+the build copies it there.
+
+The one exception to "self-contained" is deliberate and narrow: `sites/gymbro/`
+imports the logger's domain layer — the wire types, the block maths, the MSAL
+wiring — from `sites/gym/src` through a `@gym` alias. The two sites talk to one
+API as one registered client, so those are facts about the API rather than about
+either app, and a second transcription of them is the thing being avoided. See
+[gymbro.nygard.dev and the planner](#gymbronygarddev-and-the-planner).
 
 ## Deployment
 
@@ -39,6 +47,7 @@ on push and PR is intentionally off.
 | `.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml` | nygdev.dev | `sites/nygdev` | GitHub OIDC |
 | `.github/workflows/deploy-run.yml` | run.nygard.dev | `sites/run` | deployment token |
 | `.github/workflows/deploy-gym.yml` | gym.nygard.dev | `sites/gym/dist` | deployment token |
+| `.github/workflows/deploy-gymbro.yml` | gymbro.nygard.dev | `sites/gymbro/dist` | deployment token |
 
 **The nygdev.dev workflow file must keep its generated name.** That app's
 deployment authorization policy is "GitHub", so the content server identifies
@@ -47,12 +56,12 @@ at provisioning time (portal: Overview → "Edit workflow"). Renaming the file
 breaks deploys with *"Could not determine the Static Web App from the GitHub
 OIDC workflow reference"*. The `name:` inside the file is free to change.
 
-run.nygard.dev and gym.nygard.dev have no such constraint because they
-authorize with the deployment token instead, which is why their files can be
-named for what they deploy. That
-requires its deployment authorization policy to be **Deployment token** (portal:
-Settings → Deployment configuration). Both approaches still keep the token out
-of GitHub — it is fetched at runtime over the federated identity either way.
+The other three have no such constraint because they authorize with the
+deployment token instead, which is why their files can be named for what they
+deploy. That requires each app's deployment authorization policy to be
+**Deployment token** (portal: Settings → Deployment configuration). Both
+approaches still keep the token out of GitHub — it is fetched at runtime over
+the federated identity either way.
 
 Azure auth uses OIDC federated credentials, so no long-lived deployment token
 lives in GitHub; each workflow signs in with `azure/login` and fetches its
@@ -63,15 +72,17 @@ resource-name variables:
 | Variable | Used by | Required |
 | --- | --- | --- |
 | `AZURE_SWA_NAME` | nygdev.dev | yes |
-| `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev, and the other two when no `_RUN`/`_GYM` override is set | yes |
+| `AZURE_SWA_RESOURCE_GROUP` | nygdev.dev, and the other three when no `_RUN`/`_GYM`/`_GYMBRO` override is set | yes |
 | `AZURE_SWA_NAME_RUN` | run.nygard.dev | yes |
 | `AZURE_SWA_RESOURCE_GROUP_RUN` | run.nygard.dev | only if it sits in a different resource group |
 | `AZURE_SWA_NAME_GYM` | gym.nygard.dev | yes |
 | `AZURE_SWA_RESOURCE_GROUP_GYM` | gym.nygard.dev | only if it sits in a different resource group |
+| `AZURE_SWA_NAME_GYMBRO` | gymbro.nygard.dev | yes |
+| `AZURE_SWA_RESOURCE_GROUP_GYMBRO` | gymbro.nygard.dev | only if it sits in a different resource group |
 
 An unset variable expands to an empty string, which the Az CLI reports as a bare
-`expected one argument` usage error. Both workflows check first and fail naming
-the variable instead.
+`expected one argument` usage error. Every workflow checks first and fails
+naming the variable instead.
 
 The deploy identity needs a role granting `Microsoft.Web/staticSites/listSecrets`
 (e.g. Contributor) on **each** Static Web App. Setting that up from scratch
@@ -455,10 +466,14 @@ screen, with the fix printed next to it.
 On **GymLog**, once:
 
 1. **Authentication → Add a platform → Single-page application.**
-2. Redirect URI: `https://gym.nygard.dev/` and the Static Web App's own
-   hostname, both with the trailing slash. Entra matches it as a string, and a
-   slash that disagrees is `AADSTS50011`. The
-   `gymlog_spa_redirect_uri` terraform output prints both.
+2. Redirect URIs: **two per origin** — `https://gym.nygard.dev/auth.html` and
+   `https://gym.nygard.dev/`, and the same pair for the Static Web App's own
+   hostname. `/auth.html` is what MSAL actually sends as `redirect_uri`; the
+   root is where sign-out lands, and Entra validates that against the same
+   reply-URL list. Both are matched as strings, and a slash that disagrees is
+   `AADSTS50011`. The `gymlog_spa_redirect_uri` terraform output prints every
+   one of them — including gymbro.nygard.dev's, which signs in as this same
+   registration.
 3. Leave it with no client secret. The SPA platform means authorization code
    with PKCE, and a SPA that sends a secret is a SPA that has leaked one.
 4. **Expose an API → Add a scope**, named to match `API_SCOPE` above.
@@ -618,12 +633,169 @@ owner typed), so they are rendered as data rather than markup.
 user id; the Entra object id off the validated principal is the Cosmos
 partition key, and it is the only thing that decides whose log you are reading.
 
+## gymbro.nygard.dev and the planner
+
+The desktop half of the same training log. GymLog is a phone app built around a
+thumb and one tap per set; gymbro is the screen where the block those sets go
+into gets written, and where what came back off it can be read at more than one
+number at a time.
+
+There is no second store, no second API and no second account. It signs in as
+the **same GymLog registration** — Easy Auth on `func-nygdev-api` checks the
+`appid` claim and turns away a token minted by any other client, so a planner
+with a registration of its own would be answered with a 403 rather than a
+missing feature. What it edits is the same mesocycle document the phone opens.
+
+Four views, from `Gymbro Desktop.dc.html`:
+
+| View | What it is |
+| --- | --- |
+| **Dashboard** | The block from above: progress, the block map week by week, sets and volume logged, the reps-in-tank ramp, what is up next, and the last five sessions |
+| **Block** | The builder. Name, 3–8 weeks, 2–6 days, and the plan on each day — with sets-per-muscle-group and the ramp updating beside it as the cards change |
+| **Library** | Every exercise the planner can reach, with how many sets of the selected block each one accounts for |
+| **Analytics** | One lift at a time: the top set of every session in the block, charted, with the sessions under it |
+
+### The block list selects; it does not switch
+
+Clicking a block in the sidebar **selects** it. Switching is a write —
+`PUT /gym/mesocycles/current` — and it changes what the phone opens on, which is
+not what clicking a row in a list should mean. Every view reads the selected
+block, so a finished block can be read and a future one written without
+disturbing the one being trained. The Block view carries the explicit **Train
+this block** button for when moving the phone is what you meant.
+
+**New block** is the one place that is unavoidably both.
+`POST /gym/mesocycles` creates and switches in the same transaction — creating
+*is* switching on this API — so the planner says so in a banner rather than
+letting the phone quietly move under you.
+
+### One read, and one expensive one
+
+The planner opens on `GET /gym/mesocycles` alone. That call already carries
+every block in full — weeks, days, and the plan hanging off each day — plus
+`isCurrent`, so `GET /gym/mesocycles/current` would be the current block a
+second time. Sessions are read per block, when a block is looked at, and then
+held: they come from a phone that is not being used while a plan is being
+written at a desk.
+
+Analytics is the exception and pays for it openly. Nothing on
+`GET /gym/workouts` says which exercise a session's volume came from, so a chart
+of one lift over a block needs every session in it opened individually — up to
+forty-eight reads, six at a time, with the count on screen while it runs. That
+is why it is a view you navigate to rather than a panel on the Dashboard: the
+cost is paid when the question is asked, and the answers are held for the rest
+of the sign-in.
+
+What it charts is the **heaviest set actually logged** — `95 kg × 3` — not an
+estimated one-rep max. A number nobody has put on a bar is a poor thing to plan
+the next session against.
+
+### The domain layer is shared, and the design is not
+
+`sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and two of its
+hooks through a `@gym` alias declared in both `vite.config.ts` and
+`tsconfig.app.json`. The wire types, the block maths (`repsInTank`,
+`setsForWeek`, `isRestWeek`, `progressOf`), the formatting, the `GymApi` client,
+the AADSTS error map, `useAuth` and `useResource` all live once, in
+`sites/gym/src`.
+
+That is the point of `lib/types.ts` being written as a transcription of the API
+rather than as what the screens want: a route that changes shape becomes a type
+error. Two copies of it would make that a type error in one app and a wrong
+value in the other. It also means a change to the logger's domain layer is
+type-checked by **both** builds — `npm run build` in `sites/gymbro` compiles
+`sites/gym/src` as well.
+
+Nothing that draws is shared. The two apps share a contract, not a design, and a
+component from the logger would be a phone layout inside a desktop one.
+`src/auth.ts` is duplicated for the opposite reason: it is a build entry, and
+what matters about it is that nothing else ends up on that page.
+
+### Muscle groups exist here and nowhere else
+
+The API stores an exercise as a name; the library blob adds equipment and stops.
+Grouping is a planning question — it is what makes "eleven sets of chest this
+week" answerable — so `src/lib/groups.ts` holds a map from the shipped twenty
+names to seven groups, and nothing on the wire carries it. A name the map does
+not know reads as `—` and counts toward nothing, which is deliberate: a wrong
+group would silently skew the one panel that exists to be trusted.
+
+**There are no custom exercises of your own here, and there is no route for
+them.** No `/gym/exercises` endpoint exists — the built-in library is a static
+blob because it is identical for every account, and an exercise of yours would
+need a per-account store the way saved day templates already have one. What does
+work, and is the whole feature, is typing a name into the picker: the plan
+stores names, so a name that is not in the library is a complete answer. It
+appears in the Library table as `CUSTOM` the moment a block plans it.
+
+### Build
+
+Same toolchain as the logger — React 19, TypeScript 7, Vite 8, MSAL 5, the two
+self-hosted typefaces.
+
+```sh
+cd sites/gymbro
+npm ci            # exactly what package-lock.json pins
+npm run dev       # Vite dev server on http://localhost:5174
+npm run typecheck # tsc alone, this app and the logger's lib/ with it
+npm run build     # tsc --build, then vite build, into dist/
+```
+
+Two things differ from `sites/gym`:
+
+- **`resolve.alias` points outside the project root**, so `server.fs.allow`
+  admits the parent directory. Only the dev server needs that; Rollup reads from
+  disk directly at build time.
+- **`server.port` is 5174**, so both dev servers can run at once.
+
+`npm run dev` signs in against the real Entra registration, so `localhost:5174`
+would need its own SPA redirect URI to get past the gate. It is not registered
+and should not be — a redirect URI on a public registration is a permanent
+allow. Layout work is done against fixtures instead.
+
+### Where this site's CSP differs from the logger's
+
+Almost nowhere: the same `default-src 'none'` policy, the same three
+`connect-src` origins (Entra, the function app, the CDN), the same `/auth.html`
+route override that admits `frame-ancestors 'self'` for MSAL's renewal iframe.
+The one difference is `manifest-src`, which is absent because this site ships no
+web manifest — a planner is not installed to a home screen.
+
+### What has to exist on the Azure and Entra side
+
+Three of these are in `NygDevAzure`; the fourth is not managed by anything.
+
+1. **The Static Web App** — `azurerm_static_web_app.nygdevgymbro` in
+   `terraform/staticsites.tf`. Free SKU, West Europe, provisioned empty.
+2. **The function app's CORS list** — `terraform/consumption.tf`. Both
+   `https://gymbro.nygard.dev` and the app's own default hostname. An origin
+   missing from here is a browser discarding a 200 and reporting a bare network
+   failure.
+3. **The `gymlog_spa_redirect_uri` output** — now eight entries, two per origin:
+   `/auth.html` for every authorization response, and the root for sign-out.
+4. **The Entra registration itself is manual.** Add those redirect URIs under
+   App registrations → GymLog → Authentication → Single-page application. Until
+   they are there, sign-in fails with `AADSTS50011`.
+
+And one thing terraform cannot do at all: **blob-service CORS lives on the
+storage account**, which the configuration reads rather than owns. Without a
+rule for this origin the exercise library falls back to the twenty bundled names
+in `lib/library.ts` — which is exactly what the CDN currently publishes, so it
+is invisible today and would not be the first time the list is edited:
+
+```sh
+az storage cors add --account-name nygdevcdn --auth-mode login \
+  --services b --methods GET HEAD \
+  --origins https://gymbro.nygard.dev \
+  --allowed-headers '*' --exposed-headers '*' --max-age 3600
+```
+
 ## Inline scripts and the CSP
 
 No site here has ever had an inline `<script>`. nygdev.dev and run.nygard.dev
-each load their `main.js` from their own origin; gym.nygard.dev loads one
-hashed module bundle, with MSAL inside it, from its own origin. Either way that
-is all `script-src 'self'` needs. A browser
+each load their `main.js` from their own origin; gym.nygard.dev and
+gymbro.nygard.dev each load one hashed module bundle, with MSAL inside it, from
+their own origin. Either way that is all `script-src 'self'` needs. A browser
 reporting an inline script blocked on one of these pages, with a hash to add, is
 reporting
 something that is not served from here — almost always an extension injecting
@@ -634,10 +806,10 @@ code produces it.
 
 The one inline script Azure did serve on these domains was its stock 404 page,
 which comes from Microsoft's edge without the headers in
-`staticwebapp.config.json`. `sites/run/` and `sites/gym/` now ship their own
-`404.html`, wired up through `responseOverrides`, so 404s are first-party and
-carry the same policy as the rest of the site. Those pages are deliberately
-script-free — the theme follows the OS instead of a toggle — so there is
-nothing on them for the policy to have an opinion about. gym.nygard.dev's also
-links its stylesheet instead of inlining it, which is what lets that site's
-`style-src` be plain `'self'`.
+`staticwebapp.config.json`. `sites/run/`, `sites/gym/` and `sites/gymbro/` now
+ship their own `404.html`, wired up through `responseOverrides`, so 404s are
+first-party and carry the same policy as the rest of the site. Those pages are
+deliberately script-free — the theme follows the OS instead of a toggle — so
+there is nothing on them for the policy to have an opinion about. The two React
+sites' pages also link their stylesheet instead of inlining it, which is what
+lets their `style-src` be plain `'self'`.
