@@ -36,7 +36,6 @@ type Screen = 'tabs' | 'session' | 'done';
 interface Completed {
     dayLabel: string;
     week: number;
-    elapsed: number;
     totals: SessionTotals;
 }
 
@@ -68,28 +67,51 @@ export function App() {
         [auth.account, auth.getToken],
     );
 
+    const [screen, setScreen] = useState<Screen>('tabs');
+    const [tab, setTab] = useState<Tab>('today');
+
+    // Which tabs have been opened. Today is read on sign-in because the app
+    // opens on it; the other two each cost a call of their own, and most
+    // sign-ins are a workout logged and the tab closed again — so they are read
+    // the first time they are actually looked at, and held from then on.
+    //
+    // A hook handed a null client does not read. That already meant "not signed
+    // in"; this widens it by one case to "not wanted yet", which is the same
+    // answer for the same reason.
+    const [opened, setOpened] = useState<Record<Tab, boolean>>({
+        today: true,
+        plan: false,
+        history: false,
+    });
+
+    const pickTab = useCallback((next: Tab) => {
+        setTab(next);
+        setOpened((seen) => (seen[next] ? seen : { ...seen, [next]: true }));
+    }, []);
+
     const block = useBlock(api);
-    const blocks = useBlocks(api);
     const session = useSession(api);
     const library = useLibrary();
+
+    // The block list, read by Plan and History alike — so either one opening is
+    // what pays for it, and the second gets it for nothing.
+    const blocks = useBlocks(opened.plan || opened.history ? api : null);
 
     // The saved and built-in day plans the Plan tab drops into a day. Its own
     // errors stay inside its sheet rather than joining the banner chain below:
     // nothing else in the app reads this, and a day can still be planned by
     // hand while it is failing.
-    const templates = useTemplates(api);
+    const templates = useTemplates(opened.plan ? api : null);
 
     // The sessions of blocks other than the one being trained — History's
-    // second half. Read per block, when the block is opened.
+    // second half. Read per block, when the block is opened, so this one needs
+    // no gate of its own.
     const history = useHistory(api);
 
     // What the open session's exercises were last done with. Keyed off the
     // session rather than fetched by the screen, so it is in hand by the time
     // the first logger opens.
     const lastSets = useLastSets(api, block.block?.sessions ?? NO_SESSIONS, session.workout);
-
-    const [screen, setScreen] = useState<Screen>('tabs');
-    const [tab, setTab] = useState<Tab>('today');
 
     // Null until the block arrives: the week being trained is derived from the
     // sessions in it, and guessing 1 first would flash the wrong week.
@@ -112,13 +134,6 @@ export function App() {
 
     const [planBusy, setPlanBusy] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
-
-    // When the session screen opened, for its stopwatch. Client-side: the API
-    // stores no timestamp finer than the day, so there is nothing to count
-    // from but this moment. The ticking itself lives in SessionScreen — a
-    // one-second interval here would re-render every sheet and tab in the app
-    // along with it.
-    const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
 
     useEffect(() => {
         if (block.block && week === null) setWeek(currentWeek(block.block));
@@ -209,7 +224,6 @@ export function App() {
         if (!started) return;
 
         closeDay();
-        setSessionStartedAt(Date.now());
         setScreen('session');
     }
 
@@ -219,7 +233,6 @@ export function App() {
         if (!opened) return;
 
         closeDay();
-        setSessionStartedAt(Date.now());
         setScreen('session');
     }
 
@@ -258,13 +271,9 @@ export function App() {
         setCompleted({
             dayLabel: dayLabel(meso, workout.dayIndex),
             week: workout.week,
-            elapsed: sessionStartedAt === null
-                ? 0
-                : Math.max(0, Math.floor((Date.now() - sessionStartedAt) / 1000)),
             totals: workout.totals,
         });
         setFinishing(false);
-        setSessionStartedAt(null);
         setScreen('done');
         block.reload();
     }
@@ -304,7 +313,7 @@ export function App() {
             // be re-derived: week 4 of the block you just left is not week 4 of
             // this one.
             setWeek(null);
-            setTab('today');
+            pickTab('today');
         } catch (cause) {
             describe(cause);
         } finally {
@@ -374,7 +383,7 @@ export function App() {
             block.reload();
             blocks.reload();
             setWeek(1);
-            setTab('today');
+            pickTab('today');
         } catch (cause) {
             describe(cause);
         } finally {
@@ -465,7 +474,7 @@ export function App() {
                                         });
                                         setDaySessionId(sessions[0]?.id ?? null);
                                     }}
-                                    onPlan={() => setTab('plan')}
+                                    onPlan={() => pickTab('plan')}
                                 />
                             ) : null}
 
@@ -526,7 +535,7 @@ export function App() {
                         </div>
                     )}
 
-                    <TabBar active={tab} onPick={setTab} />
+                    <TabBar active={tab} onPick={pickTab} />
                 </>
             ) : null}
 
@@ -538,7 +547,6 @@ export function App() {
                     plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
                     weeks={meso?.weeks ?? session.workout.week}
                     lastSets={lastSets}
-                    startedAt={sessionStartedAt}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}
                     onLogSet={(entryIndex, set) => { void session.logSet(entryIndex, set); }}
@@ -550,7 +558,6 @@ export function App() {
                     onFinish={() => setFinishing(true)}
                     onBack={() => {
                         session.close();
-                        setSessionStartedAt(null);
                         setScreen('tabs');
                         block.reload();
                     }}
@@ -564,12 +571,11 @@ export function App() {
                     weeks={meso?.weeks ?? completed.week}
                     doneCount={progress?.doneCount ?? 0}
                     totalCount={progress?.totalCount ?? 0}
-                    elapsed={completed.elapsed}
                     totals={completed.totals}
                     onHome={() => {
                         session.close();
                         setCompleted(null);
-                        setTab('today');
+                        pickTab('today');
                         setScreen('tabs');
                     }}
                 />

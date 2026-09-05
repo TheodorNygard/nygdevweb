@@ -1,4 +1,4 @@
-import { elapsedLabel, kg, rpeLabel } from '../lib/format';
+import { kg, rpeLabel } from '../lib/format';
 import type { SessionTotals } from '../lib/types';
 
 interface DoneScreenProps {
@@ -7,7 +7,6 @@ interface DoneScreenProps {
     weeks: number;
     doneCount: number;
     totalCount: number;
-    elapsed: number;
     totals: SessionTotals;
     onHome: () => void;
 }
@@ -15,9 +14,10 @@ interface DoneScreenProps {
 /**
  * The end of a session: what it added up to, and where that leaves the block.
  *
- * Duration is here and nowhere else, because this is the only place it is known
- * — the stopwatch this page ran, not a stored field. A session opened tomorrow
- * has none, which is why History shows a date in its place.
+ * No duration. Every number here is derived from the sets that were logged, so
+ * this page says the same thing whether it is read now or a session is reopened
+ * next week — which is what a duration, measured only while the screen happened
+ * to be open, could never be.
  */
 export function DoneScreen({
     dayLabel,
@@ -25,13 +25,11 @@ export function DoneScreen({
     weeks,
     doneCount,
     totalCount,
-    elapsed,
     totals,
     onHome,
 }: DoneScreenProps) {
     const stats = [
         { key: 'Workout', value: dayLabel },
-        { key: 'Duration', value: elapsedLabel(elapsed) },
         { key: 'Exercises', value: String(totals.exerciseCount) },
         { key: 'Sets logged', value: String(totals.setCount) },
         { key: 'Total volume', value: kg(totals.volumeKg) },

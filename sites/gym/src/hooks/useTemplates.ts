@@ -46,6 +46,11 @@ const NONE: DayTemplate[] = [];
  *
  * Not folded into `useBlock`: this is read by one sheet on one tab, and
  * `useBlock` reloads after every submitted session.
+ *
+ * A null `api` means there is nothing to read yet — no sign-in, or the Plan tab
+ * not opened. Both halves wait on it, the CDN one included: the built-in list is
+ * only ever shown beside the saved one, so fetching it for a session that never
+ * opens the sheet is a request bought for nothing.
  */
 export function useTemplates(api: GymApi | null): TemplatesState {
     const [builtIn, setBuiltIn] = useState<DayTemplate[]>(NONE);
@@ -55,14 +60,18 @@ export function useTemplates(api: GymApi | null): TemplatesState {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!api) return;
+
         let cancelled = false;
 
+        // Memoised in `lib/templates`, so this is one fetch per page load no
+        // matter how often the sheet is opened and closed.
         void loadTemplates().then((loaded) => {
             if (!cancelled) setBuiltIn(loaded);
         });
 
         return () => { cancelled = true; };
-    }, []);
+    }, [api]);
 
     useEffect(() => {
         if (!api) return;

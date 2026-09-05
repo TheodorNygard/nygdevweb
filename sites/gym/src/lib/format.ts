@@ -39,6 +39,28 @@ export function rpeNote(value: number): string {
 }
 
 /**
+ * The top of the warm-up end of the scale.
+ *
+ * Read off the table above rather than picked separately: 5 and 5.5 are the two
+ * values it calls "warm-up", and both have to mean it. A rule that counted only
+ * a flat 5 would leave the app labelling a set "warm-up" while still counting it
+ * as a working one, which is the kind of disagreement nobody thinks to look for.
+ * Relabelling the scale is what changes this.
+ */
+const MAX_WARM_UP_RPE = 5.5;
+
+/**
+ * Whether a set was a warm-up, and so does not count toward a day's target.
+ *
+ * A set with **no** RPE is not a warm-up. `rpe` is optional because a set logged
+ * without a rating is still a set — that is the ordinary case the API allows —
+ * so an absent rating counts as working. Only a rating that says warm-up does.
+ */
+export function isWarmUpRpe(rpe: number | null): boolean {
+    return rpe !== null && rpe <= MAX_WARM_UP_RPE;
+}
+
+/**
  * A week's intensity target in words — "2 reps in the tank", and the singular
  * at one. The same idea the RPE notes above are written in, which is the point:
  * the target and the slider under it should read as the same sentence.
@@ -93,9 +115,4 @@ export function sessionOrdinal(sessionId: string): number {
     const match = /_(\d+)$/.exec(sessionId);
 
     return match?.[1] ? Number(match[1]) : 1;
-}
-
-/** `62:10` — the live session's elapsed time, mm:ss. */
-export function elapsedLabel(seconds: number): string {
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }

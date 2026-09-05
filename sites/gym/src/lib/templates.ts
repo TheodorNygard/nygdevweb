@@ -20,8 +20,27 @@ let pending: Promise<DayTemplate[]> | null = null;
  * in the same sheet. So the offline answer here is an empty list and a picker
  * that says so, rather than a second copy of a shipped file that can drift from
  * the one on the CDN without anything noticing.
+ *
+ * The cost of that choice is what `warn` below is for, and it is the only
+ * `console` call in this app. A library that fails to load looks fine — the
+ * bundled copy stands in — but a template list that fails to load looks like a
+ * feature that shipped empty, which is indistinguishable on screen from a CDN
+ * file that is genuinely there and genuinely empty. The first time this
+ * happened it was a blob uploaded under the wrong name, and nothing anywhere
+ * said so. Now it does.
  */
 const NONE: DayTemplate[] = [];
+
+/**
+ * Says why the list is empty, in the one place a developer will look. Not shown
+ * to the user: the sheet's empty state does that, and deliberately without
+ * naming a cause it cannot know.
+ */
+function warn(why: string): DayTemplate[] {
+    console.warn(`The built-in day templates did not load from ${TEMPLATE_LIBRARY_URL} — ${why}. The template picker shows only your own saved templates until this is fixed.`);
+
+    return NONE;
+}
 
 function isTemplate(value: unknown): value is DayTemplate {
     if (typeof value !== 'object' || value === null) return false;
@@ -49,15 +68,23 @@ export function loadTemplates(): Promise<DayTemplate[]> {
             // rule for, and the file needs no token.
             const response = await fetch(TEMPLATE_LIBRARY_URL, { credentials: 'omit' });
 
-            if (!response.ok) return NONE;
+            if (!response.ok) {
+                // A 404 here is the blob published under a name this does not
+                // ask for — the file is `gym-templates.json`, prefixed like
+                // `gym-exercises.json` beside it, because the `data` container
+                // is shared with the running dashboard's feed.
+                return warn(`the CDN answered ${response.status}`);
+            }
 
             const payload: unknown = await response.json();
 
-            return isLibrary(payload) ? payload.templates : NONE;
-        } catch {
-            // Offline, or no CORS rule for this origin — indistinguishable, and
-            // either way the sheet still plans days by hand.
-            return NONE;
+            return isLibrary(payload)
+                ? payload.templates
+                : warn('the file is not a {version, templates} document');
+        } catch (cause) {
+            // Offline, or no CORS rule for this origin — indistinguishable from
+            // here, and either way the sheet still plans days by hand.
+            return warn(`the fetch itself failed (${String(cause)})`);
         }
     })();
 

@@ -187,8 +187,10 @@ export function TemplateSheet({
             <span className="section-label">BUILT IN</span>
             {templates.builtIn.length === 0 ? (
                 <p className="empty">
-                    The built-in templates load from the CDN and are not here — offline, most
-                    likely. Your own are unaffected, and a day can still be planned by hand.
+                    The built-in templates are not here. They load from the CDN, so this is being
+                    offline or the file not being where the app looks — the browser console says
+                    which. Your own templates are unaffected, and a day can still be planned by
+                    hand.
                 </p>
             ) : (
                 <div className="rows" style={{ marginTop: 12 }}>

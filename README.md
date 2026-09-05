@@ -180,6 +180,33 @@ steps, reps in 1, RPE on a 5–10 slider in halves with a plain-language note
 are in the lower half of the screen, because the premise is a phone held in one
 hand with a bar in the other.
 
+The set that **meets an exercise's target moves the logger on** to the next
+exercise that still owes sets, scrolling it into view. That is the shape of a
+workout — finish one thing, start the next — and doing it on the tap means the
+common case costs no thought and no scrolling. It is not a limit: a fourth set
+against a three-set plan is one tap on that exercise's header to reopen it,
+because the plan is a plan and not a contract. Only the set that *crosses* the
+target advances, so the fourth set does not throw you off the exercise you just
+chose to add to.
+
+Advancing is forward-only. An exercise left unfinished higher up the list stays
+where it is rather than pulling the page backwards under a thumb that expects to
+move down; going back to it is deliberate, the same as skipping it was.
+
+**Warm-ups do not count toward the target.** A set logged at RPE 5 or 5.5 — the
+two values the slider itself labels "warm-up" — is recorded like any other set
+and shows in the volume and the header's set count, but it is numbered `W`
+rather than 1, 2, 3, and an exercise cannot be finished by ramping up to the
+working weight. The two numbers disagreeing is the point rather than a bug:
+"3 of 3" is progress against a plan, and the header's "9 sets" is the record of
+what was lifted. A set with *no* RPE is not a warm-up — the rating is optional,
+and an unrated set is a working set whose rating was not given.
+
+The rule lives in `completesTarget` and `workingSetCount` in `src/lib/block.ts`,
+reading its idea of a warm-up off `isWarmUpRpe` in `src/lib/format.ts`, which is
+derived from the same table that writes the slider's labels so the two cannot
+drift.
+
 It is dark only. Graphite is the "gym-at-night" direction of the three the
 design offered — near-black, acid-lime accent, mono digits — and it was chosen
 because a bright screen between sets is the thing that makes a logbook go

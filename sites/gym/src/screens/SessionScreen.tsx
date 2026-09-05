@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { DragHandle } from '../components/DragHandle';
 import { Stepper } from '../components/Stepper';
 import { useDragReorder } from '../hooks/useDragReorder';
-import { useElapsed } from '../hooks/useElapsed';
 import type { LastSets } from '../hooks/useLastSets';
-import { isRestWeek, repsInTank, setsForWeek } from '../lib/block';
-import { elapsedLabel, kg, num, rpeNote, tankLabel } from '../lib/format';
+import {
+    completesTarget,
+    isRestWeek,
+    repsInTank,
+    setsForWeek,
+    workingSetCount,
+} from '../lib/block';
+import { isWarmUpRpe, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
 import type { ExerciseLibrary, PlannedExercise, WorkSet, Workout } from '../lib/types';
 
@@ -90,8 +95,6 @@ interface SessionScreenProps {
      */
     lastSets: LastSets;
 
-    /** When this screen opened, for the stopwatch; null stops it at 0:00. */
-    startedAt: number | null;
     savedAt: number | null;
     onAddExercise: () => void;
     onLogSet: (entryIndex: number, set: WorkSet) => void;
@@ -135,6 +138,16 @@ interface SessionScreenProps {
  * is the week's business — the band under the header carries one target of reps
  * left in the tank for the whole session, because it is one number for the
  * whole session, and the RPE control repeats it where it is acted on.
+ *
+ * The set that meets an exercise's target **moves the logger on** to the next
+ * exercise that still owes sets. That is the shape of a workout — you finish
+ * one thing and start the next — and doing it on the tap means the common case
+ * costs no thought and no scrolling. It is not a limit: the target is a plan,
+ * not a contract, so a fourth set against a three-set plan is one tap on the
+ * exercise's own header to reopen it. Nothing is closed off, only re-ordered.
+ *
+ * Warm-ups do not count toward that target — see `workingSetCount` — so ramping
+ * up to a working weight cannot finish an exercise by itself.
  */
 export function SessionScreen({
     workout,
@@ -143,7 +156,6 @@ export function SessionScreen({
     plan,
     weeks,
     lastSets,
-    startedAt,
     savedAt,
     onAddExercise,
     onLogSet,
@@ -303,11 +315,80 @@ export function SessionScreen({
         onRemoveEntry(entryIndex);
     }
 
+    /**
+     * The next exercise below this one that still owes sets, or null when the
+     * rest of the workout is done.
+     *
+     * Forward only, deliberately. The screen is a list read top to bottom, and
+     * an advance that jumped *backwards* to an exercise left unfinished earlier
+     * would move the page under a thumb that is expecting to go down. An
+     * exercise skipped on the way past stays skipped until it is tapped, which
+     * is what leaving it meant.
+     *
+     * An unplanned exercise — one added during the session — always counts as
+     * owing sets. It has no target to have met, and it was added on purpose.
+     */
+    function nextUnmet(from: number): number | null {
+        for (let index = from + 1; index < workout.entries.length; index += 1) {
+            const entry = workout.entries[index];
+
+            if (!entry) continue;
+
+            const target = targetSetsFor(index);
+
+            if (target === undefined || workingSetCount(entry.sets) < target) return index;
+        }
+
+        return null;
+    }
+
+    /**
+     * Moves the logger on, for the set that meets the target and no other — see
+     * `completesTarget`, which is where that rule lives and is tested.
+     *
+     * Read from the session as it stands *before* this set lands: the write
+     * applies locally a render later, so `entry.sets` here is what the set being
+     * logged is about to add to.
+     */
+    function advanceAfter(entryIndex: number, rpe: number) {
+        const entry = workout.entries[entryIndex];
+
+        if (!entry || !completesTarget(entry.sets, targetSetsFor(entryIndex), rpe)) return;
+
+        const next = nextUnmet(entryIndex);
+
+        setActiveIndex(next);
+        advancedTo.current = next;
+    }
+
     const { rowProps, handleProps } = useDragReorder(workout.entries.length, reorderEntry);
 
-    // Ticks here rather than in App, so the once-a-second render stays on
-    // this screen instead of rippling through every tab and sheet above it.
-    const elapsed = useElapsed(startedAt);
+    // The rows themselves, for scrolling an auto-advance into view. Kept
+    // separately from the drag hook's own map rather than reaching into it: that
+    // one exists to measure a drag, and two features sharing one ref is how one
+    // of them ends up quietly depending on the other's lifecycle.
+    const rowElements = useRef<Map<number, HTMLElement>>(new Map());
+
+    // Which entry an advance just opened, consumed by the effect below. A ref
+    // rather than state because it must not cause a render of its own, and
+    // because the scroll has to happen *after* the render that expanded the row.
+    const advancedTo = useRef<number | null>(null);
+
+    useEffect(() => {
+        const index = advancedTo.current;
+
+        advancedTo.current = null;
+
+        // Null is the workout's last unmet exercise having just been finished:
+        // the logger closes and nothing is scrolled to, which leaves the finish
+        // bar as the only thing left to press.
+        if (index === null) return;
+
+        rowElements.current.get(index)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+        });
+    });
 
     const totals = workout.totals;
 
@@ -331,11 +412,13 @@ export function SessionScreen({
                         </span>
                     </div>
                 </div>
-                <div className="session__clock">
-                    <div className="session__elapsed">{elapsedLabel(elapsed)}</div>
-                    <div className="session__totals">
-                        {totals.setCount} sets · {kg(totals.volumeKg)}
-                    </div>
+                {/* What the session adds up to so far. There is no clock: a
+                    logbook is a record of what was lifted, and a stopwatch
+                    counting up beside it turns a rest between sets into
+                    something being measured. */}
+                <div className="session__tally">
+                    <div className="session__count">{totals.setCount} sets</div>
+                    <div className="session__volume">{kg(totals.volumeKg)}</div>
                 </div>
             </header>
 
@@ -363,10 +446,23 @@ export function SessionScreen({
                     const isActive = entryIndex === activeIndex;
                     const values = valuesFor(entryIndex);
                     const targetSets = targetSetsFor(entryIndex);
+                    const working = workingSetCount(entry.sets);
                     const volume = entry.sets.reduce(
                         (total, set) => total + set.weightKg * set.reps,
                         0,
                     );
+
+                    // Working sets are numbered 1, 2, 3 and warm-ups are not
+                    // numbered at all — a warm-up that consumed a number would
+                    // put "3 of 3" beside a row labelled 4.
+                    let counted = 0;
+                    const setLabels = entry.sets.map((set) => {
+                        if (isWarmUpRpe(set.rpe)) return 'W';
+
+                        counted += 1;
+
+                        return String(counted);
+                    });
 
                     const row = rowProps(entryIndex);
                     const articleClassName = row.className
@@ -377,7 +473,12 @@ export function SessionScreen({
                         <article
                             className={articleClassName}
                             style={row.style}
-                            ref={row.ref}
+                            ref={(element) => {
+                                row.ref(element);
+
+                                if (element) rowElements.current.set(entryIndex, element);
+                                else rowElements.current.delete(entryIndex);
+                            }}
                             key={`${entry.exerciseName}-${entryIndex}`}
                         >
                             <div className="exercise__head">
@@ -404,12 +505,12 @@ export function SessionScreen({
                                     </span>
                                     <span
                                         className={targetSets !== undefined
-                                            && entry.sets.length >= targetSets
+                                            && working >= targetSets
                                             ? 'exercise__summary exercise__summary--met'
                                             : 'exercise__summary'}
                                     >
                                         {targetSets !== undefined
-                                            ? `${entry.sets.length} of ${targetSets} sets`
+                                            ? `${working} of ${targetSets} sets`
                                             : entry.sets.length > 0
                                                 ? `${entry.sets.length} sets · ${kg(volume)}`
                                                 : 'no sets yet'}
@@ -431,10 +532,14 @@ export function SessionScreen({
                                 <div className="sets">
                                     {entry.sets.map((set, setIndex) => (
                                         <div
-                                            className="set"
+                                            className={isWarmUpRpe(set.rpe)
+                                                ? 'set set--warmup'
+                                                : 'set'}
                                             key={`${setIndex}-${set.weightKg}-${set.reps}`}
                                         >
-                                            <span className="set__no">{setIndex + 1}</span>
+                                            <span className="set__no">
+                                                {setLabels[setIndex]}
+                                            </span>
                                             <span className="set__main">
                                                 {num(set.weightKg)} kg × {num(set.reps)}
                                             </span>
@@ -537,15 +642,25 @@ export function SessionScreen({
                                     <button
                                         type="button"
                                         className="log-button"
-                                        onClick={() => onLogSet(entryIndex, {
-                                            weightKg: values.weightKg,
-                                            reps: values.reps,
-                                            rpe: values.rpe,
-                                        })}
+                                        onClick={() => {
+                                            onLogSet(entryIndex, {
+                                                weightKg: values.weightKg,
+                                                reps: values.reps,
+                                                rpe: values.rpe,
+                                            });
+
+                                            advanceAfter(entryIndex, values.rpe);
+                                        }}
                                     >
-                                        {entry.sets.length > 0
-                                            ? `Log same again (${num(values.weightKg)}×${num(values.reps)})`
-                                            : 'Log first set'}
+                                        {/* Naming the warm-up on the button is
+                                            where the rule is visible: it is the
+                                            moment it applies, and it says why
+                                            the count did not move afterwards. */}
+                                        {isWarmUpRpe(values.rpe)
+                                            ? `Log warm-up (${num(values.weightKg)}×${num(values.reps)})`
+                                            : entry.sets.length > 0
+                                                ? `Log same again (${num(values.weightKg)}×${num(values.reps)})`
+                                                : 'Log first set'}
                                     </button>
                                 </div>
                             ) : null}

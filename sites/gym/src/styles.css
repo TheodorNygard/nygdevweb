@@ -1107,17 +1107,20 @@ button {
     color: var(--fg-40);
 }
 
-.session__clock {
+/* The running total, where the stopwatch used to be. Two lines rather than
+   one, so the set count keeps the weight the clock had — it is the number
+   glanced at between sets, and the volume is what it adds up to. */
+.session__tally {
     flex: none;
     text-align: right;
 }
 
-.session__elapsed {
+.session__count {
     font: 700 20px/1 var(--mono);
     letter-spacing: -0.02em;
 }
 
-.session__totals {
+.session__volume {
     font: 400 11px/1 var(--mono);
     color: var(--fg-40);
     margin-top: 5px;
@@ -1228,6 +1231,14 @@ button {
     font: 600 12px/1 var(--mono);
     color: var(--fg-35);
     text-align: center;
+}
+
+/* A warm-up reads as preamble rather than as work: the row is still fully
+   legible and still deletable, it just stops competing with the sets that
+   count. The "W" in place of a number is what actually carries the meaning. */
+.set--warmup .set__no,
+.set--warmup .set__main {
+    color: var(--fg-40);
 }
 
 .set__main {

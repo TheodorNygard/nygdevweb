@@ -1,4 +1,5 @@
-import type { CurrentBlock, Mesocycle, SessionSummary } from './types';
+import { isWarmUpRpe } from './format';
+import type { CurrentBlock, Mesocycle, SessionSummary, WorkSet } from './types';
 
 /**
  * The sessions filed against one cell of the block map, newest first.
@@ -74,13 +75,60 @@ export function currentWeek(block: CurrentBlock): number {
     return latest;
 }
 
+/**
+ * How many of an entry's sets count against what the day asks for.
+ *
+ * Warm-ups do not. They are work you did and the session records them like any
+ * other set — the volume, the header's set count and everything the API derives
+ * all still include them — but a day that prescribes three sets is prescribing
+ * three *working* sets, and warm-ups counted toward it would mean the target is
+ * met by ramping up to the weight.
+ *
+ * That the two numbers can disagree is deliberate rather than a rounding
+ * problem: "3 of 3" is progress against a plan and the header's "9 sets" is the
+ * record of what was lifted. Only the first one is what a warm-up should be
+ * invisible to.
+ */
+export function workingSetCount(sets: readonly WorkSet[]): number {
+    return sets.reduce((total, set) => total + (isWarmUpRpe(set.rpe) ? 0 : 1), 0);
+}
+
+/**
+ * Whether logging a set at this RPE is the one that *meets* an entry's target.
+ *
+ * Three ways to be false, and each is a case the logging screen would otherwise
+ * get wrong:
+ *
+ * - **No target.** An exercise added mid-session has nothing to meet.
+ * - **Already met.** The deliberate fourth set against a three-set plan. The
+ *   plan is not a contract, and a set that took the count past the target has
+ *   not just crossed it.
+ * - **Not there yet**, warm-ups included: a warm-up adds nothing to the count,
+ *   so it can never be the set that completes one.
+ *
+ * `sets` is the entry as it stands *before* the set being logged.
+ */
+export function completesTarget(
+    sets: readonly WorkSet[],
+    target: number | undefined,
+    rpe: number | null,
+): boolean {
+    if (target === undefined) return false;
+
+    const before = workingSetCount(sets);
+
+    if (before >= target) return false;
+
+    return before + (isWarmUpRpe(rpe) ? 0 : 1) >= target;
+}
+
 /** The label for a day, falling back the way the prototype does. */
 export function dayLabel(mesocycle: Mesocycle | null, dayIndex: number): string {
     return mesocycle?.days[dayIndex]?.label ?? `Day ${dayIndex + 1}`;
 }
 
 /** What a rest week asks you to leave behind: effectively everything. */
-export const REST_TANK = 8;
+const REST_TANK = 8;
 
 /**
  * The ramp, read backwards from the end of the block: what to leave in the tank
