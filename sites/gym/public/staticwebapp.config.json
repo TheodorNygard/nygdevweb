@@ -17,6 +17,14 @@
             }
         },
         {
+            "route": "/auth.html",
+            "headers": {
+                "Content-Security-Policy": "default-src 'none'; script-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Cache-Control": "no-cache"
+            }
+        },
+        {
             "route": "/index.html",
             "headers": {
                 "Cache-Control": "no-cache"

@@ -6,14 +6,14 @@ import {
     type IPublicClientApplication,
 } from '@azure/msal-browser';
 
-import { AUTHORITY, CLIENT_ID, REDIRECT_URI } from './config';
+import { AUTHORITY, CLIENT_ID, POST_LOGOUT_REDIRECT_URI, REDIRECT_URI } from './config';
 
 const MSAL_CONFIG: Configuration = {
     auth: {
         clientId: CLIENT_ID,
         authority: AUTHORITY,
         redirectUri: REDIRECT_URI,
-        postLogoutRedirectUri: REDIRECT_URI,
+        postLogoutRedirectUri: POST_LOGOUT_REDIRECT_URI,
     },
     cache: {
         // localStorage, not sessionStorage: this is a logbook opened between

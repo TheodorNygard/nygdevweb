@@ -34,10 +34,27 @@ export const LOGIN_SCOPES = ['openid', 'profile', 'offline_access'];
 
 /**
  * Exactly what MSAL sends as redirect_uri, so it is the string to register.
- * Pinned to the origin root: Entra matches it as a string, so a page reached at
- * /index.html would send a different one and fail with AADSTS50011.
+ * Entra matches it as a string — a mismatch of one character fails with
+ * AADSTS50011.
+ *
+ * **Not the origin root.** Since v5 MSAL returns every response through this
+ * page, including the one its hidden renewal iframe waits ten seconds for, and
+ * that page has to do nothing but broadcast it back (`src/auth.ts`). Pointing
+ * this at the app would load React inside that iframe on that clock, and the
+ * app does not broadcast anything — which is silent renewal failing with a
+ * `timed_out` that names nothing.
  */
-export const REDIRECT_URI = `${window.location.origin}/`;
+export const REDIRECT_URI = `${window.location.origin}/auth.html`;
+
+/**
+ * Where sign-out lands, which is the app rather than the bridge page — there is
+ * no response to broadcast on the way back from a logout.
+ *
+ * Entra validates this against the *same* registered reply-URL list, so both
+ * this and {@link REDIRECT_URI} have to be on the registration's
+ * Single-page application platform.
+ */
+export const POST_LOGOUT_REDIRECT_URI = `${window.location.origin}/`;
 
 /**
  * The API. This origin is also what `connect-src` in

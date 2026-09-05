@@ -488,6 +488,7 @@ npm run preview   # serve the built dist/ over HTTP
 | Path | What it holds |
 | --- | --- |
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
+| `auth.html` | MSAL's redirect URI. Loads `src/auth.ts` and nothing else — the hidden renewal iframe lands here on a ten-second clock, so the app must stay off it |
 | `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library and the built-in day templates, the identity config, the AADSTS error map |
 | `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useTemplates` (the two template lists and their writes), `useLibrary`, `useElapsed` |
 | `src/screens/` | Today, Plan, History, Session, Done |
@@ -502,11 +503,16 @@ deliberately include `noUncheckedIndexedAccess` and
 the API's arrays to be checked, which is most of what this app does.
 
 Two build settings are there for what ships rather than for what compiles.
-Everything from `node_modules` goes into one `vendor` chunk, so an app edit
-reships ~50 kB instead of invalidating the ~435 kB MSAL and React sit in; and
-`/assets/*` is served `immutable` for a year from `staticwebapp.config.json`,
-which is safe because every file under it is content-hashed. `index.html` is
-`no-cache` for the same reason — it is the one file that names the hashes.
+`node_modules` is split in two: whatever `auth.html` reaches becomes the
+`bridge` chunk (~115 kB), and the rest — React, and the MSAL the app alone
+uses — becomes `vendor` (~325 kB). So an app edit reships ~70 kB instead of
+invalidating either, and the renewal iframe downloads the bridge rather than
+all of React. Left unassigned those shared modules fold back into `vendor`,
+which is why `manualChunks` names the chunk rather than returning `undefined`.
+And `/assets/*` is served `immutable` for a year from
+`staticwebapp.config.json`, which is safe because every file under it is
+content-hashed. `index.html` and `auth.html` are `no-cache` for the same
+reason — they are the files that name the hashes.
 
 **Neither `npm run dev` nor `npm run preview` carries the CSP.** Those headers
 come from `staticwebapp.config.json`, and only Azure reads that file — Vite
@@ -552,6 +558,7 @@ change was a silently ignored property and a sign-in that failed at runtime.
 | --- | --- | --- | --- |
 | `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the two CDN files — the exercise library and the built-in day templates. Three origins and no more; an exfiltration path would have to change this file to exist. |
 | `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
+| `frame-ancestors` | `'none'`, but `'self'` on `/auth.html` | `'none'` | The other half of that iframe. Entra redirects it back to the redirect URI, and a blanket `'none'` — with `X-Frame-Options: DENY` alongside it — blocks that even same-origin, which is the same nameless timeout. Relaxed on the bridge page only; the app itself stays unframeable. |
 | `font-src` | `'self'` | absent | The two self-hosted typefaces. `default-src 'none'` means an unlisted `font-src` is `none`, and the app would silently fall back to system fonts. |
 | `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup. The app signs in by redirect, so this is not load-bearing today — it is what keeps a popup flow from being a trap if one is ever added. |
 

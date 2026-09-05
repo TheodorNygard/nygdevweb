@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Signing in…</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="color-scheme" content="dark">
+</head>
+<body>
+    <!-- Deliberately empty. This page is never looked at: MSAL loads it in a
+         hidden iframe during silent renewal, and passes through it top-level
+         for a beat on the interactive path. The one script broadcasts the
+         response and leaves. -->
+    <script type="module" src="/src/auth.ts"></script>
+</body>
+</html>
