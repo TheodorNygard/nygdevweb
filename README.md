@@ -753,12 +753,25 @@ build fails with `TS2307: Cannot find module 'react'` against paths under
 downstream rather than real type errors. `deploy-gymbro.yml` installs both trees
 for that reason.
 
-Two things differ from `sites/gym`:
+Three things differ from `sites/gym`:
 
 - **`resolve.alias` points outside the project root**, so `server.fs.allow`
   admits the parent directory. Only the dev server needs that; Rollup reads from
   disk directly at build time.
 - **`server.port` is 5174**, so both dev servers can run at once.
+- **`resolve.dedupe` names `react`, `react-dom` and `@azure/msal-browser`**,
+  which is the other half of the bare-specifier problem above. Installing both
+  trees is what makes the logger's imports *resolve*; deduping is what stops
+  both copies being *bundled*. Without it the two halves of the app hold
+  different React instances and the page dies at mount with `Cannot read
+  properties of null (reading 'useState')` from inside the vendor chunk —
+  hooks dispatch through a module-level current-dispatcher that only the
+  rendering copy sets, so a component from the other copy reads null. The error
+  names neither React nor the duplication. Two MSAL copies would be the same
+  shape of bug one layer down: the memoisation in `@gym/lib/msal` is per module,
+  so two of them are two `PublicClientApplication`s racing over one storage,
+  which is the `interaction_in_progress` its own comment exists to prevent.
+  Neither can happen in `sites/gym`, which has one tree and no alias.
 
 `npm run dev` signs in against the real Entra registration, so `localhost:5174`
 would need its own SPA redirect URI to get past the gate. It is not registered

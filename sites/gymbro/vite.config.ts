@@ -55,6 +55,32 @@ export default defineConfig({
 
     resolve: {
         alias: { '@gym': GYM_SRC },
+
+        // One copy of each of these in the bundle, whichever tree asks for it.
+        //
+        // The `@gym` alias hands Rollup files that live under `sites/gym/src`,
+        // and a bare `import 'react'` inside one of them resolves by walking up
+        // from *that* file — so it finds `sites/gym/node_modules/react` while
+        // this app's own files find `sites/gymbro/node_modules/react`. Both get
+        // bundled, and the two halves of the app then hold different React
+        // instances.
+        //
+        // That reaches the browser as `Cannot read properties of null (reading
+        // 'useState')` from inside the vendor chunk: hooks are dispatched
+        // through a module-level current-dispatcher that only the rendering copy
+        // sets, so a component from the other copy reads null. It names neither
+        // React nor the duplication, and it cannot happen in `sites/gym`, which
+        // has only one tree — it is specific to this build.
+        //
+        // MSAL is here for a related but separate reason. Two module copies mean
+        // two PublicClientApplications, because the memoisation in
+        // `@gym/lib/msal` is per module — which is precisely the race its own
+        // comment exists to prevent, arriving by a different route.
+        //
+        // Not a substitute for installing both trees: tsc still resolves the
+        // logger's imports from its own node_modules for the type check. This
+        // governs what ships, that governs what compiles.
+        dedupe: ['react', 'react-dom', '@azure/msal-browser'],
     },
 
     server: {
