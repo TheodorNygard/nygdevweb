@@ -63,9 +63,13 @@ export function useDragReorder(
         rowHeight: number;
     } | null>(null);
 
-    const [visual, setVisual] = useState<{ from: number; over: number; deltaY: number } | null>(
-        null,
-    );
+    // Which row is being carried and where it is hovering — and deliberately
+    // *not* how far the finger has moved. That is what keeps the promise
+    // above: the offset changes on every frame, so it is written straight onto
+    // the carried element by `carry` below, and this state changes only when
+    // the drag crosses a slot boundary. On this screen a render is the whole
+    // entry list, open logger and steppers included.
+    const [visual, setVisual] = useState<{ from: number; over: number } | null>(null);
 
     // Where the carried row is hovering, readable from `end` without going
     // through a state updater. Committing from inside `setVisual`'s updater
@@ -92,18 +96,35 @@ export function useDragReorder(
     const onReorderRef = useRef(onReorder);
     onReorderRef.current = onReorder;
 
+    /**
+     * Puts the carried row under the finger, without a render.
+     *
+     * React never writes a transform onto this row — `rowProps` leaves the
+     * property off the active row precisely so this can own it — which is also
+     * why it has to be cleared by hand when the drag ends: React only removes
+     * style properties it set itself.
+     */
+    const carry = useCallback((index: number, deltaY: number | null) => {
+        const row = rows.current.get(index);
+
+        if (row) row.style.transform = deltaY === null ? '' : `translateY(${deltaY}px)`;
+    }, []);
+
     const end = useCallback((commit: boolean) => {
         const active = drag.current;
         const landed = over.current;
 
         drag.current = null;
         over.current = null;
+
+        if (active) carry(active.from, null);
+
         setVisual(null);
 
         if (commit && active && landed !== null && landed !== active.from) {
             onReorderRef.current(active.from, landed);
         }
-    }, []);
+    }, [carry]);
 
     const handlePointerMove = useCallback((event: PointerEvent) => {
         const active = drag.current;
@@ -112,15 +133,19 @@ export function useDragReorder(
 
         const deltaY = event.clientY - active.startY;
 
+        carry(active.from, deltaY);
+
         // Rounding to whole rows is what makes the list feel like slots rather
         // than a free floating stack: the carried row snaps to where it would
         // land, which is the only outcome a release can ever produce.
         const shift = Math.round(deltaY / active.rowHeight);
         const slot = Math.min(count - 1, Math.max(0, active.from + shift));
 
+        if (over.current === slot) return;
+
         over.current = slot;
-        setVisual({ from: active.from, over: slot, deltaY });
-    }, [count]);
+        setVisual({ from: active.from, over: slot });
+    }, [carry, count]);
 
     const handlePointerUp = useCallback((event: PointerEvent) => {
         if (drag.current?.pointerId !== event.pointerId) return;
@@ -163,7 +188,7 @@ export function useDragReorder(
         };
 
         over.current = index;
-        setVisual({ from: index, over: index, deltaY: 0 });
+        setVisual({ from: index, over: index });
 
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp);
@@ -175,12 +200,16 @@ export function useDragReorder(
             return { ref: (element) => setRow(index, element), style: {} };
         }
 
-        const { from, over, deltaY } = visual;
+        const { from, over } = visual;
 
         if (index === from) {
+            // No transform here on purpose — `carry` writes it straight onto
+            // the element on every pointermove, and naming it in this object
+            // too would have React reset it to a stale offset on the next
+            // render.
             return {
                 ref: (element) => setRow(index, element),
-                style: { transform: `translateY(${deltaY}px)`, zIndex: 2 },
+                style: { zIndex: 2 },
                 className: 'dragrow--active',
             };
         }

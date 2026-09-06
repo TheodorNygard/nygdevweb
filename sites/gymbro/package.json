@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "gymbro.nygard.dev \u00e2\u20ac\u201d the desktop planner for the GymLog training block",
+  "description": "gymbro.nygard.dev — the desktop planner for the GymLog training block",
   "license": "MIT",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

@@ -25,29 +25,68 @@ const GYM_SRC = fileURLToPath(new URL('../gym/src', import.meta.url));
 
 // `src/auth.ts` is the bridge entry; anything reachable from it is part of what
 // auth.html downloads.
-const BRIDGE_ENTRY = /[\/]src[\/]auth\.ts$/;
+const BRIDGE_ENTRY = /[\\/]src[\\/]auth\.ts$/;
+
+type ModuleInfo = { importers: readonly string[]; dynamicImporters: readonly string[] } | null;
+
+/**
+ * Every answer this build has already worked out, kept across calls.
+ *
+ * `manualChunks` asks about every module in node_modules — several hundred, for
+ * React and MSAL — and their importer graphs overlap almost entirely, so a walk
+ * that started from nothing each time would re-tread the same edges once per
+ * module. Caching across calls is safe because the graph is finished by the
+ * time the chunking runs.
+ */
+const answers = new Map<string, boolean>();
 
 /**
  * Whether `id` is reachable from the bridge entry. Walks importers back up to an
  * entry rather than the graph down from one, because `manualChunks` is called
  * per module and the finished graph reads the same in either direction.
  */
-function reachedFromBridge(
-    id: string,
-    getModuleInfo: (id: string) => { importers: readonly string[]; dynamicImporters: readonly string[] } | null,
-    seen: Set<string> = new Set(),
-): boolean {
-    if (BRIDGE_ENTRY.test(id)) return true;
-    if (seen.has(id)) return false;
+function reachedFromBridge(id: string, getModuleInfo: (id: string) => ModuleInfo): boolean {
+    // Modules currently on the stack, and whether the walk had to step over one
+    // of them. ES modules import in cycles, and a module still being resolved
+    // has no answer to lend — so a `false` that leaned on one is provisional
+    // and must not be cached, or a module the cycle turns out to reach would be
+    // filed under `vendor` for the rest of the build.
+    const stack = new Set<string>();
+    let leanedOnStack = false;
 
-    seen.add(id);
+    function walk(current: string): boolean {
+        if (BRIDGE_ENTRY.test(current)) return true;
 
-    const info = getModuleInfo(id);
+        const cached = answers.get(current);
 
-    if (!info) return false;
+        if (cached !== undefined) return cached;
 
-    return [...info.importers, ...info.dynamicImporters]
-        .some((importer) => reachedFromBridge(importer, getModuleInfo, seen));
+        if (stack.has(current)) {
+            leanedOnStack = true;
+
+            return false;
+        }
+
+        stack.add(current);
+
+        const outer = leanedOnStack;
+        leanedOnStack = false;
+
+        const info = getModuleInfo(current);
+        const reached = info !== null
+            && [...info.importers, ...info.dynamicImporters].some((importer) => walk(importer));
+
+        // A `true` is a witnessed path and always keeps. A `false` only keeps
+        // when nothing in the subtree below it was still being resolved.
+        if (reached || !leanedOnStack) answers.set(current, reached);
+
+        leanedOnStack = outer || leanedOnStack;
+        stack.delete(current);
+
+        return reached;
+    }
+
+    return walk(id);
 }
 
 export default defineConfig({
