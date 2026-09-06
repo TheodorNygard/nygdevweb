@@ -734,12 +734,24 @@ Same toolchain as the logger — React 19, TypeScript 7, Vite 8, MSAL 5, the two
 self-hosted typefaces.
 
 ```sh
-cd sites/gymbro
-npm ci            # exactly what package-lock.json pins
+cd sites/gym && npm ci    # the logger's tree, and not optional — see below
+cd ../gymbro && npm ci    # exactly what package-lock.json pins
 npm run dev       # Vite dev server on http://localhost:5174
 npm run typecheck # tsc alone, this app and the logger's lib/ with it
 npm run build     # tsc --build, then vite build, into dist/
 ```
+
+**`sites/gym/node_modules` has to exist for this build**, which is easy to miss
+because on a machine where the logger has ever been worked on it already does.
+`@gym/*` resolves to files under `sites/gym/src`, and those files import `react`
+and `@azure/msal-browser` by bare specifier. Bare specifiers resolve by walking
+up from the *importing file*, so `sites/gym/src/hooks/useAuth.ts` looks in
+`sites/gym/node_modules` and never in `sites/gymbro/node_modules` — this app
+declaring the same dependencies does not reach them. From an empty checkout the
+build fails with `TS2307: Cannot find module 'react'` against paths under
+`../gym/src`, plus a spray of `TS7006` and `TS2322` that are the same failure
+downstream rather than real type errors. `deploy-gymbro.yml` installs both trees
+for that reason.
 
 Two things differ from `sites/gym`:
 

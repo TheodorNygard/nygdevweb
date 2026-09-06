@@ -30,7 +30,30 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: sites/gymbro/package-lock.json
+          # Both lockfiles, because both trees are installed below. Keyed on
+          # gymbro's alone, a change to the logger's dependencies would restore
+          # a stale cache for the half of the build that reads them.
+          cache-dependency-path: |
+            sites/gym/package-lock.json
+            sites/gymbro/package-lock.json
+
+      # The logger's tree, installed first and *not* optional.
+      #
+      # `@gym/*` resolves to files under sites/gym/src, and those files import
+      # `react` and `@azure/msal-browser` by bare specifier. Both TypeScript and
+      # Rollup resolve a bare specifier by walking up from the *importing file*,
+      # so sites/gym/src/hooks/useAuth.ts looks in sites/gym/node_modules and
+      # never in sites/gymbro/node_modules — gymbro depending on the same
+      # packages does not help it. Without this step the build fails with
+      # TS2307 "Cannot find module 'react'" against paths under ../gym/src,
+      # followed by a spray of TS7006 and TS2322 that are that same failure
+      # wearing different hats rather than real type errors.
+      #
+      # It works on a laptop because `npm ci` was run in both folders once. CI
+      # starts from an empty checkout, which is the whole difference.
+      - name: Install the logger's dependencies
+        working-directory: sites/gym
+        run: npm ci
 
       # `npm ci`, not `npm install`: it installs exactly what the lockfile pins
       # and fails if package.json disagrees, which is what makes it reproducible.
@@ -43,9 +66,10 @@ jobs:
       #
       # This build reads sites/gym/src as well as its own — the wire types, the
       # block maths and the MSAL wiring are shared through the `@gym` alias, so
-      # a change to the logger's domain layer is type-checked here too. Nothing
-      # extra is needed for that: the checkout above is the whole repository,
-      # and the alias resolves against the working tree rather than a package.
+      # a change to the logger's domain layer is type-checked here too. The
+      # alias itself resolves against the working tree, and the checkout above
+      # is the whole repository; what the alias does *not* do is carry the
+      # logger's own imports, which is what the step above is for.
       - name: Build
         working-directory: sites/gymbro
         run: npm run build
