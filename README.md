@@ -42,6 +42,23 @@ either app, and a second transcription of them is the thing being avoided. See
 Deploys are **manual** — pick the workflow in the Actions tab and run it. Auto-deploy
 on push and PR is intentionally off.
 
+**Deploy all sites** (`.github/workflows/deploy-all.yml`) is the one to run when
+everything should ship. It deploys nothing itself: it dispatches the four
+workflows below — tick-boxes choose which — and then waits on them, so it goes
+green only once every site it started did. Without that wait it would report
+success the moment the dispatches were accepted, which is the trap worth
+avoiding: the fan-out green and one site failing to ship three minutes later.
+Each site still gets its own run in the Actions tab, so a failure names the site
+and re-running one site stays one click.
+
+It fans out rather than doing the work in four jobs of its own because of the
+nygdev.dev constraint below — that app is identified by the workflow *filename*
+carried in its OIDC token, so the only file that can deploy it is its own. A
+`workflow_call` reusable does not get around it either, since the token names
+the caller. Dispatching needs no PAT: `workflow_dispatch` is one of the two
+events exempt from the rule that an event raised with `GITHUB_TOKEN` starts no
+new run, so `permissions: actions: write` is the whole of it.
+
 | Workflow | Deploys | `app_location` | Authorized by |
 | --- | --- | --- | --- |
 | `.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml` | nygdev.dev | `sites/nygdev` | GitHub OIDC |
