@@ -624,6 +624,27 @@ knowing on sight are `AADSTS50011` (redirect URI not registered),
 `AADSTS9002326` (registered under Web instead of SPA) and `AADSTS650053` (the
 scope does not exist on the registration — see above).
 
+A token failure that is **not** `InteractionRequiredAuthError` gets a *Sign in
+again* button in the banner rather than a redirect. The distinction is MSAL's
+own. `InteractionRequiredAuthError` is Entra saying *ask the user something* —
+consent, MFA, a Conditional Access rule — so `getToken` answers it by going to
+Entra, which is what was asked for. Everything else is the renewal *mechanism*
+failing rather than the renewal being refused: a third-party cookie blocked for
+`login.microsoftonline.com`, a `frame-src` that will not let the iframe land
+back on `/auth.html`, an iframe that ran out its ten seconds. Retrying the
+silent call cannot fix any of those, and redirecting automatically on one that
+repeats is a page that bounces to Entra and back on a loop — under a thumb
+halfway through logging a set. So the redirect is offered rather than taken:
+`reauthenticate` in `useAuth` runs `acquireTokenRedirect` for the account that
+is already signed in, which gets a token without the iframe. It is not a sign
+out, because the session is not what broke.
+
+The banner shows that failure **ahead of** the read failures rather than behind
+them. Every hook asks for a token before it reads, so a token layer that is
+down surfaces as three or four API errors that each say less than the one
+underneath them. `getToken` clears the recorded failure the moment a token
+comes back, which is what stops it masking something unrelated later.
+
 An API failure is a different banner, and it prints the API's own `message`
 unedited: those messages are written to be shown or logged as-is, and they name
 the field, what arrived and what was expected.

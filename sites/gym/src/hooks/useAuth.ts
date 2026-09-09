@@ -23,6 +23,19 @@ export interface AuthActions {
     signOut: () => void;
 
     /**
+     * Get a token by going to Entra, for a session that is already signed in.
+     *
+     * The way out of a silent renewal that cannot work rather than one that was
+     * refused: a third-party cookie blocked for `login.microsoftonline.com`, a
+     * CSP that will not let the renewal iframe land back on `/auth.html`, an
+     * iframe that timed out. None of those are `InteractionRequiredAuthError`,
+     * so {@link AuthActions.getToken} does not answer them with a redirect of
+     * its own — and repeating the same silent call is the one thing certain not
+     * to help.
+     */
+    reauthenticate: () => void;
+
+    /**
      * An access token for the API, from the MSAL cache when it can be. Stable
      * across renders, so the API client can be constructed once.
      */
@@ -121,6 +134,35 @@ export function useAuth(): AuthState & AuthActions {
             .catch((cause: unknown) => setError(describeAuthError(cause)));
     }, []);
 
+    const reauthenticate = useCallback(() => {
+        const pca = pcaRef.current;
+
+        if (!pca) return;
+
+        const current = accountRef.current;
+
+        setError(null);
+        setSigningIn(true);
+
+        const scopes = [...LOGIN_SCOPES, API_SCOPE];
+
+        // Not a sign-out and back in, which is what the Plan tab's button does
+        // and is the wrong shape for this: the *session* is fine, and only this
+        // page's ability to turn it into a token is not. Naming the account
+        // keeps Entra from asking which one it belongs to, so a session that
+        // still holds usually comes back without a single prompt.
+        //
+        // Neither call returns — the browser navigates away, and the app
+        // reloads into handleRedirectPromise above.
+        void (current
+            ? pca.acquireTokenRedirect({ scopes, account: current })
+            : pca.loginRedirect({ scopes })
+        ).catch((cause: unknown) => {
+            setError(describeAuthError(cause));
+            setSigningIn(false);
+        });
+    }, []);
+
     const getToken = useCallback(async (): Promise<string> => {
         const pca = pcaRef.current;
 
@@ -135,13 +177,23 @@ export function useAuth(): AuthState & AuthActions {
         try {
             const result = await pca.acquireTokenSilent(request);
 
+            // The token layer works, so a failure recorded by an earlier call
+            // is stale — and it is read as "this is why nothing loads", ahead
+            // of the read failures it causes. React bails out when the value is
+            // already null, so this costs nothing on the ordinary path.
+            setError(null);
+
             return result.accessToken;
         } catch (cause) {
             // InteractionRequiredAuthError is how Entra says "ask the user
             // something" — consent, MFA, Conditional Access, or an expired
             // refresh token. It is the one failure worth answering with a
-            // redirect; anything else would put a sign-in screen in front of
-            // the same error.
+            // redirect *of its own*: the server asked, so going there answers
+            // it. Anything else is recorded and shown, and the redirect is
+            // offered as a button instead — see `reauthenticate`. A failure
+            // that repeats would otherwise navigate to Entra and back on a
+            // loop, and it would do it under a thumb halfway through logging a
+            // set.
             if (cause instanceof InteractionRequiredAuthError) {
                 // Does not return: the browser navigates away and the app
                 // reloads into handleRedirectPromise above.
@@ -158,5 +210,15 @@ export function useAuth(): AuthState & AuthActions {
 
     const dismissError = useCallback(() => setError(null), []);
 
-    return { ready, account, error, signingIn, signIn, signOut, getToken, dismissError };
+    return {
+        ready,
+        account,
+        error,
+        signingIn,
+        signIn,
+        signOut,
+        reauthenticate,
+        getToken,
+        dismissError,
+    };
 }
