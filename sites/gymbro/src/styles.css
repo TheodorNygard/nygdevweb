@@ -1773,12 +1773,29 @@ a:hover {
     border-bottom-color: var(--accent-30);
 }
 
+.banner__body {
+    flex: 1;
+}
+
 .banner__text {
     margin: 0;
-    flex: 1;
     font: 400 13px/1.5 var(--sans);
     color: var(--fg-80);
     text-wrap: pretty;
+}
+
+.banner__action {
+    margin-top: 10px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 120, 120, 0.4);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-80);
+    font: 600 12px/1 var(--sans);
+}
+
+.banner__action:disabled {
+    opacity: 0.5;
 }
 
 .banner__code {

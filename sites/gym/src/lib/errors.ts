@@ -22,6 +22,8 @@ const ERROR_FIXES: Record<string, string> = {
     AADSTS50194: 'The app is not configured as multi-tenant, and the request went to a shared endpoint. AUTHORITY in lib/config ends in /organizations; a single-tenant registration needs the tenant GUID there instead.',
     invalid_grant: 'The cached refresh token was rejected — usually a password change, a revoked session, or a Conditional Access policy that now demands a fresh sign-in. Sign out and sign in again.',
     interaction_required: 'Entra will not issue this token without asking the user something — consent, MFA, or a Conditional Access requirement. The redirect to Entra handles it; if it came back here without a token, try signing in again.',
+    timed_out: 'Silent renewal ran out of time. MSAL renews in a hidden iframe, and the iframe never reported back — usually third-party cookies blocked for login.microsoftonline.com, or a Content-Security-Policy whose frame-src does not admit both Entra and this origin, since the response lands back here on /auth.html. Nothing is wrong with the session: signing in again gets a token without the iframe.',
+    monitor_window_timeout: 'The renewal iframe was navigated but never came back with a response. Same causes as timed_out — blocked third-party cookies, or a CSP that will not let the response land — and the same answer: sign in again, which does it without the iframe.',
 };
 
 export interface AuthErrorDetail {

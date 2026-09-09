@@ -238,11 +238,16 @@ export function App() {
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
 
-    const failure = actionError
+    // Ahead of the read failures rather than behind them, because when the
+    // token layer is down they *are* it: every read asks for a token first, so
+    // what they report is the same failure with the diagnosis stripped off.
+    // `getToken` clears this the moment a token comes back, so it never masks
+    // an unrelated failure that came later.
+    const failure = authFailure
+        ?? actionError
         ?? blocks.error
         ?? sessions.error
-        ?? (view === 'stats' ? workouts.error : null)
-        ?? authFailure;
+        ?? (view === 'stats' ? workouts.error : null);
 
     const exerciseCount = library?.exercises.length ?? 0;
 
@@ -286,6 +291,11 @@ export function App() {
                         kind="error"
                         label="Something went wrong"
                         message={failure}
+                        action={auth.error ? {
+                            label: auth.signingIn ? 'Opening Entra ID…' : 'Sign in again',
+                            busy: auth.signingIn,
+                            onClick: auth.reauthenticate,
+                        } : null}
                         onDismiss={() => {
                             setActionError(null);
                             auth.dismissError();

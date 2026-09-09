@@ -148,6 +148,15 @@ button {
     animation: g-fade 0.2s ease;
 }
 
+/* The banner floats, and this screen's whole content — heading, line, button —
+   is the top strip it floats over, so with one showing there is nothing left to
+   read. Cleared against the banner's own max-height rather than a measurement
+   of it, since it is never taller than that. Only this screen needs it: every
+   other one is long enough that losing its first inch costs nothing. */
+.screen--cleared {
+    padding-top: calc(45dvh + 24px + env(safe-area-inset-top, 0px));
+}
+
 .eyebrow {
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.16em;
@@ -1908,6 +1917,13 @@ button {
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    /* It floats over the screen, so its height is screen it covers. A long
+       message with a fix attached scrolls inside the banner rather than
+       reaching down over whatever the screen underneath offers to do about
+       it. */
+    max-height: 45dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 13px 14px;
     border-radius: 14px;
     border: 1px solid rgba(255, 120, 110, 0.4);
@@ -1921,10 +1937,29 @@ button {
     background: #1b1f14;
 }
 
-.banner__text {
+.banner__body {
     flex: 1;
+}
+
+.banner__text {
     font: 400 13px/1.45 var(--sans);
     color: var(--fg);
+}
+
+/* Under the message, not beside it: on a phone the message is three lines and
+   a button sharing the row leaves both too narrow to read. */
+.banner__action {
+    margin-top: 11px;
+    padding: 9px 15px;
+    border: 1px solid rgba(255, 120, 110, 0.45);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--fg);
+    font: 600 12px/1 var(--sans);
+}
+
+.banner__action:disabled {
+    opacity: 0.5;
 }
 
 .banner__code {

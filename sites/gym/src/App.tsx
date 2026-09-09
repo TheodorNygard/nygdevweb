@@ -392,19 +392,25 @@ export function App() {
     }
 
     // A token failure while already signed in is a setup problem, not a
-    // sign-out — the scope does not exist, or consent was revoked — and its
-    // AADSTS fix is the useful half, so it is carried into the banner rather
-    // than left on a screen nobody reaches once signed in.
+    // sign-out — the scope does not exist, consent was revoked, or the silent
+    // renewal cannot complete — and its code and fix are the useful half, so it
+    // is carried into the banner rather than left on a screen nobody reaches
+    // once signed in.
     const authFailure = auth.error
         ? `${auth.error.code} — ${auth.error.message}${auth.error.fix ? ` ${auth.error.fix}` : ''}`
         : null;
 
-    const banner = actionError
+    // Ahead of the read failures rather than behind them, because when the
+    // token layer is down they *are* it: every hook below asks for a token
+    // first, so what they report is the same failure with the diagnosis
+    // stripped off. `getToken` clears this the moment a token comes back, so
+    // it never masks an unrelated failure that came later.
+    const banner = authFailure
+        ?? actionError
         ?? session.error
         ?? block.error
         ?? blocks.error
-        ?? history.error
-        ?? authFailure;
+        ?? history.error;
     const bannerIsNotice = !banner && session.notice !== null;
 
     // The sessions behind the open cell, out of the block that cell belongs
@@ -432,6 +438,11 @@ export function App() {
                     kind="error"
                     label="Something went wrong"
                     message={banner}
+                    action={auth.error ? {
+                        label: auth.signingIn ? 'Opening Entra ID…' : 'Sign in again',
+                        busy: auth.signingIn,
+                        onClick: auth.reauthenticate,
+                    } : null}
                     onDismiss={() => {
                         setActionError(null);
                         session.dismiss();
@@ -522,7 +533,7 @@ export function App() {
                             ) : null}
                         </>
                     ) : (
-                        <div className="screen">
+                        <div className={banner ? 'screen screen--cleared' : 'screen'}>
                             <h1 className="title">Nothing loaded.</h1>
                             <p className="lede">
                                 The block could not be read. The banner above says why.
