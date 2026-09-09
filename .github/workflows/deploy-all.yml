@@ -1,0 +1,152 @@
+name: Deploy all sites
+
+# Dispatches the four per-site workflows rather than deploying anything itself.
+#
+# The obvious alternative — one workflow with four build-and-deploy jobs in it —
+# is not available, because of nygdev.dev. That app's deployment authorization
+# policy is "GitHub", so the content server identifies the Static Web App by the
+# workflow filename carried in the OIDC token, and Azure registered the
+# generated name at provisioning time. Anything that mints that token from a
+# different file fails with "Could not determine the Static Web App from the
+# GitHub OIDC workflow reference" — including a `workflow_call` reusable, whose
+# token names the *caller*. Dispatching the real file leaves the binding alone.
+#
+# Fanning out also keeps each site's deploy its own entry in the Actions tab, so
+# a failure names the site and re-running one site is still one click.
+on:
+  workflow_dispatch:
+    inputs:
+      nygdev:
+        description: nygdev.dev
+        type: boolean
+        default: true
+      run:
+        description: run.nygard.dev
+        type: boolean
+        default: true
+      gym:
+        description: gym.nygard.dev
+        type: boolean
+        default: true
+      gymbro:
+        description: gymbro.nygard.dev
+        type: boolean
+        default: true
+
+# `actions: write` is what lets GITHUB_TOKEN dispatch the other workflows, and
+# no PAT is needed: workflow_dispatch is one of the two events exempt from the
+# rule that an event raised with GITHUB_TOKEN starts no new run. Deploying is
+# the children's job — this workflow needs nothing from Azure, so it asks for
+# no `id-token`.
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    name: Dispatch and wait
+    # Long enough for four cold npm installs in parallel; short enough that a
+    # child stuck on an Azure call does not hold a runner all afternoon.
+    timeout-minutes: 45
+    steps:
+      - name: Dispatch the selected site workflows
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          runs=""
+
+          # `gh workflow run` returns as soon as the dispatch is accepted and
+          # tells you nothing about what it started, so the run has to be found
+          # afterwards. Run ids increase monotonically and `gh run list` is
+          # newest-first, so "the newest id is not the one from before" pins our
+          # run without trusting the runner's clock to agree with GitHub's.
+          dispatch() {
+            site=$1
+            wf=$2
+
+            if [ "$3" != "true" ]; then
+              echo "Skipping $site"
+              return 0
+            fi
+
+            before=$(gh run list --workflow "$wf" --limit 1 --json databaseId --jq '.[0].databaseId // 0')
+            gh workflow run "$wf" --ref "$REF"
+
+            id=$before
+            for _ in $(seq 1 30); do
+              sleep 2
+              id=$(gh run list --workflow "$wf" --limit 1 --json databaseId --jq '.[0].databaseId // 0')
+              if [ "$id" != "$before" ]; then
+                break
+              fi
+            done
+
+            if [ "$id" = "$before" ]; then
+              echo "::error::$site ($wf) was dispatched but no new run appeared within 60s."
+              return 1
+            fi
+
+            echo "Dispatched $site -> run $id"
+            runs="$runs $site:$id"
+          }
+
+          dispatch 'nygdev.dev'       'azure-static-web-apps-brave-cliff-0253fca03.yml' '${{ inputs.nygdev }}'
+          dispatch 'run.nygard.dev'   'deploy-run.yml'                                  '${{ inputs.run }}'
+          dispatch 'gym.nygard.dev'   'deploy-gym.yml'                                  '${{ inputs.gym }}'
+          dispatch 'gymbro.nygard.dev' 'deploy-gymbro.yml'                              '${{ inputs.gymbro }}'
+
+          if [ -z "$runs" ]; then
+            echo "::error::Nothing selected — every site was unchecked."
+            exit 1
+          fi
+
+          echo "runs=$runs" >> "$GITHUB_OUTPUT"
+
+      # Without this the fan-out goes green the moment the dispatches are
+      # accepted, which is the trap: "Deploy all sites" succeeded and one site
+      # failed to ship three minutes later. The children run in parallel, so
+      # watching them one after another still costs about as long as the
+      # slowest one.
+      - name: Wait for them
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUNS: ${{ steps.dispatch.outputs.runs }}
+        run: |
+          set -uo pipefail
+
+          failed=0
+
+          {
+            echo "| Site | Result | Run |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for entry in $RUNS; do
+            site=${entry%:*}
+            id=${entry##*:}
+
+            echo "::group::$site (run $id)"
+            gh run watch "$id" --interval 15 --exit-status
+            status=$?
+            echo "::endgroup::"
+
+            url=$(gh run view "$id" --json url --jq .url)
+
+            if [ "$status" -eq 0 ]; then
+              result='deployed'
+            else
+              result='**failed**'
+              failed=1
+            fi
+
+            echo "| $site | $result | [$id]($url) |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          exit "$failed"
