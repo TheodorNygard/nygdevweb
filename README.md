@@ -572,7 +572,7 @@ change was a silently ignored property and a sign-in that failed at runtime.
 | Header | Here | Elsewhere | Why |
 | --- | --- | --- | --- |
 | `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the two CDN files — the exercise library and the built-in day templates. Three origins and no more; an exfiltration path would have to change this file to exist. |
-| `frame-src` | `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal. Without it, silent renewal fails with a timeout that names nothing. |
+| `frame-src` | `'self'`, `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal, and it takes both. The frame navigates to Entra first, then Entra redirects it to the redirect URI — which since v5 is this origin's own `/auth.html`. `frame-src` is checked on every navigation the frame makes, not just the first, so Entra on its own gets as far as the authorize call and then blocks the response on the way back. |
 | `frame-ancestors` | `'none'`, but `'self'` on `/auth.html` | `'none'` | The other half of that iframe. Entra redirects it back to the redirect URI, and a blanket `'none'` — with `X-Frame-Options: DENY` alongside it — blocks that even same-origin, which is the same nameless timeout. Relaxed on the bridge page only; the app itself stays unframeable. |
 | `font-src` | `'self'` | absent | The two self-hosted typefaces. `default-src 'none'` means an unlisted `font-src` is `none`, and the app would silently fall back to system fonts. |
 | `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup. The app signs in by redirect, so this is not load-bearing today — it is what keeps a popup flow from being a trap if one is ever added. |
@@ -610,6 +610,30 @@ scope does not exist on the registration — see above).
 An API failure is a different banner, and it prints the API's own `message`
 unedited: those messages are written to be shown or logged as-is, and they name
 the field, what arrived and what was expected.
+
+Two messages the renewal iframe leaves in the console are worth telling apart.
+
+`Feature Policy: Skipping unsupported feature name "local-network-access"`,
+pointing into the vendor chunk, is MSAL's and not this app's:
+`createHiddenIframe` sets `allow="local-network-access *"` on the frame it
+creates, and Firefox does not implement that feature name, so it skips it and
+says so. No header in `staticwebapp.config.json` produces it and none
+suppresses it, and it changes nothing about the renewal.
+
+`Content-Security-Policy: ... blocked the loading of a resource (frame-src) at
+https://gym.nygard.dev/auth.html#code=...` is not harmless, and it says the
+*deployed* policy is older than this repository's. Read the directive the
+browser quotes back: a `frame-src` naming only `login.microsoftonline.com` is
+the policy from before `'self'` was added, and the renewal dies on its last
+step — the code comes back from Entra and the frame is not allowed to land on
+the bridge page that would broadcast it. Deploys are manual, so a committed
+header change ships when somebody runs the workflow and not before — and the
+same applies to gymbro.nygard.dev, which carries the same two directives. Check
+what is actually live rather than reading the file:
+
+```sh
+curl -sSI https://gym.nygard.dev/ | grep -i content-security-policy
+```
 
 ### Tokens, storage, and what is on screen
 
