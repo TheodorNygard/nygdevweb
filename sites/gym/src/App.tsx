@@ -17,6 +17,7 @@ import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
 import { GymApi } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
+import { clearBlock } from './lib/cache';
 import { DoneScreen } from './screens/DoneScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen } from './screens/PlanScreen';
@@ -89,7 +90,13 @@ export function App() {
         setOpened((seen) => (seen[next] ? seen : { ...seen, [next]: true }));
     }, []);
 
-    const block = useBlock(api);
+    // Which account's held block is readable, and the key it is stored under.
+    // The server's tenancy boundary is the object id off the validated token;
+    // this is the client-side half, so a second person signing in on the same
+    // phone is not shown the first one's training while the server answers.
+    const accountId = auth.account?.homeAccountId ?? null;
+
+    const block = useBlock(api, accountId);
     const session = useSession(api);
     const library = useLibrary();
 
@@ -117,6 +124,22 @@ export function App() {
     // sessions in it, and guessing 1 first would flash the wrong week.
     const [week, setWeek] = useState<number | null>(null);
 
+    // Whether `week` is the one to keep, or is still following the block.
+    //
+    // The held block's sessions are last visit's, so the week derived from them
+    // is provisional: a session logged on the desktop since is a different
+    // current week, and without this the first derivation would stick and Today
+    // would open on the wrong one for the rest of the visit. So a week derived
+    // from the cache leaves this false and is derived again when the server's
+    // copy lands. A week somebody picked with the arrows settles it and outranks
+    // both — nothing arriving afterwards moves the screen under them.
+    const [weekSettled, setWeekSettled] = useState(false);
+
+    const chooseWeek = useCallback((next: number | null) => {
+        setWeekSettled(next !== null);
+        setWeek(next);
+    }, []);
+
     const [openDay, setOpenDay] = useState<OpenDay | null>(null);
     const [daySessionId, setDaySessionId] = useState<string | null>(null);
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
@@ -136,8 +159,14 @@ export function App() {
     const [actionError, setActionError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (block.block && week === null) setWeek(currentWeek(block.block));
-    }, [block.block, week]);
+        if (!block.block || weekSettled) return;
+
+        setWeek(currentWeek(block.block));
+
+        // Left unsettled while the block is the held copy, which is what brings
+        // this back once the server has answered.
+        if (!block.fromCache) setWeekSettled(true);
+    }, [block.block, block.fromCache, weekSettled]);
 
     // The entries behind a session's totals. Fetched rather than held, because
     // `/mesocycles/current` sends summaries only — and it is one read for a
@@ -202,6 +231,17 @@ export function App() {
         (cause: unknown) => setActionError(cause instanceof Error ? cause.message : String(cause)),
         [],
     );
+
+    // Drops the held block on the way out, and this is the last chance to:
+    // signing out navigates to Entra, and the page is gone by the time the
+    // browser comes back. The read is keyed on the account as well, so nobody
+    // is ever *shown* somebody else's block — but a phone lent to a friend who
+    // signs in as themselves should not have the previous account's training
+    // sitting in storage behind them either.
+    const signOut = useCallback(() => {
+        clearBlock();
+        auth.signOut();
+    }, [auth.signOut]);
 
     if (!auth.ready) {
         return <div className="app"><div className="spinner">GYMLOG</div></div>;
@@ -291,6 +331,7 @@ export function App() {
             // A shortened block can leave Today on a week that no longer
             // exists, and the arrows would not let you back.
             setWeek((value) => Math.min(value ?? 1, patch.weeks));
+            setWeekSettled(true);
         } catch (cause) {
             describe(cause);
         } finally {
@@ -312,7 +353,7 @@ export function App() {
             // The week is derived from the sessions in the block, so it has to
             // be re-derived: week 4 of the block you just left is not week 4 of
             // this one.
-            setWeek(null);
+            chooseWeek(null);
             pickTab('today');
         } catch (cause) {
             describe(cause);
@@ -339,7 +380,7 @@ export function App() {
             setOpenBlock(null);
             block.reload();
             blocks.reload();
-            setWeek(1);
+            chooseWeek(1);
 
             // Stays on Plan rather than jumping to Today: a copy is almost
             // always renamed straight afterwards, in the field at the top of
@@ -365,7 +406,7 @@ export function App() {
             // is a different block than it was a moment ago.
             block.reload();
             blocks.reload();
-            setWeek(null);
+            chooseWeek(null);
         } catch (cause) {
             describe(cause);
         } finally {
@@ -382,7 +423,7 @@ export function App() {
             await api.createMesocycle(plan.name, plan.weeks, plan.days);
             block.reload();
             blocks.reload();
-            setWeek(1);
+            chooseWeek(1);
             pickTab('today');
         } catch (cause) {
             describe(cause);
@@ -470,7 +511,7 @@ export function App() {
                                 <TodayScreen
                                     block={block.block}
                                     week={activeWeek}
-                                    onWeek={setWeek}
+                                    onWeek={chooseWeek}
                                     onOpenDay={(dayIndex) => {
                                         const sessions = sessionsFor(
                                             block.block?.sessions ?? [],
@@ -500,7 +541,7 @@ export function App() {
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
-                                    onSignOut={auth.signOut}
+                                    onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
                                 />
                             ) : null}
@@ -520,7 +561,7 @@ export function App() {
                                         // trained moves Today's week with it —
                                         // week 4 of another block is not week 4
                                         // of this one.
-                                        if (isCurrent) setWeek(summary.week);
+                                        if (isCurrent) chooseWeek(summary.week);
 
                                         setOpenDay({
                                             week: summary.week,
