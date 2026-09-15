@@ -10,8 +10,8 @@ const STEPS = [
     },
     {
         label: 'DELOAD',
-        body: 'The last week is the rest week: the same exercises at half the sets, nowhere'
-            + ' near failure. It is where the previous weeks actually land.',
+        body: 'The last week is the rest week: one or two sessions of the same exercises, at'
+            + ' half the sets and nowhere near failure. It is where the previous weeks land.',
     },
     {
         label: 'REPEAT',

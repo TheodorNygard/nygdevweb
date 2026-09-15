@@ -1005,6 +1005,13 @@ a:hover {
     border-color: var(--accent);
 }
 
+/* A day the week does not run — the rest week's dropped sessions. Drawn so the
+   grid keeps its columns under the day labels, but plainly not a workout. */
+.map__cell--off {
+    border-style: dashed;
+    border-color: var(--line);
+}
+
 .map__tank {
     flex: none;
     width: 52px;

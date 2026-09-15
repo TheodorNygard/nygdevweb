@@ -95,9 +95,9 @@ export function DayPlanSheet({
                 <div className="sheet__eyebrow">PLAN · DAY {dayIndex + 1}</div>
                 <div className="sheet__title">{label}</div>
                 <p className="day__sub" style={{ marginTop: 8 }}>
-                    Applies to {label} in every week of this block. Sets only — how hard each one
-                    should be comes from the week you are in, and the rest week runs the same
-                    exercises at half these sets.
+                    Applies to {label} in every training week of this block. Sets only — how hard
+                    each one should be comes from the week you are in, and the rest week runs
+                    half these sets, on the one or two days it keeps.
                 </p>
 
                 <button

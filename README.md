@@ -240,6 +240,36 @@ design offered — near-black, acid-lime accent, mono digits — and it was chos
 because a bright screen between sets is the thing that makes a logbook go
 unused. A light variant would be a different design, not a preference.
 
+### The ramp and the rest week
+
+What separates one week of a block from another is not the exercises — the plan
+hangs off the day, so every week runs the same ones — but **how many reps you
+leave in the tank**. The ramp is counted back from the last *training* week
+rather than forward from the first, so the hard end of the block is fixed and a
+shorter block loses its easy weeks: six run 3 · 2 · 2 · 1 · 0 · rest, and four
+are the last four of those.
+
+**The last week is the rest week**, derived from the position rather than stored,
+so every block has one including those planned before it existed. It changes two
+things and no more:
+
+- **Half the sets**, rounded up so a single-set exercise survives it.
+- **Fewer sessions**: one, or two once the block trains four days or more. Six
+  trips to the gym to do half a workout each is not a deload; the trips are what
+  the fatigue is made of. The days it keeps are the first of the plan — D1 and
+  D2 are what a split is built around, and what the next block will be read
+  against. A dropped day with something already filed against it still shows on
+  Today, so a block logged before this existed keeps its sessions reachable.
+
+Its tank is **4**, not the "leave everything behind" it reads as. The target is
+aimed at the RPE slider, which starts at 5 and calls 5 and 5.5 warm-ups — so a
+deeper tank clamps onto the warm-up band, and *every set of the rest week was
+logged as a warm-up*: numbered `W`, counted toward nothing, no day ever
+filling. Four is the deepest tank with a working rating of its own (RPE 6,
+"easy, 4+ left"), which is what a deload should be anyway: easy, not absent.
+`rpeForTank` now floors at `MIN_WORKING_RPE` rather than at the bottom of the
+slider, so no week's target can land in the warm-up band again.
+
 ### Planned sessions
 
 A day can carry a plan: which exercises, and how many sets of how many reps.
@@ -248,9 +278,10 @@ Tapping the handle beside a day label on the Plan tab opens it.
 **The plan hangs off the day, not off a cell of the block**, so every week's
 "Upper A" shares it. That follows from the app's own premise — days are
 labelled, not scheduled — and it keeps a block one small document instead of up
-to 48 planned ones. Planning a single week differently, a deload week most of
-all, is what it gives up; that would be a plan per cell, and it is the change
-to make if per-week progression is ever wanted.
+to 48 planned ones. Planning a single week differently is what it gives up;
+that would be a plan per cell, and it is the change to make if per-week
+progression is ever wanted. The deload is the one week that does differ, and it
+is derived from the block's shape rather than planned — see above.
 
 **Targets are sets and reps, and deliberately not weight.** Sets and reps are
 what a programme prescribes; the weight is what the session discovers, and a

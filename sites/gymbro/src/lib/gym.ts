@@ -50,6 +50,7 @@ export { useResource, type Resource } from '@gym/hooks/useResource';
 export {
     currentWeek,
     dayLabel,
+    daysForWeek,
     isRestWeek,
     progressOf,
     repsInTank,

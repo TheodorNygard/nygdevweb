@@ -4,6 +4,7 @@ import { ExercisePicker } from '../components/ExercisePicker';
 import { Stepper } from '../components/Stepper';
 import { catalogue, GROUPS, groupOf, NO_GROUP } from '../lib/groups';
 import {
+    daysForWeek,
     equipmentFor,
     isRestWeek,
     repsInTank,
@@ -147,12 +148,15 @@ export function BlockScreen({
     }
 
     // Sets per group for the week being viewed, so a rest week's halved sets
-    // show as halved rather than as the plan on paper.
+    // show as halved rather than as the plan on paper — and only across the days
+    // that week runs, since the rest week drops most of them.
     const tally = new Map<string, number>();
 
     for (const group of GROUPS) tally.set(group, 0);
 
-    for (const day of draft.days) {
+    const weekDays = draft.days.slice(0, daysForWeek(draft.days.length, week, draft.weeks));
+
+    for (const day of weekDays) {
         for (const planned of day.plan) {
             const group = groupOf(planned.exerciseName);
 
@@ -417,16 +421,21 @@ export function BlockScreen({
                             {Array.from({ length: draft.weeks }, (_, index) => {
                                 const w = index + 1;
                                 const rest = isRestWeek(w, draft.weeks);
+                                const runs = daysForWeek(draft.days.length, w, draft.weeks);
 
                                 return (
                                     <div key={w} className="row">
-                                        <span className="row__meta">{`WEEK ${w}`}</span>
+                                        <span className="row__meta">
+                                            {rest
+                                                ? `WEEK ${w} · ${runs} ${runs === 1 ? 'DAY' : 'DAYS'}`
+                                                : `WEEK ${w}`}
+                                        </span>
                                         <span
                                             className={
                                                 rest ? 'map__tank map__tank--rest' : 'map__tank'
                                             }
                                         >
-                                            {rest ? 'REST · 8' : `${repsInTank(w, draft.weeks)} LEFT`}
+                                            {`${repsInTank(w, draft.weeks)} LEFT`}
                                         </span>
                                     </div>
                                 );
@@ -435,7 +444,8 @@ export function BlockScreen({
 
                         <p className="panel__note">
                             Counted back from the last training week, so shortening a block gives
-                            at the easy end.
+                            at the easy end. The rest week closing it runs half the sets, on the
+                            first one or two days of the plan.
                         </p>
                     </section>
                 </div>

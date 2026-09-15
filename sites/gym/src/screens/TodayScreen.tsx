@@ -1,4 +1,12 @@
-import { dayLabel, draftIn, isRestWeek, progressOf, repsInTank, sessionsFor } from '../lib/block';
+import {
+    dayLabel,
+    daysForWeek,
+    draftIn,
+    isRestWeek,
+    progressOf,
+    repsInTank,
+    sessionsFor,
+} from '../lib/block';
 import { kg, rpeLabel, tankLabel, todayLabel } from '../lib/format';
 import { IntroScreen } from './IntroScreen';
 import type { CurrentBlock } from '../lib/types';
@@ -30,18 +38,30 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
     const progress = progressOf(mesocycle, sessions);
     const days = mesocycle.days;
 
-    const rows = days.map((day) => {
-        const cell = sessionsFor(sessions, week, day.dayIndex);
-        const submitted = cell.filter((session) => session.status === 'submitted');
+    // What this week runs: every day in a training week, one or two in the rest
+    // week. The block's cadence is unchanged — `days` is still what it trains —
+    // so the header keeps saying 4×/week while the deload lists two.
+    const runs = daysForWeek(days.length, week, mesocycle.weeks);
 
-        return {
-            day,
-            draft: draftIn(cell),
-            latest: submitted[0],
-            done: submitted.length > 0,
-            extra: submitted.length - 1,
-        };
-    });
+    const rows = days
+        .map((day) => {
+            const cell = sessionsFor(sessions, week, day.dayIndex);
+            const submitted = cell.filter((session) => session.status === 'submitted');
+
+            return {
+                day,
+                draft: draftIn(cell),
+                latest: submitted[0],
+                done: submitted.length > 0,
+                extra: submitted.length - 1,
+                sessions: cell.length,
+            };
+        })
+        // A day the rest week dropped still shows if something is filed against
+        // it: a block logged before the rest week got shorter, or a session
+        // started on it anyway. Hiding the row would strand an open draft with
+        // nothing in the app able to reopen it.
+        .filter((row) => row.day.dayIndex < runs || row.sessions > 0);
 
     // "Up next" is the first day of the week with nothing submitted. A day with
     // a draft open counts as next too: resuming it is the same tap.
@@ -108,7 +128,8 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
 
             <p className="weeknote">
                 {rest
-                    ? `Rest week — same exercises at half the sets, ${tankLabel(tank)}.`
+                    ? `Rest week — ${runs === 1 ? 'one session' : `${runs} sessions`}, same`
+                        + ` exercises at half the sets, ${tankLabel(tank)}.`
                     : `Target ${tankLabel(tank)} on every working set.`}
             </p>
 

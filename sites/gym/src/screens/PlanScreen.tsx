@@ -4,7 +4,7 @@ import { DayPlanSheet } from '../components/DayPlanSheet';
 import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
 import type { TemplatesState } from '../hooks/useTemplates';
-import { draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
+import { daysForWeek, draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
 import type {
     CurrentBlock,
     DayInput,
@@ -168,6 +168,10 @@ export function PlanScreen({
     const rows = Array.from({ length: draft.weeks }, (_, index) => {
         const week = index + 1;
 
+        // How many days this row actually runs: all of them, or the one or two
+        // the rest week keeps.
+        const runs = daysForWeek(draft.days.length, week, draft.weeks);
+
         return {
             week,
 
@@ -180,6 +184,11 @@ export function PlanScreen({
                 const cell = sessionsFor(block.sessions, week, dayIndex);
                 const submitted = cell.some((session) => session.status === 'submitted');
 
+                // A day this week does not run is drawn rather than dropped, so
+                // the columns stay columns — except where something is already
+                // filed against it, which is a workout and reads as one.
+                if (dayIndex >= runs && cell.length === 0) return { dayIndex, state: 'off' };
+
                 return {
                     dayIndex,
                     state: submitted ? 'done' : draftIn(cell) ? 'draft' : 'planned',
@@ -188,6 +197,9 @@ export function PlanScreen({
         };
     });
 
+    // What the deload comes out at for this cadence, for the note under the map.
+    const restRuns = daysForWeek(draft.days.length, draft.weeks, draft.weeks);
+
     const canSave = draft.name.trim().length > 0
         && draft.days.every((day) => day.label.trim().length > 0);
 
@@ -195,8 +207,9 @@ export function PlanScreen({
         <div className="screen">
             <h1 className="title">Mesocycle</h1>
             <p className="lede">
-                3–8 weeks, 2–6 workouts per week — the last of them a rest week. Changing the plan
-                never touches sessions you have already logged.
+                3–8 weeks, 2–6 workouts per week — the last week a rest week, at half the sets
+                and one or two sessions. Changing the plan never touches sessions you have
+                already logged.
             </p>
 
             <section className="panel">
@@ -271,7 +284,7 @@ export function PlanScreen({
                         {/* The ramp, which is the only thing that distinguishes one
                             week of the block from another now that days are shared.
                             The rest week keeps the units rather than reading REST:
-                            its eight is the top of the same scale, and a word in a
+                            its four is the top of the same scale, and a word in a
                             column of numbers reads as a gap in the ramp. */}
                         <span
                             className={row.rest ? 'map__tank map__tank--rest' : 'map__tank'}
@@ -284,12 +297,15 @@ export function PlanScreen({
                     <span>■ logged</span>
                     <span>▨ in progress</span>
                     <span>□ planned</span>
+                    <span>▫ not this week</span>
                 </div>
                 <p className="map__note">
                     The number is reps left in the tank: how much you should have in reserve when
                     a set ends. It tightens as the block goes on and reaches nothing left in the
                     last training week. The final week is the rest week — the same exercises at
-                    half the sets, nowhere near failure.
+                    half the sets, stopped well short of failure, and fewer days:{' '}
+                    {restRuns === 1 ? 'one session' : `${restRuns} sessions`} instead of{' '}
+                    {draft.days.length}.
                 </p>
             </div>
 

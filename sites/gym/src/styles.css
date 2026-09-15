@@ -849,6 +849,14 @@ button {
     border-color: var(--accent);
 }
 
+/* A day the week does not run — the rest week's dropped sessions. Still drawn,
+   so the map keeps its columns and the short row reads as a decision rather
+   than as a missing cell, but plainly not somewhere a workout goes. */
+.map__cell--off {
+    border-style: dashed;
+    border-color: var(--line);
+}
+
 /* The ramp beside each row of the block map. Fixed width so the numbers line
    up in a column and the cells stay the same size on every row. */
 .map__tank {
