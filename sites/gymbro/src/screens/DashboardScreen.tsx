@@ -1,5 +1,6 @@
 import { groupOf } from '../lib/groups';
 import {
+    daysForWeek,
     isRestWeek,
     kg,
     progressOf,
@@ -47,6 +48,10 @@ export function DashboardScreen({
     const progress = progressOf(block, sessions);
     const rest = isRestWeek(week, block.weeks);
 
+    // How many days the viewed week runs: all of them, or the one or two the
+    // rest week keeps.
+    const runs = daysForWeek(block.days.length, week, block.weeks);
+
     // A day is "done" for the map when something was submitted against it; a
     // draft is its own state, because an open session is neither nothing nor a
     // week's work finished.
@@ -64,7 +69,7 @@ export function DashboardScreen({
     // Up next: the first day of the viewed week with nothing submitted against
     // it. A week that is fully logged falls back to its first day, which is
     // what the panel should show once there is nothing left to do in it.
-    const pending = block.days.findIndex(
+    const pending = block.days.slice(0, runs).findIndex(
         (_, dayIndex) => !submitted.some(
             (session) => session.week === week && session.dayIndex === dayIndex,
         ),
@@ -78,8 +83,13 @@ export function DashboardScreen({
     const volumeMax = Math.max(1, ...weekVolumes);
     const step = CHART_WIDTH / block.weeks;
 
-    const plannedSetsPerWeek = block.days.reduce(
-        (total, day) => total + day.plan.reduce((sum, planned) => sum + planned.sets, 0),
+    // For the week being viewed rather than for the plan on paper, which are
+    // two different numbers in the rest week: half the sets, on fewer days.
+    const plannedSetsPerWeek = block.days.slice(0, runs).reduce(
+        (total, day) => total + day.plan.reduce(
+            (sum, planned) => sum + setsForWeek(planned.sets, week, block.weeks),
+            0,
+        ),
         0,
     );
 
@@ -119,15 +129,15 @@ export function DashboardScreen({
                     </div>
                     <div className="tile">
                         <div className="tile__key">IN TANK</div>
-                        <div className="tile__value">
-                            {rest ? 'REST' : repsInTank(week, block.weeks)}
-                        </div>
+                        <div className="tile__value">{repsInTank(week, block.weeks)}</div>
                     </div>
                 </div>
 
                 <div className="panel__head" style={{ marginTop: 22 }}>
                     <span className="panel__label">BLOCK MAP</span>
-                    <span className="map__key">■ logged &nbsp;▨ in progress &nbsp;□ planned</span>
+                    <span className="map__key">
+                        ■ logged &nbsp;▨ in progress &nbsp;□ planned &nbsp;▫ not this week
+                    </span>
                 </div>
 
                 <div className="map">
@@ -147,6 +157,7 @@ export function DashboardScreen({
                         const w = index + 1;
                         const weekRest = isRestWeek(w, block.weeks);
                         const tank = repsInTank(w, block.weeks);
+                        const weekRuns = daysForWeek(block.days.length, w, block.weeks);
 
                         return (
                             <div key={w} className="map__row">
@@ -161,17 +172,31 @@ export function DashboardScreen({
                                 <span className="map__cells">
                                     {block.days.map((day, dayIndex) => {
                                         const state = cellFor(w, dayIndex);
+
+                                        // A day the week does not run is drawn
+                                        // rather than dropped, so the columns
+                                        // stay under their labels — unless
+                                        // something is filed against it, which
+                                        // is a workout and reads as one.
+                                        const off = dayIndex >= weekRuns
+                                            && !state.done
+                                            && !state.draft;
+
                                         const className = state.done
                                             ? 'map__cell map__cell--done'
                                             : state.draft
                                                 ? 'map__cell map__cell--draft'
-                                                : 'map__cell';
+                                                : off
+                                                    ? 'map__cell map__cell--off'
+                                                    : 'map__cell';
 
                                         return (
                                             <span
                                                 key={dayIndex}
                                                 className={className}
-                                                title={`W${w} · ${day.label}`}
+                                                title={off
+                                                    ? `W${w} · ${day.label} — not in the rest week`
+                                                    : `W${w} · ${day.label}`}
                                             />
                                         );
                                     })}
@@ -181,7 +206,7 @@ export function DashboardScreen({
                                         weekRest ? 'map__tank map__tank--rest' : 'map__tank'
                                     }
                                 >
-                                    {weekRest ? 'REST · 8' : `${tank} LEFT`}
+                                    {`${tank} LEFT`}
                                 </span>
                             </div>
                         );
@@ -191,7 +216,8 @@ export function DashboardScreen({
                 <p className="panel__note panel__note--wide">
                     The number is reps left in the tank: how much to have in reserve when a set
                     ends. It tightens as the block goes on and reaches nothing left in the last
-                    training week. The final week runs the same exercises at half the sets.
+                    training week. The final week is the rest week — the same exercises at half
+                    the sets, well short of failure, on the first one or two days of the plan.
                 </p>
             </section>
 
@@ -201,7 +227,8 @@ export function DashboardScreen({
                     <div className="next__label">{nextDay ? nextDay.label : '—'}</div>
                     <div className="next__sub">
                         {rest
-                            ? `Week ${week} · rest week — half the sets, nowhere near failure`
+                            ? `Week ${week} · rest week — ${runs === 1 ? 'one session' : `${runs} sessions`},`
+                                + ` half the sets, ${repsInTank(week, block.weeks)} in the tank`
                             : `Week ${week} · target ${repsInTank(week, block.weeks)} reps in the tank`}
                     </div>
 

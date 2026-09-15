@@ -40,12 +40,25 @@ export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): Bl
     for (const session of sessions) {
         if (session.status !== 'submitted') continue;
         if (session.week < 1 || session.week > mesocycle.weeks) continue;
-        if (session.dayIndex >= mesocycle.days.length) continue;
+
+        // Against what the *week* asks for rather than what the block holds,
+        // which is now two different numbers: the rest week runs fewer days
+        // than the training weeks do. A session logged on a day the rest week
+        // dropped is work you did, and History keeps it — it is just not a
+        // cell of a plan that no longer has one there, the same way a second
+        // session on one date is not a second cell.
+        if (session.dayIndex >= daysForWeek(mesocycle.days.length, session.week, mesocycle.weeks)) {
+            continue;
+        }
 
         cells.add(`${session.week}:${session.dayIndex}`);
     }
 
-    const totalCount = mesocycle.weeks * mesocycle.days.length;
+    let totalCount = 0;
+
+    for (let week = 1; week <= mesocycle.weeks; week += 1) {
+        totalCount += daysForWeek(mesocycle.days.length, week, mesocycle.weeks);
+    }
 
     return {
         doneCount: cells.size,
@@ -127,8 +140,22 @@ export function dayLabel(mesocycle: Mesocycle | null, dayIndex: number): string 
     return mesocycle?.days[dayIndex]?.label ?? `Day ${dayIndex + 1}`;
 }
 
-/** What a rest week asks you to leave behind: effectively everything. */
-const REST_TANK = 8;
+/**
+ * What a rest week asks you to leave behind: most of the set, but not all of it.
+ *
+ * Four rather than the eight this started as, because the scale the target is
+ * read off has a floor. RPE runs from 5, and everything at 5.5 or below is a
+ * warm-up — a set the app deliberately does not count toward what the day asks
+ * for. A tank of eight is RPE 2, which the slider cannot reach, so it clamped
+ * to the bottom of the scale and every set of a rest week was logged as a
+ * warm-up: the sets never counted and no day ever filled.
+ *
+ * Four is the deepest tank with a working rating of its own — RPE 6, "easy, 4+
+ * left" — and it is what a deload is supposed to be anyway. Easy, not absent:
+ * the week still has to be training, or there is nothing for the half sets to
+ * be half of.
+ */
+const REST_TANK = 4;
 
 /**
  * The ramp, read backwards from the end of the block: what to leave in the tank
@@ -185,6 +212,42 @@ export function repsInTank(week: number, weeks: number): number {
     const remaining = Math.max(0, weeks - 1 - week);
 
     return TANK_RAMP[Math.min(remaining, TANK_RAMP.length - 1)] ?? OPENING_TANK;
+}
+
+/**
+ * How many sessions the rest week keeps, and the cadence it changes at.
+ *
+ * The other half of the deload, and the one that gives a rest week any rest in
+ * it: turning up six times to do half a workout is six trips to the gym, which
+ * is the part of a training week that fatigue is actually made of. So the week
+ * collapses to one session, or two once the block runs four days or more —
+ * enough to keep both halves of an upper/lower or push/pull split moving
+ * through the week instead of leaving one of them a fortnight cold.
+ *
+ * Kept as the first days of the plan rather than a spread, because a day *is*
+ * its position here: D1 and D2 are the two sessions the block was built around,
+ * and the ones whose numbers the next block will be read against.
+ */
+const REST_DAYS_FEW = 1;
+const REST_DAYS_MANY = 2;
+const REST_TWO_SESSION_CADENCE = 4;
+
+/**
+ * How many of the block's days a given week actually runs.
+ *
+ * A training week runs all of them. The rest week runs one or two — see the
+ * constants above. Derived from the block's shape for the same reason the tank
+ * is: there is nowhere to write "week 6 is shorter", and deriving it means
+ * every block gets the deload, including ones planned before it existed.
+ */
+export function daysForWeek(days: number, week: number, weeks: number): number {
+    if (!isRestWeek(week, weeks)) return days;
+
+    const kept = days >= REST_TWO_SESSION_CADENCE ? REST_DAYS_MANY : REST_DAYS_FEW;
+
+    // Clamped, so a block with fewer days than the rest week would keep asks
+    // for what it has rather than for a day that does not exist.
+    return Math.min(days, kept);
 }
 
 /** What share of a day's planned sets the rest week keeps. */

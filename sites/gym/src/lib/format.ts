@@ -61,6 +61,18 @@ export function isWarmUpRpe(rpe: number | null): boolean {
 }
 
 /**
+ * The lowest rating a *working* set can carry: the first step above the warm-up
+ * band, on the same half-point scale the slider moves in.
+ *
+ * Exported because a week's target is aimed at this scale, and a target below
+ * this line is a week that prescribes warm-ups — every set of it labelled W,
+ * counted toward nothing, no day ever filling. That is what a full-tank rest
+ * week used to do. Reading the floor off the warm-up rule is what keeps the two
+ * from drifting apart again.
+ */
+export const MIN_WORKING_RPE = MAX_WARM_UP_RPE + 0.5;
+
+/**
  * A week's intensity target in words — "2 reps in the tank", and the singular
  * at one. The same idea the RPE notes above are written in, which is the point:
  * the target and the slider under it should read as the same sentence.
