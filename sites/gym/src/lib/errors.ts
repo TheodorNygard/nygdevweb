@@ -22,9 +22,35 @@ const ERROR_FIXES: Record<string, string> = {
     AADSTS50194: 'The app is not configured as multi-tenant, and the request went to a shared endpoint. AUTHORITY in lib/config ends in /organizations; a single-tenant registration needs the tenant GUID there instead.',
     invalid_grant: 'The cached refresh token was rejected — usually a password change, a revoked session, or a Conditional Access policy that now demands a fresh sign-in. Sign out and sign in again.',
     interaction_required: 'Entra will not issue this token without asking the user something — consent, MFA, or a Conditional Access requirement. The redirect to Entra handles it; if it came back here without a token, try signing in again.',
-    timed_out: 'Silent renewal ran out of time. MSAL renews in a hidden iframe, and the iframe never reported back — usually third-party cookies blocked for login.microsoftonline.com, or a Content-Security-Policy whose frame-src does not admit both Entra and this origin, since the response lands back here on /auth.html. Nothing is wrong with the session: signing in again gets a token without the iframe.',
-    monitor_window_timeout: 'The renewal iframe was navigated but never came back with a response. Same causes as timed_out — blocked third-party cookies, or a CSP that will not let the response land — and the same answer: sign in again, which does it without the iframe.',
+    timed_out: 'MSAL renewed in a hidden iframe and the iframe never reported back — usually third-party cookies blocked for login.microsoftonline.com, or a Content-Security-Policy whose frame-src does not admit both Entra and this origin, since the response lands back here on /auth.html. This app does not renew that way: getToken stops at the refresh token and goes to Entra top-level instead, so seeing this points at a cached bundle older than that change.',
+    monitor_window_timeout: 'The renewal iframe was navigated but never came back with a response. Same causes as timed_out, and the same note: this app does not renew in a frame any more.',
 };
+
+/**
+ * Whether MSAL's own `errorCode` is this one. The field is read defensively —
+ * a failure can arrive as a DOMException or a plain Error, neither of which
+ * has it.
+ */
+function hasCode(error: unknown, code: string): boolean {
+    const actual = typeof error === 'object' && error !== null
+        ? (error as Record<string, unknown>)['errorCode']
+        : undefined;
+
+    return actual === code;
+}
+
+/**
+ * Whether Entra rejected the cached refresh token outright.
+ *
+ * Worth telling apart because MSAL does *not* raise it as an
+ * `InteractionRequiredAuthError` — the token endpoint answered, so it is a
+ * server error — and yet it is the same answer: a password change, a revoked
+ * session or a new Conditional Access rule all want a trip to Entra, and that
+ * trip is what sorts out which.
+ */
+export function isRejectedRefreshToken(error: unknown): boolean {
+    return hasCode(error, 'invalid_grant');
+}
 
 export interface AuthErrorDetail {
     code: string;

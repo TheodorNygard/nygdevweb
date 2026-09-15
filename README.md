@@ -589,8 +589,8 @@ change was a silently ignored property and a sign-in that failed at runtime.
 | Header | Here | Elsewhere | Why |
 | --- | --- | --- | --- |
 | `connect-src` | `login.microsoftonline.com`, `func-nygdev-api.azurewebsites.net`, `nygdevcdn.blob.core.windows.net` | the blob endpoint | Sign-in, the API, and the two CDN files — the exercise library and the built-in day templates. Three origins and no more; an exfiltration path would have to change this file to exist. |
-| `frame-src` | `'self'`, `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal, and it takes both. The frame navigates to Entra first, then Entra redirects it to the redirect URI — which since v5 is this origin's own `/auth.html`. `frame-src` is checked on every navigation the frame makes, not just the first, so Entra on its own gets as far as the authorize call and then blocks the response on the way back. |
-| `frame-ancestors` | `'none'`, but `'self'` on `/auth.html` | `'none'` | The other half of that iframe. Entra redirects it back to the redirect URI, and a blanket `'none'` — with `X-Frame-Options: DENY` alongside it — blocks that even same-origin, which is the same nameless timeout. Relaxed on the bridge page only; the app itself stays unframeable. |
+| `frame-src` | `'self'`, `login.microsoftonline.com` | absent | MSAL's hidden-iframe path for silent renewal, and it takes both. The frame navigates to Entra first, then Entra redirects it to the redirect URI — which since v5 is this origin's own `/auth.html`. `frame-src` is checked on every navigation the frame makes, not just the first, so Entra on its own gets as far as the authorize call and then blocks the response on the way back. **`getToken` no longer takes that path** (see below), so these two directives are now belt-and-braces rather than load-bearing — kept because they cost nothing and are the difference between a working fallback and a nameless timeout if one is ever wanted again. |
+| `frame-ancestors` | `'none'`, but `'self'` on `/auth.html` | `'none'` | The other half of that iframe, and the same note applies. Entra redirects it back to the redirect URI, and a blanket `'none'` — with `X-Frame-Options: DENY` alongside it — blocks that even same-origin, which is the same nameless timeout. Relaxed on the bridge page only; the app itself stays unframeable. |
 | `font-src` | `'self'` | absent | The two self-hosted typefaces. `default-src 'none'` means an unlisted `font-src` is `none`, and the app would silently fall back to system fonts. |
 | `Cross-Origin-Opener-Policy` | `same-origin-allow-popups` | `same-origin` | `same-origin` severs the handle between opener and popup. The app signs in by redirect, so this is not load-bearing today — it is what keeps a popup flow from being a trap if one is ever added. |
 
@@ -624,20 +624,58 @@ knowing on sight are `AADSTS50011` (redirect URI not registered),
 `AADSTS9002326` (registered under Web instead of SPA) and `AADSTS650053` (the
 scope does not exist on the registration — see above).
 
-A token failure that is **not** `InteractionRequiredAuthError` gets a *Sign in
-again* button in the banner rather than a redirect. The distinction is MSAL's
-own. `InteractionRequiredAuthError` is Entra saying *ask the user something* —
-consent, MFA, a Conditional Access rule — so `getToken` answers it by going to
-Entra, which is what was asked for. Everything else is the renewal *mechanism*
-failing rather than the renewal being refused: a third-party cookie blocked for
-`login.microsoftonline.com`, a `frame-src` that will not let the iframe land
-back on `/auth.html`, an iframe that ran out its ten seconds. Retrying the
-silent call cannot fix any of those, and redirecting automatically on one that
-repeats is a page that bounces to Entra and back on a loop — under a thumb
-halfway through logging a set. So the redirect is offered rather than taken:
-`reauthenticate` in `useAuth` runs `acquireTokenRedirect` for the account that
-is already signed in, which gets a token without the iframe. It is not a sign
-out, because the session is not what broke.
+### Silent renewal, and why this app never uses the iframe
+
+Entra caps a SPA's refresh token at **24 hours** and will not extend it. Inside
+that window renewal is a POST to the token endpoint — no frames, no cookies,
+works everywhere. Outside it there is nothing left to redeem, and MSAL's default
+is to fall back to a hidden iframe, which needs a third-party cookie for
+`login.microsoftonline.com`. A logbook is opened at the gym and then not again
+until the next session, so **the 24 hours are up almost every time**: the
+fallback is not an edge case here, it is the ordinary path.
+
+Where the browser blocks that cookie, Entra renders a sign-in page inside the
+hidden frame instead of redirecting it home, nothing ever reaches `/auth.html`,
+and the renewal dies on MSAL's ten-second clock with `timed_out`. No header in
+`staticwebapp.config.json` and no code here can hand that frame a cookie the
+browser has decided not to send — the `frame-src`/`frame-ancestors` pair above
+is necessary for the iframe and nowhere near sufficient. Ten seconds of a blank
+app, then a banner, is the worst version of a failure that was knowable at once.
+
+**And it is knowable at once.** Entra states the refresh token's 24-hour cap on
+the wire as `refresh_token_expires_in`; MSAL stores it on the cache entry, and
+`RefreshTokenClient` compares it *before opening a frame or sending a request*.
+Nothing has to be measured or remembered — the expiry is already written down.
+So `getToken` passes
+`CacheLookupPolicy.AccessTokenAndRefreshToken`, which is cache and refresh token
+only. A session with nothing left to redeem fails in microseconds instead of ten
+seconds, and **the iframe is never opened at all** — on any browser, whatever
+its cookie policy.
+
+What that failure turns into is a trip to Entra, which is the renewal moved
+somewhere it works: at `login.microsoftonline.com` the session cookie is
+first-party during a top-level navigation, so an account still signed in comes
+back without being shown anything, with a fresh token and a fresh refresh token.
+A relog, taken before the user has waited for one.
+
+| Failure | What it means | What `getToken` does |
+| --- | --- | --- |
+| `InteractionRequiredAuthError` | usually `refresh_token_expired` or `no_tokens_found` — a session left overnight. Also Entra wanting consent, MFA or Conditional Access | `acquireTokenRedirect` for the signed-in account |
+| `invalid_grant` | the refresh token was rejected rather than expired: a password change, a revoked session, a new policy. Not an `InteractionRequiredAuthError`, because the token endpoint answered | the same redirect, which is what sorts out whether it can still be silent |
+| anything else | a network failure, a server error, a misconfiguration | the banner, with the `AADSTS` fix where there is one |
+
+`claimRenewalRedirect` in `src/lib/renewal.ts` keeps that from becoming a page
+that bounces to Entra and back on a loop under a thumb halfway through logging a
+set. It allows **one** automatic redirect per five minutes, kept in
+`sessionStorage` so the guard survives the trip to Entra and back. A chain that
+ends in a token hands the attempt back; a chain that comes back and fails
+identically does not get a second one, and falls to the *Sign in again* button
+in the banner — `reauthenticate`, which is the same `acquireTokenRedirect` taken
+deliberately. It is not a sign out, because the session is not what broke.
+
+`timed_out` is therefore a message this app should no longer be able to produce.
+Its entry in `ERROR_FIXES` stays, and now says so: seeing it means the bundle
+being run is older than this change.
 
 The banner shows that failure **ahead of** the read failures rather than behind
 them. Every hook asks for a token before it reads, so a token layer that is
