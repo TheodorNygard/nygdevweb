@@ -22,39 +22,34 @@ const ERROR_FIXES: Record<string, string> = {
     AADSTS50194: 'The app is not configured as multi-tenant, and the request went to a shared endpoint. AUTHORITY in lib/config ends in /organizations; a single-tenant registration needs the tenant GUID there instead.',
     invalid_grant: 'The cached refresh token was rejected — usually a password change, a revoked session, or a Conditional Access policy that now demands a fresh sign-in. Sign out and sign in again.',
     interaction_required: 'Entra will not issue this token without asking the user something — consent, MFA, or a Conditional Access requirement. The redirect to Entra handles it; if it came back here without a token, try signing in again.',
-    timed_out: 'Silent renewal ran out of time. MSAL renews in a hidden iframe, and the iframe never reported back — usually third-party cookies blocked for login.microsoftonline.com, or a Content-Security-Policy whose frame-src does not admit both Entra and this origin, since the response lands back here on /auth.html. The app answers this by renewing top-level instead, where the cookie is first-party; seeing the message means that was tried and did not produce a token either.',
-    monitor_window_timeout: 'The renewal iframe was navigated but never came back with a response. Same causes as timed_out — blocked third-party cookies, or a CSP that will not let the response land — and the same answer: renew top-level rather than in the frame.',
+    timed_out: 'MSAL renewed in a hidden iframe and the iframe never reported back — usually third-party cookies blocked for login.microsoftonline.com, or a Content-Security-Policy whose frame-src does not admit both Entra and this origin, since the response lands back here on /auth.html. This app does not renew that way: getToken stops at the refresh token and goes to Entra top-level instead, so seeing this points at a cached bundle older than that change.',
+    monitor_window_timeout: 'The renewal iframe was navigated but never came back with a response. Same causes as timed_out, and the same note: this app does not renew in a frame any more.',
 };
 
 /**
- * Failures of the renewal *mechanism* rather than refusals of the renewal.
- *
- * Each one is MSAL's hidden iframe not reporting back: it timed out, or it was
- * torn down before it could. Entra was never asked anything it declined — the
- * question never arrived — so the session is very likely still good, and the
- * same round trip taken top-level, where `login.microsoftonline.com` gets its
- * own cookie, usually returns a token without showing the user anything.
- *
- * `monitor_window_timeout` is MSAL v4's name for the same thing and is kept
- * here because a cached bundle can still be the one raising it.
+ * Whether MSAL's own `errorCode` is this one. The field is read defensively —
+ * a failure can arrive as a DOMException or a plain Error, neither of which
+ * has it.
  */
-const IFRAME_MECHANISM_CODES: ReadonlySet<string> = new Set([
-    'timed_out',
-    'monitor_window_timeout',
-    'iframe_closed_prematurely',
-]);
-
-/**
- * Whether this failure is the renewal iframe failing to report, which is the
- * one class of error worth answering with a top-level redirect that MSAL does
- * not raise as an `InteractionRequiredAuthError`.
- */
-export function isIframeRenewalFailure(error: unknown): boolean {
-    const code = typeof error === 'object' && error !== null
+function hasCode(error: unknown, code: string): boolean {
+    const actual = typeof error === 'object' && error !== null
         ? (error as Record<string, unknown>)['errorCode']
         : undefined;
 
-    return typeof code === 'string' && IFRAME_MECHANISM_CODES.has(code);
+    return actual === code;
+}
+
+/**
+ * Whether Entra rejected the cached refresh token outright.
+ *
+ * Worth telling apart because MSAL does *not* raise it as an
+ * `InteractionRequiredAuthError` — the token endpoint answered, so it is a
+ * server error — and yet it is the same answer: a password change, a revoked
+ * session or a new Conditional Access rule all want a trip to Entra, and that
+ * trip is what sorts out which.
+ */
+export function isRejectedRefreshToken(error: unknown): boolean {
+    return hasCode(error, 'invalid_grant');
 }
 
 export interface AuthErrorDetail {

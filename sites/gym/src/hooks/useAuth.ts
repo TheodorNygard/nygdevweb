@@ -9,14 +9,9 @@ import {
 } from '@azure/msal-browser';
 
 import { API_SCOPE, LOGIN_SCOPES } from '../lib/config';
-import { describeAuthError, isIframeRenewalFailure, type AuthErrorDetail } from '../lib/errors';
+import { describeAuthError, isRejectedRefreshToken, type AuthErrorDetail } from '../lib/errors';
 import { REDIRECT_HANDLING, getMsalInstance } from '../lib/msal';
-import {
-    claimRenewalRedirect,
-    iframeRenewalWorthTrying,
-    rememberIframeRenewalFailed,
-    releaseRenewalRedirect,
-} from '../lib/renewal';
+import { claimRenewalRedirect, releaseRenewalRedirect } from '../lib/renewal';
 
 export interface AuthState {
     /** MSAL has initialised and any redirect response has been consumed. */
@@ -198,19 +193,28 @@ export function useAuth(): AuthState & AuthActions {
         // back with a token the next silent call does not find.
         const asking = { scopes: [API_SCOPE], account: current };
 
-        const request: SilentRequest = iframeRenewalWorthTrying()
-            ? { ...asking }
-            : {
-                ...asking,
-                // The iframe has already failed in this browser, and a cookie
-                // policy does not change between two calls. `Default` would
-                // spend ten seconds proving that again on every cold start;
-                // this policy stops after the cache and the refresh token, so
-                // a session with nothing left to redeem fails in milliseconds
-                // and the redirect below happens while the app is still
-                // loading rather than after it has sat there.
-                cacheLookupPolicy: CacheLookupPolicy.AccessTokenAndRefreshToken,
-            };
+        const request: SilentRequest = {
+            ...asking,
+
+            // The whole of the fix, and it is a subtraction.
+            //
+            // `Default` would, once the refresh token is gone, fall back to
+            // renewing in a hidden iframe — which needs a third-party cookie
+            // for `login.microsoftonline.com` and, where the browser withholds
+            // one, hangs for ten seconds before failing with `timed_out`. This
+            // policy stops at the refresh token.
+            //
+            // Stopping there costs nothing, because MSAL is not guessing.
+            // Entra states the refresh token's 24-hour cap on the wire as
+            // `refresh_token_expires_in` and MSAL keeps it on the cache entry,
+            // so a session with nothing left to redeem is known to be one
+            // *before* any frame is opened or any request is sent, and the
+            // call fails in microseconds instead of ten seconds. The catch
+            // below turns that into a trip to Entra, which is the renewal —
+            // top-level, where the cookie is first-party and every browser
+            // sends it.
+            cacheLookupPolicy: CacheLookupPolicy.AccessTokenAndRefreshToken,
+        };
 
         try {
             const result = await pca.acquireTokenSilent(request);
@@ -228,25 +232,27 @@ export function useAuth(): AuthState & AuthActions {
 
             return result.accessToken;
         } catch (cause) {
-            // Two failures are worth answering by going to Entra top-level, and
-            // they are worth telling apart.
+            // Two failures mean the session needs a trip to Entra, and both are
+            // now reached in microseconds rather than after a frame times out.
             //
             // `InteractionRequiredAuthError` is Entra saying *ask the user
-            // something* — consent, MFA, Conditional Access — or MSAL saying
-            // the refresh token is gone. Entra was asked and answered.
+            // something* — consent, MFA, Conditional Access — or, far more
+            // often here, MSAL saying the refresh token is expired or gone,
+            // which is a session left alone overnight and is what every cold
+            // start after a day away looks like.
             //
-            // An iframe that never reported back was never asked: a blocked
-            // third-party cookie for `login.microsoftonline.com` means Entra
-            // rendered a sign-in page inside the hidden frame instead of
-            // redirecting it home, and nothing reached `/auth.html`. Nothing
-            // this app serves can hand that frame a cookie the browser has
-            // withheld — but the same round trip taken top-level gets one,
-            // because there `login.microsoftonline.com` is first-party, and an
-            // account that is still signed in comes back without being shown
-            // anything at all. That is the renewal, moved somewhere it works.
-            const iframeFailed = isIframeRenewalFailure(cause);
-
-            if (iframeFailed) rememberIframeRenewalFailed();
+            // `invalid_grant` is the refresh token rejected rather than
+            // expired: a password change, a revoked session, a policy that
+            // now wants a fresh sign-in. MSAL does not class it as interaction
+            // required, because the token endpoint answered — but going to
+            // Entra is still what sorts it out, and it is what tells a session
+            // that can come back silently from one that has to be signed in.
+            //
+            // Everything else — a network failure, a server error, a
+            // registration that does not match — is recorded and shown,
+            // because Entra is not what would fix it.
+            const needsEntra = cause instanceof InteractionRequiredAuthError
+                || isRejectedRefreshToken(cause);
 
             // A parallel call is already taking the page to Entra over this
             // same expiry. Reporting it again would put a failure on screen
@@ -256,9 +262,8 @@ export function useAuth(): AuthState & AuthActions {
             // One attempt, then the banner. `claimRenewalRedirect` is what
             // keeps "redirect, come back, fail identically, redirect again"
             // from being a page that bounces to Entra on a loop — the reason
-            // this used to be a button for everything but the error above.
-            if ((iframeFailed || cause instanceof InteractionRequiredAuthError)
-                && claimRenewalRedirect()) {
+            // this used to be a button rather than something the app did.
+            if (needsEntra && claimRenewalRedirect()) {
                 renewingRef.current = true;
                 setSigningIn(true);
 
