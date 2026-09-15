@@ -624,20 +624,55 @@ knowing on sight are `AADSTS50011` (redirect URI not registered),
 `AADSTS9002326` (registered under Web instead of SPA) and `AADSTS650053` (the
 scope does not exist on the registration — see above).
 
-A token failure that is **not** `InteractionRequiredAuthError` gets a *Sign in
-again* button in the banner rather than a redirect. The distinction is MSAL's
-own. `InteractionRequiredAuthError` is Entra saying *ask the user something* —
-consent, MFA, a Conditional Access rule — so `getToken` answers it by going to
-Entra, which is what was asked for. Everything else is the renewal *mechanism*
-failing rather than the renewal being refused: a third-party cookie blocked for
-`login.microsoftonline.com`, a `frame-src` that will not let the iframe land
-back on `/auth.html`, an iframe that ran out its ten seconds. Retrying the
-silent call cannot fix any of those, and redirecting automatically on one that
-repeats is a page that bounces to Entra and back on a loop — under a thumb
-halfway through logging a set. So the redirect is offered rather than taken:
-`reauthenticate` in `useAuth` runs `acquireTokenRedirect` for the account that
-is already signed in, which gets a token without the iframe. It is not a sign
-out, because the session is not what broke.
+### Silent renewal, and the iframe that cannot always do it
+
+Entra caps a SPA's refresh token at **24 hours** and will not extend it. Inside
+that window renewal is a POST to the token endpoint — no frames, no cookies,
+works everywhere. Outside it there is nothing left to redeem, and MSAL falls
+back to its hidden iframe, which needs a third-party cookie for
+`login.microsoftonline.com`. A logbook is opened at the gym and then not again
+until the next session, so **the 24 hours are up almost every time**, and the
+iframe is the path that actually runs.
+
+Where the browser blocks that cookie, Entra renders a sign-in page inside the
+hidden frame instead of redirecting it home, nothing ever reaches `/auth.html`,
+and the renewal dies on MSAL's ten-second clock with `timed_out`. No header in
+`staticwebapp.config.json` and no code here can hand that frame a cookie the
+browser has decided not to send — the `frame-src`/`frame-ancestors` pair above
+is necessary for the iframe and nowhere near sufficient.
+
+**The same round trip taken top-level works in every browser.** At
+`login.microsoftonline.com` the session cookie is first-party during a top-level
+navigation, so Entra answers an account that is still signed in without showing
+anything, and the app comes back with a fresh token and a fresh refresh token.
+So `getToken` answers a renewal that *failed* the same way it answers one that
+was *refused* — by going to Entra — and the two are still worth telling apart:
+
+| Failure | What it means | What `getToken` does |
+| --- | --- | --- |
+| `InteractionRequiredAuthError` | Entra was asked and wants something — consent, MFA, Conditional Access — or MSAL has no refresh token left | `acquireTokenRedirect` for the signed-in account |
+| `timed_out`, `monitor_window_timeout`, `iframe_closed_prematurely` | the iframe never reported back; Entra was never asked | the same redirect, plus a note that the iframe does not work here |
+| anything else | a network failure, a server error, a misconfiguration | the banner, with the `AADSTS` fix where there is one |
+
+Two records in `src/lib/renewal.ts` keep that from becoming a page that bounces
+to Entra and back on a loop under a thumb halfway through logging a set.
+
+`claimRenewalRedirect` allows **one** automatic redirect per five minutes, in
+`sessionStorage` so the guard survives the trip to Entra and back. A chain that
+ends in a token hands the attempt back; a chain that comes back and fails
+identically does not get a second one, and falls to the *Sign in again* button
+in the banner — `reauthenticate`, which is the same `acquireTokenRedirect` taken
+deliberately. It is not a sign out, because the session is not what broke.
+
+`iframeRenewalWorthTrying` is the other half, and it is what makes this feel
+like renewal rather than an outage. A cookie policy does not change between two
+calls, so once the iframe has timed out the fact is written to `localStorage`
+and the next silent call passes
+`CacheLookupPolicy.AccessTokenAndRefreshToken` — cache and refresh token only,
+no iframe. A session with nothing left to redeem then fails in milliseconds
+rather than ten seconds, and the redirect happens while the app is still
+loading. The record lapses after a week so a browser whose settings have changed
+is tried again rather than written off forever.
 
 The banner shows that failure **ahead of** the read failures rather than behind
 them. Every hook asks for a token before it reads, so a token layer that is

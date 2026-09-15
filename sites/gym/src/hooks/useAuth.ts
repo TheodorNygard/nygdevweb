@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    CacheLookupPolicy,
     InteractionRequiredAuthError,
     type AccountInfo,
     type AuthenticationResult,
     type IPublicClientApplication,
+    type SilentRequest,
 } from '@azure/msal-browser';
 
 import { API_SCOPE, LOGIN_SCOPES } from '../lib/config';
-import { describeAuthError, type AuthErrorDetail } from '../lib/errors';
+import { describeAuthError, isIframeRenewalFailure, type AuthErrorDetail } from '../lib/errors';
 import { REDIRECT_HANDLING, getMsalInstance } from '../lib/msal';
+import {
+    claimRenewalRedirect,
+    iframeRenewalWorthTrying,
+    rememberIframeRenewalFailed,
+    releaseRenewalRedirect,
+} from '../lib/renewal';
 
 export interface AuthState {
     /** MSAL has initialised and any redirect response has been consumed. */
@@ -25,13 +33,14 @@ export interface AuthActions {
     /**
      * Get a token by going to Entra, for a session that is already signed in.
      *
-     * The way out of a silent renewal that cannot work rather than one that was
-     * refused: a third-party cookie blocked for `login.microsoftonline.com`, a
-     * CSP that will not let the renewal iframe land back on `/auth.html`, an
-     * iframe that timed out. None of those are `InteractionRequiredAuthError`,
-     * so {@link AuthActions.getToken} does not answer them with a redirect of
-     * its own — and repeating the same silent call is the one thing certain not
-     * to help.
+     * {@link AuthActions.getToken} now does this by itself for a renewal that
+     * failed rather than was refused — a blocked third-party cookie, an iframe
+     * that timed out — because top-level is the one place that round trip can
+     * work. This is what is left when that has already been spent and the app
+     * still has no token: the automatic attempt takes itself out of the way
+     * after one try, on purpose, and what remains is a button rather than a
+     * page that bounces to Entra and back under a thumb halfway through logging
+     * a set.
      */
     reauthenticate: () => void;
 
@@ -57,6 +66,12 @@ export function useAuth(): AuthState & AuthActions {
     // the account value would rebuild the API client on every sign-in and
     // restart every screen's data load with it.
     const accountRef = useRef<AccountInfo | null>(null);
+
+    // Whether a renewal redirect is already taking this page to Entra. Every
+    // screen's hooks ask for a token before they read, so a renewal that has
+    // come due fails three or four calls at once — and all but the first are
+    // reporting something that is already being handled.
+    const renewingRef = useRef(false);
 
     const adopt = useCallback((pca: IPublicClientApplication, next: AccountInfo) => {
         pca.setActiveAccount(next);
@@ -107,6 +122,7 @@ export function useAuth(): AuthState & AuthActions {
 
         setError(null);
         setSigningIn(true);
+        releaseRenewalRedirect();
 
         // Redirect rather than popup: an iOS home-screen app has no popup to
         // open. The API scope rides along with the sign-in scopes so one round
@@ -144,6 +160,11 @@ export function useAuth(): AuthState & AuthActions {
         setError(null);
         setSigningIn(true);
 
+        // A sign-in the user asked for supersedes whatever the app tried on its
+        // own, so it hands back the automatic attempt rather than spending the
+        // cooldown standing between the next expiry and a renewal.
+        releaseRenewalRedirect();
+
         const scopes = [...LOGIN_SCOPES, API_SCOPE];
 
         // Not a sign-out and back in, which is what the Plan tab's button does
@@ -172,7 +193,24 @@ export function useAuth(): AuthState & AuthActions {
 
         if (!current) throw new Error('No signed-in account.');
 
-        const request = { scopes: [API_SCOPE], account: current };
+        // The same ask, either silently or by going there. Named once because
+        // the two have to agree: a redirect for different scopes would come
+        // back with a token the next silent call does not find.
+        const asking = { scopes: [API_SCOPE], account: current };
+
+        const request: SilentRequest = iframeRenewalWorthTrying()
+            ? { ...asking }
+            : {
+                ...asking,
+                // The iframe has already failed in this browser, and a cookie
+                // policy does not change between two calls. `Default` would
+                // spend ten seconds proving that again on every cold start;
+                // this policy stops after the cache and the refresh token, so
+                // a session with nothing left to redeem fails in milliseconds
+                // and the redirect below happens while the app is still
+                // loading rather than after it has sat there.
+                cacheLookupPolicy: CacheLookupPolicy.AccessTokenAndRefreshToken,
+            };
 
         try {
             const result = await pca.acquireTokenSilent(request);
@@ -183,21 +221,57 @@ export function useAuth(): AuthState & AuthActions {
             // already null, so this costs nothing on the ordinary path.
             setError(null);
 
+            // The chain that may have redirected to get here ended in a token,
+            // so it was a renewal and not a loop. Hand the attempt back for the
+            // next expiry.
+            releaseRenewalRedirect();
+
             return result.accessToken;
         } catch (cause) {
-            // InteractionRequiredAuthError is how Entra says "ask the user
-            // something" — consent, MFA, Conditional Access, or an expired
-            // refresh token. It is the one failure worth answering with a
-            // redirect *of its own*: the server asked, so going there answers
-            // it. Anything else is recorded and shown, and the redirect is
-            // offered as a button instead — see `reauthenticate`. A failure
-            // that repeats would otherwise navigate to Entra and back on a
-            // loop, and it would do it under a thumb halfway through logging a
-            // set.
-            if (cause instanceof InteractionRequiredAuthError) {
-                // Does not return: the browser navigates away and the app
-                // reloads into handleRedirectPromise above.
-                await pca.acquireTokenRedirect(request);
+            // Two failures are worth answering by going to Entra top-level, and
+            // they are worth telling apart.
+            //
+            // `InteractionRequiredAuthError` is Entra saying *ask the user
+            // something* — consent, MFA, Conditional Access — or MSAL saying
+            // the refresh token is gone. Entra was asked and answered.
+            //
+            // An iframe that never reported back was never asked: a blocked
+            // third-party cookie for `login.microsoftonline.com` means Entra
+            // rendered a sign-in page inside the hidden frame instead of
+            // redirecting it home, and nothing reached `/auth.html`. Nothing
+            // this app serves can hand that frame a cookie the browser has
+            // withheld — but the same round trip taken top-level gets one,
+            // because there `login.microsoftonline.com` is first-party, and an
+            // account that is still signed in comes back without being shown
+            // anything at all. That is the renewal, moved somewhere it works.
+            const iframeFailed = isIframeRenewalFailure(cause);
+
+            if (iframeFailed) rememberIframeRenewalFailed();
+
+            // A parallel call is already taking the page to Entra over this
+            // same expiry. Reporting it again would put a failure on screen
+            // that is being handled, on a page that is navigating away.
+            if (renewingRef.current) throw cause;
+
+            // One attempt, then the banner. `claimRenewalRedirect` is what
+            // keeps "redirect, come back, fail identically, redirect again"
+            // from being a page that bounces to Entra on a loop — the reason
+            // this used to be a button for everything but the error above.
+            if ((iframeFailed || cause instanceof InteractionRequiredAuthError)
+                && claimRenewalRedirect()) {
+                renewingRef.current = true;
+                setSigningIn(true);
+
+                // Does not return when it works: the browser navigates away and
+                // the app reloads into handleRedirectPromise above. When it
+                // does not — an interaction already in progress, a navigation
+                // blocked — the attempt goes back so the button can use it.
+                await pca.acquireTokenRedirect({ ...asking }).catch((failure: unknown) => {
+                    renewingRef.current = false;
+                    releaseRenewalRedirect();
+                    setSigningIn(false);
+                    setError(describeAuthError(failure));
+                });
 
                 throw cause;
             }
