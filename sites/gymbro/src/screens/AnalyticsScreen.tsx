@@ -5,10 +5,6 @@ interface AnalyticsScreenProps {
     series: LiftSeries[];
     selected: string | null;
     onSelect: (name: string) => void;
-
-    /** Sessions read so far, out of how many the block holds. */
-    done: number;
-    total: number;
     loading: boolean;
 }
 
@@ -45,8 +41,6 @@ export function AnalyticsScreen({
     series,
     selected,
     onSelect,
-    done,
-    total,
     loading,
 }: AnalyticsScreenProps) {
     const lift = series.find((one) => one.name === selected) ?? series[0] ?? null;
@@ -86,7 +80,7 @@ export function AnalyticsScreen({
                     <span className="panel__label">PROGRESSION</span>
                     <p className="empty" style={{ paddingLeft: 0 }}>
                         {loading
-                            ? `Reading sessions — ${done} of ${total}.`
+                            ? 'Reading the block…'
                             : 'Nothing submitted in this block yet. A chart needs sets, and sets '
                                 + 'come from the phone.'}
                     </p>
@@ -203,7 +197,7 @@ export function AnalyticsScreen({
                     <div className="panel__head">
                         <span className="panel__label">EVERY LOGGED SESSION</span>
                         {loading ? (
-                            <span className="progress-note">{`reading ${done}/${total}`}</span>
+                            <span className="progress-note">reading…</span>
                         ) : null}
                     </div>
 

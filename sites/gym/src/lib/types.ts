@@ -59,6 +59,22 @@ export interface SessionSummary {
 }
 
 /**
+ * The same summary with the sets left on it — `GET /gym/workouts?include=entries`.
+ *
+ * A separate type rather than an optional field on the summary above, because
+ * the key is present exactly when it was asked for: a screen holding one of
+ * these knows it has the sets, and the block map cannot accidentally read a
+ * `?.entries` that is never populated for it.
+ *
+ * The API derives every total by walking these, so including them costs the
+ * bytes and nothing else. That is what makes charting a block one call rather
+ * than one call per session — see `hooks/useWorkouts` in the planner.
+ */
+export interface SessionDetail extends SessionSummary {
+    entries: SessionEntry[];
+}
+
+/**
  * One exercise a day prescribes: a name and a number of sets.
  *
  * Deliberately no target weight and — since reps stopped being planned — no
