@@ -7,6 +7,7 @@ import type { LastSets } from '../hooks/useLastSets';
 import {
     completesTarget,
     isRestWeek,
+    plannedFor,
     repsInTank,
     setsForWeek,
     workingSetCount,
@@ -205,30 +206,12 @@ export function SessionScreen({
     const targetRpe = rpeForTank(tank);
 
     /**
-     * The target for one entry, or none. By position first, because a seeded
-     * session's entries are the plan in order and exercises are only appended.
-     * The name check keeps that position from being trusted blindly; the name
-     * lookup behind it covers a planned exercise that ended up out of order.
-     */
-    function targetFor(entryIndex: number): PlannedExercise | undefined {
-        const entry = workout.entries[entryIndex];
-
-        if (!entry) return undefined;
-
-        const positional = plan[entryIndex];
-
-        if (positional && positional.exerciseName === entry.exerciseName) return positional;
-
-        return plan.find((planned) => planned.exerciseName === entry.exerciseName);
-    }
-
-    /**
      * How many sets this week wants of one entry, or none if it is not planned.
      * The plan's count in a training week; half of it in the rest week, which
      * is the whole of what the deload changes — same exercises, less of them.
      */
     function targetSetsFor(entryIndex: number): number | undefined {
-        const target = targetFor(entryIndex);
+        const target = plannedFor(plan, workout.entries, entryIndex);
 
         return target ? setsForWeek(target.sets, workout.week, weeks) : undefined;
     }

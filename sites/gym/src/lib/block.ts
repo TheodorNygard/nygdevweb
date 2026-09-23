@@ -1,5 +1,12 @@
 import { isWarmUpRpe } from './format';
-import type { CurrentBlock, Mesocycle, SessionSummary, WorkSet } from './types';
+import type {
+    CurrentBlock,
+    Mesocycle,
+    PlannedExercise,
+    SessionEntry,
+    SessionSummary,
+    WorkSet,
+} from './types';
 
 /**
  * The sessions filed against one cell of the block map, newest first.
@@ -271,4 +278,27 @@ export function setsForWeek(planned: number, week: number, weeks: number): numbe
     if (!isRestWeek(week, weeks)) return planned;
 
     return Math.max(1, Math.ceil(planned * REST_SET_SHARE));
+}
+
+/**
+ * The planned exercise behind one entry of a session, or none. By position
+ * first, because a seeded session's entries are the plan in order and
+ * exercises are only appended. The name check keeps that position from being
+ * trusted blindly; the name lookup behind it covers a planned exercise that
+ * ended up out of order.
+ */
+export function plannedFor(
+    plan: readonly PlannedExercise[],
+    entries: readonly SessionEntry[],
+    entryIndex: number,
+): PlannedExercise | undefined {
+    const entry = entries[entryIndex];
+
+    if (!entry) return undefined;
+
+    const positional = plan[entryIndex];
+
+    if (positional && positional.exerciseName === entry.exerciseName) return positional;
+
+    return plan.find((planned) => planned.exerciseName === entry.exerciseName);
 }

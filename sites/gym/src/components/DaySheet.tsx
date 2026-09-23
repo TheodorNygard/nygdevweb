@@ -1,13 +1,23 @@
 import { useState } from 'react';
 
 import { Sheet } from './Sheet';
+import { plannedFor, setsForWeek } from '../lib/block';
 import { kg, num, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
-import type { SessionSummary, Workout } from '../lib/types';
+import type { PlannedExercise, SessionSummary, Workout } from '../lib/types';
 
 interface DaySheetProps {
     week: number;
     dayIndex: number;
     label: string;
+
+    /**
+     * What this day prescribes, and how long its block is — which together are
+     * what a day with nothing logged yet has to show. Without them the sheet
+     * over an untouched day is a row of zeroes, while the draft Start is about
+     * to seed from this very plan would show every exercise.
+     */
+    plan: PlannedExercise[];
+    weeks: number;
 
     /** Everything filed against this cell, newest first. Often one; sometimes not. */
     sessions: SessionSummary[];
@@ -52,6 +62,8 @@ export function DaySheet({
     week,
     dayIndex,
     label,
+    plan,
+    weeks,
     sessions,
     selectedId,
     detail,
@@ -80,11 +92,27 @@ export function DaySheet({
             { key: 'AVG RPE', value: rpeLabel(selected.avgRpe) },
         ]
         : [
-            { key: 'STATUS', value: '—' },
-            { key: 'SETS', value: '0' },
+            { key: 'EXERCISES', value: String(plan.length) },
+            {
+                key: 'PLANNED SETS',
+                value: String(plan.reduce(
+                    (total, planned) => total + setsForWeek(planned.sets, week, weeks),
+                    0,
+                )),
+            },
         ];
 
     const lines = detail?.id === selected?.id ? detail?.entries ?? [] : [];
+
+    /**
+     * What an exercise with nothing logged against it is asked for. Today that
+     * is the plan's count for this week; it is also the one place a
+     * recommendation from the backend will replace it, so the untouched day and
+     * the empty draft both read from here.
+     */
+    function setsAsked(planned: PlannedExercise | undefined): string {
+        return planned ? `${setsForWeek(planned.sets, week, weeks)} sets planned` : 'no sets';
+    }
 
     return (
         <Sheet label={`Week ${week}, ${label}`} onClose={onClose}>
@@ -116,7 +144,7 @@ export function DaySheet({
                         const first = entry.sets[0];
                         const detailText = first
                             ? `${entry.sets.length} × ${num(first.reps)} · ${num(first.weightKg)}kg`
-                            : 'no sets';
+                            : setsAsked(plannedFor(plan, lines, index));
 
                         return (
                             <div className="line" key={`${entry.exerciseName}-${index}`}>
@@ -126,6 +154,23 @@ export function DaySheet({
                         );
                     })}
                 </div>
+            ) : null}
+
+            {!selected && plan.length > 0 ? (
+                <div className="lines">
+                    {plan.map((planned, index) => (
+                        <div className="line" key={`${planned.exerciseName}-${index}`}>
+                            <span className="line__name">{planned.exerciseName}</span>
+                            <span className="line__detail">{setsAsked(planned)}</span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {!selected && plan.length === 0 ? (
+                <p className="empty">
+                    Nothing planned for this day — add exercises as you go.
+                </p>
             ) : null}
 
             {selected && loading && lines.length === 0 ? (
