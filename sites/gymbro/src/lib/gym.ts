@@ -67,6 +67,7 @@ export type {
     Mesocycle,
     MesocycleSummary,
     PlannedExercise,
+    SessionDetail,
     SessionEntry,
     SessionSummary,
     Workout,

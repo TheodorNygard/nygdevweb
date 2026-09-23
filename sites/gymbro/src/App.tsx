@@ -117,19 +117,26 @@ export function App() {
         : 1;
 
     // Only Analytics pays for the sessions themselves, and only while it is
-    // open. Submitted ones alone: a draft is a workout in progress, and a lift
-    // chart that dipped three sets into every session would report the clock.
+    // open — one call for the whole block, rather than one per session. The ids
+    // are passed so a session logged on the phone since is noticed; the read is
+    // the block's, not theirs. Submitted ones alone: a draft is a workout in
+    // progress, and a lift chart that dipped three sets into every session
+    // would report the clock.
     const analyticsIds = view === 'stats'
         ? blockSessions
             .filter((session) => session.status === 'submitted')
             .map((session) => session.id)
         : NO_IDS;
 
-    const workouts = useWorkouts(api, analyticsIds);
+    const workouts = useWorkouts(
+        api,
+        view === 'stats' ? selectedId : null,
+        analyticsIds,
+    );
 
     const series = useMemo(
-        () => seriesOf(workouts.workouts, blockSessions, sessionDateLabel),
-        [workouts.workouts, blockSessions],
+        () => seriesOf(workouts.sessions, sessionDateLabel),
+        [workouts.sessions],
     );
 
     const describe = useCallback(
@@ -367,8 +374,6 @@ export function App() {
                             series={series}
                             selected={lift}
                             onSelect={setLift}
-                            done={workouts.done}
-                            total={workouts.total}
                             loading={workouts.loading}
                         />
                     )}

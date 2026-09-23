@@ -10,6 +10,7 @@ import type {
     PlannedExercise,
     RemoveEntryResult,
     RemoveSetResult,
+    SessionDetail,
     SessionSummary,
     SetResult,
     StartedWorkout,
@@ -330,6 +331,25 @@ export class GymApi {
         const body = await this.send<{ sessions: SessionSummary[] }>({
             method: 'GET',
             path: `/gym/workouts${query}`,
+        });
+
+        return body.sessions;
+    }
+
+    /**
+     * The same list with every session's sets on it, in one call.
+     *
+     * For the one question a summary cannot answer: which exercise a session's
+     * volume came from. The API reads the sets to derive the totals either way,
+     * so asking for them back costs the bytes rather than a second read — where
+     * fetching each session with `workout()` would be a round trip and a point
+     * read per session, up to forty-eight of them for one block.
+     */
+    async sessionDetails(mesoId?: string): Promise<SessionDetail[]> {
+        const block = mesoId ? `mesoId=${encodeURIComponent(mesoId)}&` : '';
+        const body = await this.send<{ sessions: SessionDetail[] }>({
+            method: 'GET',
+            path: `/gym/workouts?${block}include=entries`,
         });
 
         return body.sessions;

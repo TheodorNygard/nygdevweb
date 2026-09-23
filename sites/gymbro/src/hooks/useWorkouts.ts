@@ -1,79 +1,90 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { type GymApi, type Workout } from '../lib/gym';
-
-/**
- * How many session reads are in flight at once.
- *
- * A block is up to forty-eight cells and each one is a call, so this is the
- * difference between a browser queueing them six at a time on its own terms
- * and the app deciding. Six is what a browser would do to one origin anyway;
- * naming it here is what makes the progress count move steadily rather than in
- * one jump at the end.
- */
-const CONCURRENCY = 6;
+import { type GymApi, type SessionDetail } from '../lib/gym';
 
 export interface WorkoutsState {
-    /** Every session read so far, in no particular order. */
-    workouts: Workout[];
-
-    /** How many of `ids` have landed, and how many were asked for. */
-    done: number;
-    total: number;
+    /** Every session in the block, sets and all, newest first. */
+    sessions: SessionDetail[];
 
     loading: boolean;
     error: string | null;
 }
 
 /**
- * The full sessions behind a list of ids — sets and all.
+ * Every session in a block with its sets, in one call.
  *
- * The expensive read on this site, and the only one that is. Nothing on
- * `GET /gym/workouts` carries which exercise a session's volume came from, so
- * a chart of one lift over a block needs every session in it opened
- * individually. That is why Analytics is a view you navigate to rather than a
- * panel on the Dashboard: the cost is paid when the question is asked.
+ * Analytics is the one view that needs the sets themselves: nothing on a
+ * session's totals says which exercise the volume came from, so a chart of one
+ * lift across a block cannot be drawn from the block map alone.
  *
- * Read once per session id and then held, so switching lifts, or leaving the
- * view and coming back, costs nothing. Sessions are immutable once submitted,
- * which is what makes holding them safe — a reload of the block's summaries
- * brings new ids, and only those are fetched.
+ * It used to be drawn by opening each session in turn — up to forty-eight
+ * round trips, six at a time, with the count on screen while it ran. That was
+ * forty-eight point reads for sets the block map's own query had already read:
+ * `GET /gym/workouts` projects `c.entries` whatever it is asked for, because
+ * volume and average RPE are derived rather than stored and deriving them means
+ * walking every set. `?include=entries` simply keeps them on the answer, so the
+ * whole block now costs the one query that was already being run, plus the
+ * bytes. There is no progress to report any more, which is why nothing here
+ * counts.
+ *
+ * Read once per block and then held, so switching lifts, or leaving the view
+ * and coming back, costs nothing. The held copy is keyed on the ids the block
+ * map is showing as well as on the block: a session logged on the phone since
+ * changes that key, and is read rather than missed.
  */
-export function useWorkouts(api: GymApi | null, ids: readonly string[]): WorkoutsState {
-    const [workouts, setWorkouts] = useState<Workout[]>([]);
-    const [done, setDone] = useState(0);
+export function useWorkouts(
+    api: GymApi | null,
+    mesoId: string | null,
+    ids: readonly string[],
+): WorkoutsState {
+    const [sessions, setSessions] = useState<SessionDetail[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Held across renders and read from inside the effect, so an id already
-    // fetched is not fetched again when the list it arrived in changes.
-    const held = useRef(new Map<string, Workout>());
+    // What the held copy is a copy of. Held across renders rather than in
+    // state, because it is read inside the effect to decide whether to run —
+    // putting it in state would make setting it re-run this.
+    const held = useRef<string | null>(null);
 
     useEffect(() => {
-        held.current = new Map();
-        setWorkouts([]);
+        held.current = null;
+        setSessions([]);
     }, [api]);
 
-    // `ids` is rebuilt by the caller on every render, so the effect keys off
-    // its content rather than its identity — and reads the content back out of
-    // that key, so the dependency list is the whole of what the effect uses.
-    // Session ids are `session_YYYY-MM-DD[_n]`, which carries no comma.
-    const key = ids.join(',');
+    // What this would be reading, or null when there is nothing to read: the
+    // view is closed, or the block has nothing submitted in it.
+    //
+    // `ids` is rebuilt by the caller on every render, so the key is its content
+    // rather than its identity. Session ids are `session_YYYY-MM-DD[_n]`, which
+    // carries no comma.
+    const key = mesoId === null || ids.length === 0
+        ? null
+        : `${mesoId}:${ids.join(',')}`;
 
     useEffect(() => {
         if (!api) return;
 
-        const all = key === '' ? [] : key.split(',');
-        const wanted = all.filter((id) => !held.current.has(id));
-
-        setDone(all.length - wanted.length);
-
-        if (wanted.length === 0) {
-            setWorkouts([...held.current.values()]);
+        // The view is closed. What was read stays in hand, so opening it again
+        // on the same block draws immediately.
+        if (mesoId === null) {
             setLoading(false);
 
             return;
         }
+
+        // The block being looked at has nothing submitted in it, so there is
+        // nothing to read and nothing to draw — and what the last block left
+        // behind must not be what is drawn instead.
+        if (ids.length === 0) {
+            setLoading(false);
+            setError(null);
+            held.current = null;
+            setSessions([]);
+
+            return;
+        }
+
+        if (held.current === key) return;
 
         let cancelled = false;
 
@@ -81,51 +92,31 @@ export function useWorkouts(api: GymApi | null, ids: readonly string[]): Workout
         setError(null);
 
         void (async () => {
-            let next = 0;
+            try {
+                // `mesoId` rather than the current block: this view reads the
+                // block that is selected, which is not always the one being
+                // trained.
+                const read = await api.sessionDetails(mesoId);
 
-            // A fixed pool of workers pulling from one cursor, rather than
-            // chunks: a slow session in one chunk would otherwise hold up the
-            // five beside it.
-            const worker = async (): Promise<void> => {
-                for (;;) {
-                    const index = next;
+                if (cancelled) return;
 
-                    next += 1;
+                held.current = key;
+                setSessions(read);
+            } catch (cause) {
+                if (cancelled) return;
 
-                    const id = wanted[index];
-
-                    if (id === undefined || cancelled) return;
-
-                    try {
-                        const workout = await api.workout(id);
-
-                        held.current.set(id, workout);
-                    } catch (cause) {
-                        // One unreadable session should not cost the chart the
-                        // other twenty-three. The message is kept and the
-                        // series is drawn from what did arrive, which the view
-                        // says out loud.
-                        if (!cancelled) {
-                            setError(cause instanceof Error ? cause.message : String(cause));
-                        }
-                    }
-
-                    if (cancelled) return;
-
-                    setDone((count) => count + 1);
-                    setWorkouts([...held.current.values()]);
-                }
-            };
-
-            await Promise.all(
-                Array.from({ length: Math.min(CONCURRENCY, wanted.length) }, worker),
-            );
-
-            if (!cancelled) setLoading(false);
+                // The chart draws nothing rather than something partial: this
+                // is one call, so a failure is the whole block rather than the
+                // one session it used to be.
+                setSessions([]);
+                setError(cause instanceof Error ? cause.message : String(cause));
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         })();
 
         return () => { cancelled = true; };
-    }, [api, key]);
+    }, [api, key, mesoId]);
 
-    return { workouts, done, total: ids.length, loading, error };
+    return { sessions, loading, error };
 }

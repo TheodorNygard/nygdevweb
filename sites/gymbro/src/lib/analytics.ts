@@ -1,4 +1,4 @@
-import { type SessionSummary, type Workout } from './gym';
+import { type SessionDetail } from './gym';
 
 /**
  * One exercise on one day: the heaviest set that was logged, and what the
@@ -30,34 +30,28 @@ export interface LiftSeries {
 /**
  * Every exercise that was actually lifted, with its progression, newest last.
  *
- * Built from full workouts rather than from the summaries the block list
- * carries: a summary has totals and nothing about which exercise they came
- * from, so nothing short of the sets themselves can answer this. That is the
- * cost the Analytics view pays and the reason it is a view of its own rather
- * than a panel on the dashboard — see `useWorkouts`.
+ * Built from sessions read with their sets on them, because a summary has
+ * totals and nothing about which exercise they came from — nothing short of the
+ * sets themselves can answer this. They arrive in the block's own list rather
+ * than a session at a time; see `useWorkouts` for what that replaced.
  *
  * Only submitted sessions count. A draft is a workout in progress, and a lift
  * chart that dipped every time somebody was three sets into a session would be
  * reporting the clock rather than the training.
  */
 export function seriesOf(
-    workouts: readonly Workout[],
-    summaries: readonly SessionSummary[],
+    sessions: readonly SessionDetail[],
     dateOf: (sessionId: string) => string,
 ): LiftSeries[] {
-    const submitted = new Set(
-        summaries.filter((one) => one.status === 'submitted').map((one) => one.id),
-    );
-
     const byName = new Map<string, LiftPoint[]>();
 
     // Oldest first, so a series comes out in the order the chart draws it.
-    const ordered = [...workouts]
-        .filter((workout) => submitted.has(workout.id))
+    const ordered = [...sessions]
+        .filter((session) => session.status === 'submitted')
         .sort((a, b) => a.id.localeCompare(b.id));
 
-    for (const workout of ordered) {
-        for (const entry of workout.entries) {
+    for (const session of ordered) {
+        for (const entry of session.entries) {
             let top: { weightKg: number; reps: number } | null = null;
             let rpeTotal = 0;
             let rpeCount = 0;
@@ -84,13 +78,13 @@ export function seriesOf(
             const points = byName.get(entry.exerciseName) ?? [];
 
             points.push({
-                sessionId: workout.id,
-                date: dateOf(workout.id),
+                sessionId: session.id,
+                date: dateOf(session.id),
                 weightKg: top.weightKg,
                 reps: top.reps,
                 sets: entry.sets.length,
                 rpe: rpeCount === 0 ? null : Math.round((rpeTotal / rpeCount) * 10) / 10,
-                week: workout.week,
+                week: session.week,
             });
 
             byName.set(entry.exerciseName, points);

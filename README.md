@@ -800,7 +800,7 @@ this block** button for when moving the phone is what you meant.
 *is* switching on this API — so the planner says so in a banner rather than
 letting the phone quietly move under you.
 
-### One read, and one expensive one
+### One read, and one more for the chart
 
 The planner opens on `GET /gym/mesocycles` alone. That call already carries
 every block in full — weeks, days, and the plan hanging off each day — plus
@@ -809,13 +809,24 @@ second time. Sessions are read per block, when a block is looked at, and then
 held: they come from a phone that is not being used while a plan is being
 written at a desk.
 
-Analytics is the exception and pays for it openly. Nothing on
-`GET /gym/workouts` says which exercise a session's volume came from, so a chart
-of one lift over a block needs every session in it opened individually — up to
-forty-eight reads, six at a time, with the count on screen while it runs. That
-is why it is a view you navigate to rather than a panel on the Dashboard: the
-cost is paid when the question is asked, and the answers are held for the rest
-of the sign-in.
+Analytics needs one thing more, and asks for it in one call. Nothing on a
+session's totals says which exercise the volume came from, so a chart of one
+lift over a block needs the sets themselves — `GET
+/gym/workouts?mesoId=…&include=entries`, which is the block list it already
+reads with the entries left on it.
+
+That parameter costs the API nothing to honour. The route reads `c.entries`
+whichever way it is called, because volume and average RPE are derived rather
+than stored and deriving them means walking every set; `include` only decides
+whether they are dropped on the way out. This view used to open each session
+individually instead — up to forty-eight round trips, six at a time, with the
+count on screen while it ran, and forty-eight point reads for sets the block's
+own query had already read.
+
+It is still a view you navigate to rather than a panel on the Dashboard, and
+the answers are still held for the rest of the sign-in — but what is being put
+off is now one call rather than forty-eight, and there is no progress to report
+while it runs.
 
 What it charts is the **heaviest set actually logged** — `95 kg × 3` — not an
 estimated one-rep max. A number nobody has put on a bar is a poor thing to plan
