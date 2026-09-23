@@ -638,6 +638,8 @@ export function App() {
                     week={openDay.week}
                     dayIndex={openDay.dayIndex}
                     label={dayLabel(openDay.block ?? meso, openDay.dayIndex)}
+                    plan={(openDay.block ?? meso)?.days[openDay.dayIndex]?.plan ?? []}
+                    weeks={(openDay.block ?? meso)?.weeks ?? openDay.week}
                     sessions={cell}
                     selectedId={daySessionId}
                     detail={dayDetail}

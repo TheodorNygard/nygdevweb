@@ -1,13 +1,23 @@
 import { useState } from 'react';
 
 import { Sheet } from './Sheet';
+import { setsForWeek } from '../lib/block';
 import { kg, num, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
-import type { SessionSummary, Workout } from '../lib/types';
+import type { PlannedExercise, SessionSummary, Workout } from '../lib/types';
 
 interface DaySheetProps {
     week: number;
     dayIndex: number;
     label: string;
+
+    /**
+     * What this day prescribes, and how long its block is — which together are
+     * what a day with nothing logged yet has to show. Without them the sheet
+     * over an untouched day is a row of zeroes, while the draft Start is about
+     * to seed from this very plan would show every exercise.
+     */
+    plan: PlannedExercise[];
+    weeks: number;
 
     /** Everything filed against this cell, newest first. Often one; sometimes not. */
     sessions: SessionSummary[];
@@ -52,6 +62,8 @@ export function DaySheet({
     week,
     dayIndex,
     label,
+    plan,
+    weeks,
     sessions,
     selectedId,
     detail,
@@ -80,8 +92,14 @@ export function DaySheet({
             { key: 'AVG RPE', value: rpeLabel(selected.avgRpe) },
         ]
         : [
-            { key: 'STATUS', value: '—' },
-            { key: 'SETS', value: '0' },
+            { key: 'EXERCISES', value: String(plan.length) },
+            {
+                key: 'PLANNED SETS',
+                value: String(plan.reduce(
+                    (total, planned) => total + setsForWeek(planned.sets, week, weeks),
+                    0,
+                )),
+            },
         ];
 
     const lines = detail?.id === selected?.id ? detail?.entries ?? [] : [];
@@ -126,6 +144,25 @@ export function DaySheet({
                         );
                     })}
                 </div>
+            ) : null}
+
+            {!selected && plan.length > 0 ? (
+                <div className="lines">
+                    {plan.map((planned, index) => (
+                        <div className="line" key={`${planned.exerciseName}-${index}`}>
+                            <span className="line__name">{planned.exerciseName}</span>
+                            <span className="line__detail">
+                                {setsForWeek(planned.sets, week, weeks)} sets
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {!selected && plan.length === 0 ? (
+                <p className="empty">
+                    Nothing planned for this day — add exercises as you go.
+                </p>
             ) : null}
 
             {selected && loading && lines.length === 0 ? (
