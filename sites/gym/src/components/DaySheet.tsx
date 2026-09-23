@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Sheet } from './Sheet';
-import { setsForWeek } from '../lib/block';
+import { plannedFor, setsForWeek } from '../lib/block';
 import { kg, num, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
 import type { PlannedExercise, SessionSummary, Workout } from '../lib/types';
 
@@ -104,6 +104,16 @@ export function DaySheet({
 
     const lines = detail?.id === selected?.id ? detail?.entries ?? [] : [];
 
+    /**
+     * What an exercise with nothing logged against it is asked for. Today that
+     * is the plan's count for this week; it is also the one place a
+     * recommendation from the backend will replace it, so the untouched day and
+     * the empty draft both read from here.
+     */
+    function setsAsked(planned: PlannedExercise | undefined): string {
+        return planned ? `${setsForWeek(planned.sets, week, weeks)} sets planned` : 'no sets';
+    }
+
     return (
         <Sheet label={`Week ${week}, ${label}`} onClose={onClose}>
             <div className="sheet__eyebrow">WEEK {week} · DAY {dayIndex + 1}</div>
@@ -134,7 +144,7 @@ export function DaySheet({
                         const first = entry.sets[0];
                         const detailText = first
                             ? `${entry.sets.length} × ${num(first.reps)} · ${num(first.weightKg)}kg`
-                            : 'no sets';
+                            : setsAsked(plannedFor(plan, lines, index));
 
                         return (
                             <div className="line" key={`${entry.exerciseName}-${index}`}>
@@ -151,9 +161,7 @@ export function DaySheet({
                     {plan.map((planned, index) => (
                         <div className="line" key={`${planned.exerciseName}-${index}`}>
                             <span className="line__name">{planned.exerciseName}</span>
-                            <span className="line__detail">
-                                {setsForWeek(planned.sets, week, weeks)} sets
-                            </span>
+                            <span className="line__detail">{setsAsked(planned)}</span>
                         </div>
                     ))}
                 </div>
