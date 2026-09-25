@@ -343,11 +343,13 @@ so the confirmation *is* the safety mechanism:
 
 - two taps, the second a different button;
 - the button names the count (`sessionCount` comes down with the list);
-- and it stays **disabled until the volume has been read**, through
-  `GET /gym/workouts?mesoId=`, so the confirmation can never understate what it
-  is about to take. A failed volume read leaves it disabled, which is the right
-  failure — a cascade should not be confirmable against a number nobody could
-  read.
+- and it stays **disabled until the volume is in hand**, so the confirmation
+  can never understate what it is about to take. For the block being trained
+  that is immediate — Today already holds its sessions — and for any block
+  History has opened likewise. A block nothing has read is fetched through
+  `GET /gym/workouts?mesoId=`, and a failed read leaves the button disabled,
+  which is the right failure: a cascade should not be confirmable against a
+  number nobody could read.
 
 The list is its own hook rather than part of `useBlock`. That one reloads after
 every submitted session and every back-out of the logging screen; sharing a
