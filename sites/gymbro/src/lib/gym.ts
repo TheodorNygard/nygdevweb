@@ -45,6 +45,10 @@ export { useAuth, type AuthActions, type AuthState } from '@gym/hooks/useAuth';
 
 export { useLibrary } from '@gym/hooks/useLibrary';
 
+export { useTheme } from '@gym/hooks/useTheme';
+
+export { applyTheme, readTheme, THEMES, type Theme } from '@gym/lib/theme';
+
 export { useResource, type Resource } from '@gym/hooks/useResource';
 
 export {

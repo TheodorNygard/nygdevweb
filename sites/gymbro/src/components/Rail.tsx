@@ -1,4 +1,4 @@
-import { type MesocycleSummary } from '../lib/gym';
+import { THEMES, type MesocycleSummary, type Theme } from '../lib/gym';
 
 /** The four views, and the numbers beside them in the design. */
 export const VIEWS = [
@@ -19,6 +19,11 @@ interface RailProps {
     onSelect: (mesoId: string) => void;
     onCreate: () => void;
     busy: boolean;
+
+    /** The palette, and the click that changes it. Remembered per browser. */
+    theme: Theme;
+    onTheme: (theme: Theme) => void;
+
     account: string;
     onSignOut: () => void;
 }
@@ -52,6 +57,8 @@ export function Rail({
     onSelect,
     onCreate,
     busy,
+    theme,
+    onTheme,
     account,
     onSignOut,
 }: RailProps) {
@@ -115,6 +122,28 @@ export function Rail({
             </div>
 
             <div className="rail__foot">
+                <div className="rail__theme" role="group" aria-label="Theme">
+                    <span className="rail__section rail__section--tight">THEME</span>
+                    <div className="rail__theme-chips">
+                        {THEMES.map((option) => (
+                            <button
+                                key={option.id}
+                                type="button"
+                                className={
+                                    option.id === theme
+                                        ? 'chip chip--small chip--on'
+                                        : 'chip chip--small'
+                                }
+                                aria-pressed={option.id === theme}
+                                title={option.note}
+                                onClick={() => onTheme(option.id)}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="rail__note">
                     <div className="rail__note-title">LOGGING</div>
                     <p className="rail__note-body">

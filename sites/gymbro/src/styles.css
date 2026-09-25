@@ -8,6 +8,12 @@
  *
  * Dark only, like the logger. Sitting at a desk does not make a light variant a
  * preference — it would be a different design.
+ *
+ * Themed, within that, the same way: every colour is a token on `:root`, a
+ * theme is a `[data-theme]` block that redefines them, and the attribute is
+ * written by the logger's `lib/theme` before the first render. The two sites
+ * carry the same two themes — Graphite by default, Orchis after it — each
+ * transcribed into its own stylesheet, since the token sets differ.
  */
 
 /* Self-hosted rather than fetched from Google Fonts: the CSP names no
@@ -31,6 +37,19 @@
     --accent: #d6ff3f;
     --accent-hi: #e6ff7a;
 
+    /* What sits on the accent: lime is bright, so near-black text reads on it.
+       A theme with a saturated accent flips this to white. */
+    --on-accent: var(--bg);
+    --on-accent-rgb: var(--bg-rgb);
+
+    /* The channels behind `--bg` and `--accent`, for the tints below: an
+       alpha on the accent has to follow the accent when a theme changes it. */
+    --bg-rgb: 11, 12, 14;
+    --accent-rgb: 214, 255, 63;
+
+    /* A surface tinted toward the accent — the notice banner. */
+    --accent-bg: #1a1d12;
+
     --fg-80: rgba(242, 243, 245, 0.8);
     --fg-72: rgba(242, 243, 245, 0.72);
     --fg-62: rgba(242, 243, 245, 0.62);
@@ -50,11 +69,11 @@
     --fill: rgba(255, 255, 255, 0.06);
     --fill-soft: rgba(255, 255, 255, 0.045);
 
-    --accent-06: rgba(214, 255, 63, 0.06);
-    --accent-14: rgba(214, 255, 63, 0.14);
-    --accent-25: rgba(214, 255, 63, 0.25);
-    --accent-30: rgba(214, 255, 63, 0.3);
-    --accent-40: rgba(214, 255, 63, 0.4);
+    --accent-06: rgba(var(--accent-rgb), 0.06);
+    --accent-14: rgba(var(--accent-rgb), 0.14);
+    --accent-25: rgba(var(--accent-rgb), 0.25);
+    --accent-30: rgba(var(--accent-rgb), 0.3);
+    --accent-40: rgba(var(--accent-rgb), 0.4);
 
     --sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
     --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -62,6 +81,51 @@
     --rail-width: 236px;
 
     color-scheme: dark;
+}
+
+/*
+ * Orchis — after the GTK theme of that name: neutral dark greys a step lighter
+ * than Graphite, a sidebar darker than the canvas the way its window chrome
+ * is, and Material's purple as the accent. White on the purple, where Graphite
+ * puts near-black on lime. The accent tints are not restated: they are built
+ * from `--accent-rgb` and follow it.
+ */
+:root[data-theme="orchis"] {
+    --bg: #1e1e1e;
+    --rail: #181818;
+    --card: #262626;
+    --row: #2a2a2a;
+    --row-hover: #333333;
+    --fg: #eeeeee;
+    --accent: #ab47bc;
+    --accent-hi: #ba68c8;
+
+    --on-accent: #ffffff;
+    --on-accent-rgb: 255, 255, 255;
+
+    --bg-rgb: 30, 30, 30;
+    --accent-rgb: 171, 71, 188;
+
+    --accent-bg: #2b2130;
+
+    --fg-80: rgba(238, 238, 238, 0.8);
+    --fg-72: rgba(238, 238, 238, 0.72);
+    --fg-62: rgba(238, 238, 238, 0.62);
+    --fg-60: rgba(238, 238, 238, 0.6);
+    --fg-55: rgba(238, 238, 238, 0.55);
+    --fg-50: rgba(238, 238, 238, 0.5);
+    --fg-45: rgba(238, 238, 238, 0.45);
+    --fg-40: rgba(238, 238, 238, 0.4);
+    --fg-35: rgba(238, 238, 238, 0.35);
+    --fg-32: rgba(238, 238, 238, 0.32);
+    --fg-30: rgba(238, 238, 238, 0.3);
+    --fg-28: rgba(238, 238, 238, 0.28);
+
+    --line: rgba(255, 255, 255, 0.1);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --hair: rgba(255, 255, 255, 0.09);
+    --fill: rgba(255, 255, 255, 0.07);
+    --fill-soft: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -203,7 +267,7 @@ a:hover {
     height: 22px;
     border-radius: 7px;
     background: var(--accent);
-    color: var(--bg);
+    color: var(--on-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -256,7 +320,7 @@ a:hover {
 .nav-item--on,
 .nav-item--on:hover {
     background: var(--accent);
-    color: var(--bg);
+    color: var(--on-accent);
 }
 
 .nav-item__key {
@@ -304,7 +368,7 @@ a:hover {
 
 .block-item--on,
 .block-item--on:hover {
-    background: rgba(214, 255, 63, 0.09);
+    background: rgba(var(--accent-rgb), 0.09);
     color: var(--fg);
     box-shadow: inset 0 0 0 1px var(--accent-25);
 }
@@ -388,6 +452,17 @@ a:hover {
         gap: 14px;
     }
 
+    .rail__theme {
+        flex: none;
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .rail__theme-chips {
+        flex-wrap: nowrap;
+        padding: 0;
+    }
+
     .rail__note {
         flex: none;
         display: flex;
@@ -408,6 +483,26 @@ a:hover {
         flex: 1;
         min-width: 0;
     }
+}
+
+/* The theme picker: a label and two chips, above the note about the phone.
+   Chips rather than a select because there are two of them and a select
+   hides which is on. */
+.rail__theme {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rail__section--tight {
+    padding: 0 8px;
+}
+
+.rail__theme-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 6px;
 }
 
 .rail__note {
@@ -494,7 +589,7 @@ a:hover {
     z-index: 5;
     padding: 20px 32px 16px;
     border-bottom: 1px solid var(--line);
-    background: rgba(11, 12, 14, 0.9);
+    background: rgba(var(--bg-rgb), 0.9);
     backdrop-filter: blur(14px);
     display: flex;
     align-items: flex-end;
@@ -569,7 +664,7 @@ a:hover {
     border: none;
     border-radius: 12px;
     background: var(--accent);
-    color: var(--bg);
+    color: var(--on-accent);
     font: 700 13px/1 var(--sans);
 }
 
@@ -578,8 +673,8 @@ a:hover {
 }
 
 .primary:disabled {
-    background: rgba(214, 255, 63, 0.35);
-    color: rgba(11, 12, 14, 0.6);
+    background: rgba(var(--accent-rgb), 0.35);
+    color: rgba(var(--on-accent-rgb), 0.6);
 }
 
 .primary--tall {
@@ -652,7 +747,7 @@ a:hover {
 .chip--on:hover {
     background: var(--accent);
     border-color: var(--accent);
-    color: var(--bg);
+    color: var(--on-accent);
 }
 
 .chip--small {
@@ -1324,7 +1419,7 @@ a:hover {
 .group__bar {
     height: 100%;
     border-radius: 99px;
-    background: rgba(214, 255, 63, 0.6);
+    background: rgba(var(--accent-rgb), 0.6);
 }
 
 .group__bar--low {
@@ -1463,7 +1558,7 @@ a:hover {
 .lift-item--on:hover {
     background: var(--card);
     color: var(--fg);
-    box-shadow: inset 0 0 0 1px rgba(214, 255, 63, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35);
 }
 
 .lift-item__name {
@@ -1753,7 +1848,7 @@ a:hover {
     display: block;
     padding: 14px;
     margin-bottom: 6px;
-    border: 1px dashed rgba(214, 255, 63, 0.45);
+    border: 1px dashed rgba(var(--accent-rgb), 0.45);
     border-radius: 12px;
     background: var(--accent-06);
     color: var(--accent);
@@ -1776,7 +1871,7 @@ a:hover {
 }
 
 .banner--notice {
-    background: #1a1d12;
+    background: var(--accent-bg);
     border-bottom-color: var(--accent-30);
 }
 

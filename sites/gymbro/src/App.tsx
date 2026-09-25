@@ -13,6 +13,7 @@ import {
     sessionDateLabel,
     useAuth,
     useLibrary,
+    useTheme,
     type SessionSummary,
 } from './lib/gym';
 import { DEFAULT_DAY_LABELS, MIN_DAYS } from './lib/limits';
@@ -46,6 +47,7 @@ export function App() {
 
     const [view, setView] = useState<View>('dashboard');
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [theme, pickTheme] = useTheme();
 
     // Edits in flight, by block id. Keyed rather than single so that clicking
     // another block in the sidebar — the ordinary thing to do here — cannot
@@ -288,6 +290,8 @@ export function App() {
                 onSelect={setSelectedId}
                 onCreate={() => { void createBlock(); }}
                 busy={busy}
+                theme={theme}
+                onTheme={pickTheme}
                 account={auth.account.username || auth.account.name || 'this account'}
                 onSignOut={auth.signOut}
             />

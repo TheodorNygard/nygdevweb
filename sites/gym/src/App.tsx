@@ -15,6 +15,7 @@ import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
+import { useTheme } from './hooks/useTheme';
 import { GymApi } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
@@ -70,6 +71,7 @@ export function App() {
 
     const [screen, setScreen] = useState<Screen>('tabs');
     const [tab, setTab] = useState<Tab>('today');
+    const [theme, pickTheme] = useTheme();
 
     // Which tabs have been opened. Today is read on sign-in because the app
     // opens on it; the other two each cost a call of their own, and most
@@ -557,6 +559,8 @@ export function App() {
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
+                                    theme={theme}
+                                    onTheme={pickTheme}
                                     onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
                                 />

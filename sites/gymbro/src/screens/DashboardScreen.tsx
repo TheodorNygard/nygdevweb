@@ -283,7 +283,9 @@ export function DashboardScreen({
                                     height={height}
                                     rx={3}
                                     fill={
-                                        index + 1 === week ? '#d6ff3f' : 'rgba(214, 255, 63, 0.22)'
+                                        index + 1 === week
+                                            ? 'var(--accent)'
+                                            : 'rgba(var(--accent-rgb), 0.22)'
                                     }
                                 />
                             );
