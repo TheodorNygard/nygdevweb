@@ -545,6 +545,8 @@ export function App() {
                                         setDaySessionId(sessions[0]?.id ?? null);
                                     }}
                                     onPlan={() => pickTab('plan')}
+                                    theme={theme}
+                                    onTheme={pickTheme}
                                 />
                             ) : null}
 
@@ -559,8 +561,6 @@ export function App() {
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
-                                    theme={theme}
-                                    onTheme={pickTheme}
                                     onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
                                 />

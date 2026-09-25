@@ -7,8 +7,10 @@ import {
     repsInTank,
     sessionsFor,
 } from '../lib/block';
-import { kg, rpeLabel, tankLabel, todayLabel } from '../lib/format';
+import { kg, rpeLabel, tankLabel } from '../lib/format';
 import { IntroScreen } from './IntroScreen';
+import { Masthead } from '../components/Masthead';
+import type { Theme } from '../lib/theme';
 import type { CurrentBlock } from '../lib/types';
 
 interface TodayScreenProps {
@@ -17,6 +19,10 @@ interface TodayScreenProps {
     onWeek: (week: number) => void;
     onOpenDay: (dayIndex: number) => void;
     onPlan: () => void;
+
+    /** The palette, and the tap that changes it — the masthead's mark. */
+    theme: Theme;
+    onTheme: (theme: Theme) => void;
 }
 
 /**
@@ -25,14 +31,22 @@ interface TodayScreenProps {
  * it, and it is the only row carrying an action — so the common case is one tap
  * from opening the app.
  */
-export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScreenProps) {
+export function TodayScreen({
+    block,
+    week,
+    onWeek,
+    onOpenDay,
+    onPlan,
+    theme,
+    onTheme,
+}: TodayScreenProps) {
     const { mesocycle, sessions } = block;
 
     if (!mesocycle) {
         // A first run, not an error: the API answers `mesocycle: null` when
         // nobody has planned a block yet. It is also the only moment anyone
         // will read what a mesocycle is, so that is what the screen is.
-        return <IntroScreen />;
+        return <IntroScreen theme={theme} onTheme={onTheme} />;
     }
 
     const progress = progressOf(mesocycle, sessions);
@@ -80,10 +94,7 @@ export function TodayScreen({ block, week, onWeek, onOpenDay, onPlan }: TodayScr
 
     return (
         <div className="screen">
-            <div className="masthead">
-                <span className="eyebrow eyebrow--wide">{todayLabel()}</span>
-                <span className="masthead__mark">LOGBOOK</span>
-            </div>
+            <Masthead theme={theme} onTheme={onTheme} />
 
             <section className="block">
                 <div className="block__head">

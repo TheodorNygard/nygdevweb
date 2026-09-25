@@ -253,11 +253,22 @@ below the tokens knows which theme is on. Two ship:
   background, and Material's purple (`#ab47bc`) as the accent, with white text
   on it.
 
-The picker is on the Plan tab, under the block list and beside the sign-out —
-the one other thing on that screen that is about the app rather than the
-block. The choice is stored under `gymlog.theme` in `localStorage`, per
-browser rather than per account, because a palette is a preference of the
-phone and should survive signing out.
+The switch is the **LOGBOOK** mark at the top right of Today: a tap moves to
+the next theme, and the mark is drawn in the accent so the tap answers with
+the new colour. It was a wordmark with nothing behind it on the screen every
+visit opens on, and a palette is the kind of preference that wants one tap
+from there rather than a section of its own. The choice is stored under
+`gymlog.theme` in `localStorage`, per browser rather than per account,
+because a palette is a preference of the phone and should survive signing
+out.
+
+Orchis keeps its accent as two tokens where Graphite needs one. Lime is bright
+enough to be both a button's fill and a word on near-black; Material's purple
+400 fills the buttons (white on it is 4.8:1) but is 3.4:1 as text on the grey,
+so accent-coloured text — eyebrows, row values, the mark — reads
+`--accent-ink`, which Orchis sets to the purple 200 (6.9:1). Its muted greys
+also sit a notch above Graphite's alphas, since the same alpha on a lighter
+background lands on a lower contrast.
 
 `src/lib/theme.ts` owns the attribute. `main.tsx` applies the stored theme
 before React mounts, so the first paint is already in it; an inline script in
@@ -894,7 +905,8 @@ the logger's and are read through the alias, so both sites offer the same two
 `data-theme` attribute. What each theme *looks like* is not shared: the token
 blocks are transcribed into each stylesheet separately, because the two token
 sets differ (the planner has a rail and a hairline the phone has no use for).
-The picker here is in the rail's foot, above the note about the phone.
+The picker here is two chips in the rail's foot, above the note about the
+phone — this site has no wordmark at the top right to make the switch.
 
 ### Muscle groups exist here and nowhere else
 

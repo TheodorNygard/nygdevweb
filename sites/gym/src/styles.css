@@ -42,6 +42,14 @@
     --on-accent: var(--bg);
     --on-accent-rgb: var(--bg-rgb);
 
+    /* The accent as *text* on the dark background — eyebrows, row values,
+       the masthead mark. Lime is bright enough to be both the fill of a
+       button and a word on near-black; a saturated purple is not, since a
+       fill dark enough for white text on it is too dark to read as text
+       itself. So the two are separate tokens, and only a theme that needs
+       them apart sets this to anything but the accent. */
+    --accent-ink: var(--accent);
+
     /* The channels behind `--bg` and `--accent`, for the tints below and the
        dozens of `rgba(var(--accent-rgb), …)` in the rules: an alpha on the
        accent has to follow the accent when a theme changes it. */
@@ -90,25 +98,33 @@
     --sheet: #2a2a2a;
     --row: #2a2a2a;
     --row-hover: #333333;
-    --fg: #eeeeee;
+    --fg: #f4f4f4;
     --accent: #ab47bc;
     --accent-hi: #ba68c8;
 
     --on-accent: #ffffff;
     --on-accent-rgb: 255, 255, 255;
 
+    /* Material's purple 200, for the accent as text: the 400 that fills the
+       buttons is 3.4:1 against this grey, which is under the 4.5:1 that
+       body-sized text wants, and the 200 is 6.9:1. */
+    --accent-ink: #ce93d8;
+
     --bg-rgb: 30, 30, 30;
     --accent-rgb: 171, 71, 188;
 
     --accent-bg: #2b2130;
 
-    --fg-70: rgba(238, 238, 238, 0.7);
-    --fg-60: rgba(238, 238, 238, 0.6);
-    --fg-50: rgba(238, 238, 238, 0.5);
-    --fg-45: rgba(238, 238, 238, 0.45);
-    --fg-40: rgba(238, 238, 238, 0.4);
-    --fg-35: rgba(238, 238, 238, 0.35);
-    --fg-28: rgba(238, 238, 238, 0.28);
+    /* A notch above Graphite's alphas throughout. The background is lighter,
+       so the same alpha lands on a lower contrast, and the muted greys are
+       where that shows first. */
+    --fg-70: rgba(244, 244, 244, 0.76);
+    --fg-60: rgba(244, 244, 244, 0.66);
+    --fg-50: rgba(244, 244, 244, 0.56);
+    --fg-45: rgba(244, 244, 244, 0.52);
+    --fg-40: rgba(244, 244, 244, 0.47);
+    --fg-35: rgba(244, 244, 244, 0.42);
+    --fg-28: rgba(244, 244, 244, 0.34);
 
     --line: rgba(255, 255, 255, 0.1);
     --line-strong: rgba(255, 255, 255, 0.16);
@@ -234,13 +250,19 @@ button {
     justify-content: space-between;
 }
 
+/* The wordmark, and the theme switch — see `components/Masthead`. Drawn in
+   the accent rather than the muted grey it was, so a tap on it visibly
+   answers with the new colour. The padding and the negative margin are the
+   44px touch target around an 11px word, without moving the word. */
 .masthead__mark {
-    font: 400 11px/1 var(--mono);
+    font: 600 11px/1 var(--mono);
     letter-spacing: 0.1em;
-    color: var(--fg-35);
+    color: var(--accent-ink);
     background: none;
     border: none;
-    padding: 4px 0;
+    padding: 17px 0 17px 16px;
+    margin: -17px 0 -17px 0;
+    transition: color 0.2s ease;
 }
 
 .title {
@@ -364,7 +386,7 @@ button {
 .primer__label {
     font: 600 10px/1.6 var(--mono);
     letter-spacing: 0.14em;
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .primer__body {
@@ -416,7 +438,7 @@ button {
     flex: none;
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.12em;
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .block__bar {
@@ -526,7 +548,7 @@ button {
 
 .day--done .day__badge {
     background: rgba(var(--accent-rgb), 0.14);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .day__body {
@@ -550,7 +572,7 @@ button {
 .day__action {
     flex: none;
     font: 600 13px/1 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .weekdone {
@@ -561,7 +583,7 @@ button {
     border: 1px solid rgba(var(--accent-rgb), 0.35);
     border-radius: 16px;
     background: rgba(var(--accent-rgb), 0.06);
-    color: var(--accent);
+    color: var(--accent-ink);
     font: 600 15px/1.3 var(--sans);
 }
 
@@ -672,7 +694,7 @@ button {
 }
 
 .stepper__value--typable:hover {
-    text-decoration-color: var(--accent);
+    text-decoration-color: var(--accent-ink);
 }
 
 /* Sized and weighted exactly like the value it replaces, so opening the keypad
@@ -814,7 +836,7 @@ button {
 
 .dayfield__plan:hover {
     border-color: rgba(var(--accent-rgb), 0.5);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 /* One planned exercise in the day-plan sheet: the name, and the two steppers
@@ -901,12 +923,12 @@ button {
 
 .map__cell--done {
     background: var(--accent);
-    border-color: var(--accent);
+    border-color: var(--accent-ink);
 }
 
 .map__cell--draft {
     background: rgba(var(--accent-rgb), 0.25);
-    border-color: var(--accent);
+    border-color: var(--accent-ink);
 }
 
 /* A day the week does not run — the rest week's dropped sessions. Still drawn,
@@ -929,7 +951,7 @@ button {
 }
 
 .map__tank--rest {
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .map__key {
@@ -1043,7 +1065,7 @@ button {
 
 .hist__total {
     font: 400 11px/1 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .rows {
@@ -1086,7 +1108,7 @@ button {
     padding: 3px 6px;
     border-radius: 5px;
     background: rgba(var(--accent-rgb), 0.14);
-    color: var(--accent);
+    color: var(--accent-ink);
     font: 600 9px/1 var(--mono);
     letter-spacing: 0.12em;
     vertical-align: 1px;
@@ -1102,7 +1124,7 @@ button {
 .row__value {
     display: block;
     font: 600 15px/1.2 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .row__unit {
@@ -1270,7 +1292,7 @@ button {
    the same job it does on a completed day in the week list, which is why it is
    the accent and not a tick. */
 .exercise__summary--met {
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 /* Taking the exercise itself back out, and only while it holds no sets. Same
@@ -1325,7 +1347,7 @@ button {
 
 .set__rpe {
     font: 400 11px/1 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
     background: rgba(var(--accent-rgb), 0.1);
     padding: 5px 8px;
     border-radius: 6px;
@@ -1391,7 +1413,7 @@ button {
 
 .tank__value {
     font: 600 13px/1 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .tank__note {
@@ -1414,7 +1436,7 @@ button {
 /* The slider is on the week's target. The accent is doing the same job it does
    on an exercise that has met its set count. */
 .rpe__note--met {
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .rpe__controls {
@@ -1429,7 +1451,7 @@ button {
     width: 52px;
     text-align: right;
     font: 700 24px/1 var(--mono);
-    color: var(--accent);
+    color: var(--accent-ink);
     letter-spacing: -0.03em;
 }
 
@@ -1502,7 +1524,7 @@ button {
 
 .add-exercise:hover {
     border-color: rgba(var(--accent-rgb), 0.5);
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .finish-bar {
@@ -1701,7 +1723,7 @@ button {
 .sheet__eyebrow {
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.16em;
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .sheet__title {
@@ -1862,7 +1884,7 @@ button {
 
 .chip--on {
     background: var(--accent);
-    border-color: var(--accent);
+    border-color: var(--accent-ink);
     color: var(--on-accent);
 }
 
@@ -1881,7 +1903,7 @@ button {
     border: 1px dashed rgba(var(--accent-rgb), 0.45);
     border-radius: 12px;
     background: rgba(var(--accent-rgb), 0.06);
-    color: var(--accent);
+    color: var(--accent-ink);
     font: 500 15px/1.2 var(--sans);
     text-align: left;
     margin-bottom: 8px;
@@ -2096,7 +2118,7 @@ button {
 .gate__mark {
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.18em;
-    color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .gate__title {

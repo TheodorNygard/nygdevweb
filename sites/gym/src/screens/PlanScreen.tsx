@@ -5,7 +5,6 @@ import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
 import type { TemplatesState } from '../hooks/useTemplates';
 import { daysForWeek, draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
-import { THEMES, type Theme } from '../lib/theme';
 import type {
     CurrentBlock,
     DayInput,
@@ -87,16 +86,6 @@ interface PlanScreenProps {
     busy: boolean;
     onSave: (patch: { name: string; weeks: number; days: DayInput[] }) => void;
     onCreate: (plan: { name: string; weeks: number; days: DayInput[] }) => void;
-
-    /**
-     * The palette, and the tap that changes it. Here rather than on a settings
-     * screen of its own because this tab already holds the one other thing
-     * that is about the app rather than the block — the sign-out — and a
-     * preference this small does not earn a fourth tab.
-     */
-    theme: Theme;
-    onTheme: (theme: Theme) => void;
-
     onSignOut: () => void;
     account: string;
 }
@@ -120,8 +109,6 @@ export function PlanScreen({
     busy,
     onSave,
     onCreate,
-    theme,
-    onTheme,
     onSignOut,
     account,
 }: PlanScreenProps) {
@@ -395,25 +382,6 @@ export function PlanScreen({
                     ))}
                 </div>
             )}
-
-            <span className="section-label">THEME</span>
-            <div className="chips" role="group" aria-label="Theme">
-                {THEMES.map((option) => (
-                    <button
-                        key={option.id}
-                        type="button"
-                        className={option.id === theme ? 'chip chip--on' : 'chip'}
-                        aria-pressed={option.id === theme}
-                        onClick={() => onTheme(option.id)}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-            </div>
-            <p className="empty">
-                {THEMES.find((option) => option.id === theme)?.note}
-                {' '}Remembered on this phone.
-            </p>
 
             <div className="stack-22">
                 <p className="empty">Signed in as {account}.</p>

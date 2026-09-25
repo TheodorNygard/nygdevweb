@@ -1,5 +1,6 @@
 import { EffortGraph } from '../components/EffortGraph';
-import { todayLabel } from '../lib/format';
+import { Masthead } from '../components/Masthead';
+import type { Theme } from '../lib/theme';
 
 /** The three moves a block makes, in the order it makes them. */
 const STEPS = [
@@ -33,13 +34,15 @@ const STEPS = [
  * second door onto the same room — and one that pushes the reader past the
  * thing they are here to read.
  */
-export function IntroScreen() {
+interface IntroScreenProps {
+    theme: Theme;
+    onTheme: (theme: Theme) => void;
+}
+
+export function IntroScreen({ theme, onTheme }: IntroScreenProps) {
     return (
         <div className="screen">
-            <div className="masthead">
-                <span className="eyebrow eyebrow--wide">{todayLabel()}</span>
-                <span className="masthead__mark">LOGBOOK</span>
-            </div>
+            <Masthead theme={theme} onTheme={onTheme} />
 
             <h1 className="title">Train in blocks.</h1>
             <p className="lede">
