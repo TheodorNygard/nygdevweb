@@ -15,6 +15,7 @@ import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
+import { useTheme } from './hooks/useTheme';
 import { GymApi } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
@@ -70,6 +71,7 @@ export function App() {
 
     const [screen, setScreen] = useState<Screen>('tabs');
     const [tab, setTab] = useState<Tab>('today');
+    const [theme, pickTheme] = useTheme();
 
     // Which tabs have been opened. Today is read on sign-in because the app
     // opens on it; the other two each cost a call of their own, and most
@@ -146,10 +148,11 @@ export function App() {
     const [dayLoading, setDayLoading] = useState(false);
 
     // The block whose sheet is open, and the volume logged in it. The volume is
-    // fetched rather than listed because it needs the sets, which
-    // `GET /gym/mesocycles` deliberately does not carry.
+    // not on the block list because it needs the sets, which
+    // `GET /gym/mesocycles` deliberately does not carry — so it is summed from
+    // the sessions a screen has already read, or fetched for a block none has.
     const [openBlock, setOpenBlock] = useState<MesocycleSummary | null>(null);
-    const [blockVolume, setBlockVolume] = useState<number | null>(null);
+    const [fetchedVolume, setFetchedVolume] = useState<number | null>(null);
 
     const [picking, setPicking] = useState(false);
     const [finishing, setFinishing] = useState(false);
@@ -191,16 +194,27 @@ export function App() {
         return () => { cancelled = true; };
     }, [api, daySessionId]);
 
-    // What a block delete would destroy, in kilos. Read when the sheet opens
-    // rather than when the confirmation is armed: the delete button stays
-    // disabled until this lands, so fetching it early is what keeps a
-    // deliberate tap from waiting on a request it did not know it started.
-    useEffect(() => {
-        if (!api || !openBlock) {
-            setBlockVolume(null);
+    // The open block's sessions, where something has already read them: Today
+    // holds the current block's, and History holds any block it has opened.
+    // The held copy from last visit does not count — its sessions are as old
+    // as that visit, and a delete confirmation should not understate what it
+    // is about to take.
+    const heldBlockSessions = openBlock === null
+        ? null
+        : openBlock.id === block.block?.mesocycle?.id
+            ? (block.fromCache ? null : block.block?.sessions ?? null)
+            : history.sessions[openBlock.id] ?? null;
 
-            return;
-        }
+    // What a block delete would destroy, in kilos, for a block nothing has
+    // read. Fetched when the sheet opens rather than when the confirmation is
+    // armed: the delete button stays disabled until this lands, so fetching it
+    // early is what keeps a deliberate tap from waiting on a request it did
+    // not know it started. The common case — the block being trained — is
+    // already in hand and skips this entirely.
+    useEffect(() => {
+        setFetchedVolume(null);
+
+        if (!api || !openBlock || heldBlockSessions) return;
 
         let cancelled = false;
 
@@ -209,17 +223,21 @@ export function App() {
             .then((sessions) => {
                 if (cancelled) return;
 
-                setBlockVolume(sessions.reduce((total, one) => total + one.volumeKg, 0));
+                setFetchedVolume(sessions.reduce((total, one) => total + one.volumeKg, 0));
             })
             .catch(() => {
                 // Leaving this null keeps the delete disabled, which is the
                 // right failure: a cascade should not be confirmable against a
                 // number nobody could read.
-                if (!cancelled) setBlockVolume(null);
+                if (!cancelled) setFetchedVolume(null);
             });
 
         return () => { cancelled = true; };
-    }, [api, openBlock]);
+    }, [api, openBlock, heldBlockSessions]);
+
+    const blockVolume = heldBlockSessions
+        ? heldBlockSessions.reduce((total, one) => total + one.volumeKg, 0)
+        : fetchedVolume;
 
     const closeDay = useCallback(() => {
         setOpenDay(null);
@@ -541,6 +559,8 @@ export function App() {
                                     busy={planBusy}
                                     onSave={(patch) => { void savePlan(patch); }}
                                     onCreate={(plan) => { void createPlan(plan); }}
+                                    theme={theme}
+                                    onTheme={pickTheme}
                                     onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
                                 />

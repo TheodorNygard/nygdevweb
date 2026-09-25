@@ -3,7 +3,14 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { API_BASE } from './lib/config';
+import { applyTheme, readTheme } from './lib/theme';
 import './styles.css';
+
+// Before anything renders, so the first paint is already in the chosen theme
+// rather than Graphite for a frame. Not an inline script in index.html: the
+// CSP admits no inline scripts, and this module runs before the root is
+// populated anyway, which is as early as the page has anything to paint.
+applyTheme(readTheme());
 
 // Wakes the function app now, rather than when the first real call needs it.
 //

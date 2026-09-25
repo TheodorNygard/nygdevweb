@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { reordered } from './useDragReorder';
-import { ApiError, NetworkError, type GymApi } from '../lib/api';
+import { ApiError, type GymApi } from '../lib/api';
 import { localDate } from '../lib/format';
 import { computeTotals } from '../lib/totals';
 import type { SessionEntry, WorkSet, Workout } from '../lib/types';
@@ -58,6 +58,11 @@ function withEntries(workout: Workout, entries: SessionEntry[]): Workout {
     return { ...workout, entries, totals: computeTotals(entries) };
 }
 
+/** The API writes its `message` to be shown as-is, which is why it is not reworded. */
+function describe(cause: unknown): string {
+    return cause instanceof Error ? cause.message : String(cause);
+}
+
 /**
  * The open session, and the four guarded writes that change it.
  *
@@ -96,12 +101,6 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         setWorkout(next);
     }, []);
 
-    const describe = useCallback((cause: unknown): string => {
-        if (cause instanceof ApiError || cause instanceof NetworkError) return cause.message;
-
-        return cause instanceof Error ? cause.message : String(cause);
-    }, []);
-
     /** Re-read from the API and adopt what it holds. Used after a stale count. */
     const resync = useCallback(async (sessionId: string): Promise<Workout | null> => {
         if (!api) return null;
@@ -117,7 +116,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
             return null;
         }
-    }, [api, put, describe]);
+    }, [api, put]);
 
     const start = useCallback(async (week: number, dayIndex: number): Promise<Workout | null> => {
         if (!api) return null;
@@ -146,7 +145,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         } finally {
             setBusy(false);
         }
-    }, [api, put, describe]);
+    }, [api, put]);
 
     const open = useCallback(async (sessionId: string): Promise<Workout | null> => {
         if (!api) return null;
@@ -169,7 +168,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         } finally {
             setBusy(false);
         }
-    }, [api, put, describe]);
+    }, [api, put]);
 
     const close = useCallback(() => {
         put(null);
@@ -228,7 +227,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                 await resync(session.id);
             }
         }
-    }, [api, put, resync, describe]);
+    }, [api, put, resync]);
 
     const addEntry = useCallback(async (exerciseName: string): Promise<void> => {
         const expectedEntryCount = current.current?.entries.length ?? 0;
@@ -363,7 +362,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         } finally {
             setBusy(false);
         }
-    }, [api, put, describe]);
+    }, [api, put]);
 
     const dismiss = useCallback(() => {
         setError(null);

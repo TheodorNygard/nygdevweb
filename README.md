@@ -240,6 +240,39 @@ design offered — near-black, acid-lime accent, mono digits — and it was chos
 because a bright screen between sets is the thing that makes a logbook go
 unused. A light variant would be a different design, not a preference.
 
+### Themes
+
+Within dark, the palette is a choice. Every colour in `styles.css` is a token
+on `:root`, and a theme is a `[data-theme]` block that redefines them — nothing
+below the tokens knows which theme is on. Two ship:
+
+- **Graphite**, the `:root` default: near-black surfaces, lime accent,
+  near-black text on the accent.
+- **Orchis**, after the GTK theme of that name: neutral greys a step lighter
+  than Graphite, surfaces with edges rather than ones that dissolve into the
+  background, and Material's purple (`#ab47bc`) as the accent, with white text
+  on it.
+
+The picker is on the Plan tab, under the block list and beside the sign-out —
+the one other thing on that screen that is about the app rather than the
+block. The choice is stored under `gymlog.theme` in `localStorage`, per
+browser rather than per account, because a palette is a preference of the
+phone and should survive signing out.
+
+`src/lib/theme.ts` owns the attribute. `main.tsx` applies the stored theme
+before React mounts, so the first paint is already in it; an inline script in
+`index.html` would do the same a few milliseconds earlier and is what the CSP
+forbids. It also rewrites the `theme-color` meta from the theme's `--bg`, so an
+iPhone's status bar and the standalone app's chrome follow the screen rather
+than staying Graphite's near-black over an Orchis grey.
+
+Adding a theme is a block of tokens and an entry in `THEMES`. The tints that
+were once literal `rgba(214, 255, 63, …)` are `rgba(var(--accent-rgb), …)`, so
+a theme sets the accent's channels once and every alpha on it follows; the same
+holds for `--bg-rgb`. What sits *on* the accent is its own token, `--on-accent`,
+because that is the one place a lime theme and a purple one disagree about
+what reads.
+
 ### The ramp and the rest week
 
 What separates one week of a block from another is not the exercises — the plan
@@ -343,11 +376,13 @@ so the confirmation *is* the safety mechanism:
 
 - two taps, the second a different button;
 - the button names the count (`sessionCount` comes down with the list);
-- and it stays **disabled until the volume has been read**, through
-  `GET /gym/workouts?mesoId=`, so the confirmation can never understate what it
-  is about to take. A failed volume read leaves it disabled, which is the right
-  failure — a cascade should not be confirmable against a number nobody could
-  read.
+- and it stays **disabled until the volume is in hand**, so the confirmation
+  can never understate what it is about to take. For the block being trained
+  that is immediate — Today already holds its sessions — and for any block
+  History has opened likewise. A block nothing has read is fetched through
+  `GET /gym/workouts?mesoId=`, and a failed read leaves the button disabled,
+  which is the right failure: a cascade should not be confirmable against a
+  number nobody could read.
 
 The list is its own hook rather than part of `useBlock`. That one reloads after
 every submitted session and every back-out of the logging screen; sharing a
@@ -852,6 +887,14 @@ Nothing that draws is shared. The two apps share a contract, not a design, and a
 component from the logger would be a phone layout inside a desktop one.
 `src/auth.ts` is duplicated for the opposite reason: it is a build entry, and
 what matters about it is that nothing else ends up on that page.
+
+Themes sit on the shared side of that line. `lib/theme.ts` and `useTheme` are
+the logger's and are read through the alias, so both sites offer the same two
+— Graphite and Orchis — under the same storage key and the same
+`data-theme` attribute. What each theme *looks like* is not shared: the token
+blocks are transcribed into each stylesheet separately, because the two token
+sets differ (the planner has a rail and a hairline the phone has no use for).
+The picker here is in the rail's foot, above the note about the phone.
 
 ### Muscle groups exist here and nowhere else
 
