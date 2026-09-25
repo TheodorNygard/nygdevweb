@@ -1516,7 +1516,18 @@ button {
     background: linear-gradient(180deg, rgba(var(--bg-rgb), 0) 0%, var(--bg) 42%);
 }
 
+/* The blur is on a pseudo-element behind the label rather than on the button
+   itself, and that is a bug fix rather than a nicety. WebKit and Chromium
+   both promote the children of a `backdrop-filter` box to a layer of their
+   own, and after the screen underneath repaints — the fade that replays on
+   every tab switch — that layer can be composited empty until something
+   touches it again: the button is there, the words are not. Keeping the
+   label out of the blurred box is what keeps it painted. `isolation` gives
+   the button its own stacking context, so the pseudo-element's negative
+   z-index puts it behind the label and not behind the button. */
 .finish-bar__button {
+    position: relative;
+    isolation: isolate;
     width: 100%;
     height: 56px;
     border: 1px solid var(--line-strong);
@@ -1524,6 +1535,14 @@ button {
     background: rgba(255, 255, 255, 0.06);
     color: var(--fg);
     font: 600 16px/1 var(--sans);
+}
+
+.finish-bar__button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
     backdrop-filter: blur(12px);
 }
 
@@ -1590,19 +1609,31 @@ button {
 
 /* ------------------------------------------------------------- tab bar --- */
 
+/* The blur and the tint are on a pseudo-element behind the tabs rather than on
+   the bar, for the reason `.finish-bar__button` gives: a label inside a
+   `backdrop-filter` box can be composited empty after the screen underneath
+   repaints, and the tab labels were the ones going missing. */
 .tabs {
     position: fixed;
+    isolation: isolate;
     left: 0;
     right: 0;
     bottom: 0;
     max-width: var(--shell);
     margin: 0 auto;
     padding: 10px 14px calc(18px + env(safe-area-inset-bottom, 0px));
-    background: rgba(var(--bg-rgb), 0.86);
-    backdrop-filter: blur(18px);
     border-top: 1px solid var(--line);
     display: flex;
     gap: 6px;
+}
+
+.tabs::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(var(--bg-rgb), 0.86);
+    backdrop-filter: blur(18px);
 }
 
 .tab {

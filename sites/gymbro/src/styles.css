@@ -583,19 +583,33 @@ a:hover {
     flex-direction: column;
 }
 
+/* The blur and the tint are on a pseudo-element behind the heading rather
+   than on the bar. WebKit and Chromium promote the children of a
+   `backdrop-filter` box to a layer of their own, and after the canvas
+   underneath repaints that layer can be composited empty until something
+   touches it — the logger's tab labels went missing this way. Keeping the
+   text out of the blurred box is what keeps it painted. */
 .masthead {
     position: sticky;
+    isolation: isolate;
     top: 0;
     z-index: 5;
     padding: 20px 32px 16px;
     border-bottom: 1px solid var(--line);
-    background: rgba(var(--bg-rgb), 0.9);
-    backdrop-filter: blur(14px);
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 24px;
     flex-wrap: wrap;
+}
+
+.masthead::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(var(--bg-rgb), 0.9);
+    backdrop-filter: blur(14px);
 }
 
 .masthead__eyebrow {
