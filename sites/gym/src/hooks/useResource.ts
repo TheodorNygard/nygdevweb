@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { GymApi } from '../lib/api';
+import { messageOf, type GymApi } from '../lib/api';
 
 export interface Resource<T> {
     data: T;
@@ -47,9 +47,7 @@ export function useResource<T>(
             } catch (cause) {
                 if (cancelled) return;
 
-                // The API writes its `message` to be shown as-is, which is why
-                // it is not reworded here.
-                setError(cause instanceof Error ? cause.message : String(cause));
+                setError(messageOf(cause));
             } finally {
                 if (!cancelled) setLoading(false);
             }

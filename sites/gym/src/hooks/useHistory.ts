@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { GymApi } from '../lib/api';
+import { messageOf, type GymApi } from '../lib/api';
 import type { SessionSummary } from '../lib/types';
 
 export interface HistoryState {
@@ -15,23 +15,24 @@ export interface HistoryState {
     /** Reads one block's sessions, unless they are already held. */
     load: (mesoId: string) => void;
 
-    /** Reads them again — after a session is deleted out of one. */
+    /** Reads them again — after something wrote to that block. */
     reload: (mesoId: string) => void;
 }
 
 /**
- * The sessions of blocks other than the one being trained.
+ * The sessions of a block, read when the block is opened.
  *
  * History used to end at the current block, because `/mesocycles/current` is
- * the one call that carries sessions and it carries only that block's. Past
+ * the one call that carries sessions and it carries only that block's. Other
  * blocks are a second call each — `GET /gym/workouts?mesoId=` — and the shape
  * here follows from what that costs: a block is read when it is opened, once,
  * and then held for as long as the sign-in lasts.
  *
  * Not `useResource`: that reads one thing on mount, and this reads an unknown
- * number of things on demand. The current block is deliberately not among them
- * — `useBlock` already holds it, and reading it again here would be the same
- * query twice on the one block guaranteed to be looked at.
+ * number of things on demand. Here the current block is deliberately not among
+ * them — `useBlock` already holds it, and reading it again would be the same
+ * query twice on the one block guaranteed to be looked at. gymbro, which has no
+ * `useBlock`, reads every block through this, current included.
  */
 export function useHistory(api: GymApi | null): HistoryState {
     const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
@@ -64,8 +65,7 @@ export function useHistory(api: GymApi | null): HistoryState {
             setSessions(held.current);
             setError(null);
         } catch (cause) {
-            // The API writes its message to be shown as-is.
-            setError(cause instanceof Error ? cause.message : String(cause));
+            setError(messageOf(cause));
         } finally {
             setLoading((current) => (current === mesoId ? null : current));
         }

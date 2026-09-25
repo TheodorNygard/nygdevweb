@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Banner } from './components/Banner';
 import { Rail, type View } from './components/Rail';
 import { SignInGate } from './components/SignInGate';
 import { useBlocks } from './hooks/useBlocks';
-import { useSessions } from './hooks/useSessions';
 import { useWorkouts } from './hooks/useWorkouts';
 import { seriesOf } from './lib/analytics';
 import {
     currentWeek,
     GymApi,
+    messageOf,
     sessionDateLabel,
     useAuth,
+    useHistory,
     useLibrary,
     useTheme,
     type SessionSummary,
@@ -42,7 +43,7 @@ export function App() {
     );
 
     const blocks = useBlocks(api);
-    const sessions = useSessions(api);
+    const history = useHistory(api);
     const library = useLibrary();
 
     const [view, setView] = useState<View>('dashboard');
@@ -85,15 +86,15 @@ export function App() {
 
     // `load` is stable across renders; the state object around it is not, so
     // the dependency has to be the function rather than the hook's return.
-    const { load: loadSessions } = sessions;
+    const { load: loadSessions } = history;
 
     useEffect(() => {
         if (selectedId) loadSessions(selectedId);
     }, [selectedId, loadSessions]);
 
     const selected = blocks.blocks.find((block) => block.id === selectedId) ?? null;
-    const blockSessions = selectedId ? sessions.byBlock[selectedId] ?? NO_SESSIONS : NO_SESSIONS;
-    const sessionsRead = selectedId !== null && sessions.byBlock[selectedId] !== undefined;
+    const blockSessions = selectedId ? history.sessions[selectedId] ?? NO_SESSIONS : NO_SESSIONS;
+    const sessionsRead = selectedId !== null && history.sessions[selectedId] !== undefined;
 
     // The week to read the block at. Not calendar-derived — days are labelled
     // rather than scheduled — so it is the latest week anything was logged in.
@@ -141,11 +142,6 @@ export function App() {
         [workouts.sessions],
     );
 
-    const describe = useCallback(
-        (cause: unknown) => setActionError(cause instanceof Error ? cause.message : String(cause)),
-        [],
-    );
-
     function setDraft(next: Draft) {
         if (!selected) return;
 
@@ -153,13 +149,27 @@ export function App() {
         setDrafts((held) => ({ ...held, [selected.id]: next }));
     }
 
-    async function save() {
-        if (!api || !selected || !draft) return;
+    // Every write here is the same shape: one call under the busy flag, and a
+    // failure in the banner. What differs is what the answer changes.
+    async function write(action: (client: GymApi) => Promise<void>) {
+        if (!api) return;
 
         setBusy(true);
 
         try {
-            await api.updateMesocycle(selected.id, {
+            await action(api);
+        } catch (cause) {
+            setActionError(messageOf(cause));
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function save() {
+        if (!selected || !draft) return;
+
+        void write(async (client) => {
+            await client.updateMesocycle(selected.id, {
                 name: draft.name.trim(),
                 weeks: draft.weeks,
                 days: draft.days.map((day) => ({ label: day.label.trim(), plan: day.plan })),
@@ -176,20 +186,12 @@ export function App() {
 
             setSaved(true);
             blocks.reload();
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setBusy(false);
-        }
+        });
     }
 
-    async function createBlock() {
-        if (!api) return;
-
-        setBusy(true);
-
-        try {
-            const created = await api.createMesocycle(
+    function createBlock() {
+        void write(async (client) => {
+            const created = await client.createMesocycle(
                 `Block ${blocks.blocks.length + 1}`,
                 NEW_BLOCK_WEEKS,
                 DEFAULT_DAY_LABELS.slice(0, Math.max(MIN_DAYS, NEW_BLOCK_DAYS))
@@ -207,27 +209,17 @@ export function App() {
                 'Block created, and the phone now opens on it. Name it and plan the days here; '
                 + 'the block you were training is still in the list.',
             );
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setBusy(false);
-        }
+        });
     }
 
-    async function makeCurrent() {
-        if (!api || !selected) return;
+    function makeCurrent() {
+        if (!selected) return;
 
-        setBusy(true);
-
-        try {
-            await api.switchMesocycle(selected.id);
+        void write(async (client) => {
+            await client.switchMesocycle(selected.id);
             blocks.reload();
             setNotice(`The phone now opens on ${selected.name}.`);
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setBusy(false);
-        }
+        });
     }
 
     if (!auth.ready) {
@@ -255,7 +247,7 @@ export function App() {
     const failure = authFailure
         ?? actionError
         ?? blocks.error
-        ?? sessions.error
+        ?? history.error
         ?? (view === 'stats' ? workouts.error : null);
 
     const exerciseCount = library?.exercises.length ?? 0;
@@ -288,7 +280,7 @@ export function App() {
                 blocksLoading={blocks.loading}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                onCreate={() => { void createBlock(); }}
+                onCreate={createBlock}
                 busy={busy}
                 theme={theme}
                 onTheme={pickTheme}
@@ -335,7 +327,7 @@ export function App() {
                             <button
                                 type="button"
                                 className="primary"
-                                onClick={() => { void save(); }}
+                                onClick={save}
                                 disabled={busy || !isSaveable(draft)}
                             >
                                 {isSaveable(draft) ? 'Save changes' : 'Name every day'}
@@ -356,7 +348,7 @@ export function App() {
                         <DashboardScreen
                             block={selected}
                             sessions={blockSessions}
-                            loading={sessions.loading === selected.id}
+                            loading={history.loading === selected.id}
                             week={week}
                             onWeek={(next) => setWeeks((held) => ({ ...held, [selected.id]: next }))}
                             onEditPlan={() => setView('block')}
@@ -369,7 +361,7 @@ export function App() {
                             library={library}
                             week={week}
                             busy={busy}
-                            onMakeCurrent={() => { void makeCurrent(); }}
+                            onMakeCurrent={makeCurrent}
                         />
                     ) : view === 'library' ? (
                         <LibraryScreen library={library} block={selected} />
