@@ -6,10 +6,24 @@ name: Deploy nygdev.dev
 # provisioning. A rename fails with "Could not determine the Static Web App from
 # the GitHub OIDC workflow reference". The `name:` above is free to change.
 #
-# Manual-only: deploy on demand from the Actions tab. To restore auto-deploy,
-# re-add the push/pull_request triggers and close_pull_request_job (git history).
+# Deploys on every push to master that touches the site, and on demand from the
+# Actions tab. The workflow file itself is in the filter so a change to how the
+# site deploys is proven by deploying it.
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'sites/nygdev/**'
+      - '.github/workflows/azure-static-web-apps-brave-cliff-0253fca03.yml'
   workflow_dispatch:
+
+# A second push while a deploy is still uploading queues behind it rather than
+# racing it, so the last commit is always the one that ends up live. Not
+# cancel-in-progress: an upload cut off halfway is worse than one that finishes
+# and is immediately superseded.
+concurrency:
+  group: deploy-nygdev
+  cancel-in-progress: false
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
 # azure/login with a federated credential, then the Az CLI for anything that

@@ -1,9 +1,32 @@
 name: Deploy gymbro.nygard.dev
 
-# Manual-only, like the other three site workflows: deploy on demand from the
-# Actions tab. Auto-deploy on push/PR is intentionally off.
+# Deploys on every push to master that touches the site, and on demand from the
+# Actions tab.
+#
+# The filter covers the parts of sites/gym this build reads, not just
+# sites/gymbro: the `@gym` alias compiles the logger's src into this bundle,
+# vite.config.ts imports its bridge-chunks plugin, and its package files decide
+# what the logger's tree installs. A change to the logger's domain layer ships
+# both apps, which is the point of sharing it.
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'sites/gymbro/**'
+      - 'sites/gym/src/**'
+      - 'sites/gym/vite.bridge-chunks.ts'
+      - 'sites/gym/package.json'
+      - 'sites/gym/package-lock.json'
+      - '.github/workflows/deploy-gymbro.yml'
   workflow_dispatch:
+
+# A second push while a deploy is still uploading queues behind it rather than
+# racing it, so the last commit is always the one that ends up live. Not
+# cancel-in-progress: an upload cut off halfway is worse than one that finishes
+# and is immediately superseded.
+concurrency:
+  group: deploy-gymbro
+  cancel-in-progress: false
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
 # id-token: write is for azure/login only; like the gym.nygard.dev workflow this

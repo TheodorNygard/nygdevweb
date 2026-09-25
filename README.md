@@ -39,13 +39,19 @@ either app, and a second transcription of them is the thing being avoided. See
 
 ## Deployment
 
-Deploys are **manual** — pick the workflow in the Actions tab and run it. Auto-deploy
-on push and PR is intentionally off.
+Each site deploys **on push to `master`** when the commit touches it — its own
+folder or its own workflow file. gymbro.nygard.dev also redeploys when the
+parts of `sites/gym/` it compiles in change (`src/`, `vite.bridge-chunks.ts`,
+the package files), since the `@gym` alias builds the logger's domain layer into
+its bundle. Pull requests deploy nothing. A push that lands while the same site
+is still deploying queues behind it rather than racing it.
 
-**Deploy all sites** (`.github/workflows/deploy-all.yml`) is the one to run when
-everything should ship. It deploys nothing itself: it dispatches the four
-workflows below — tick-boxes choose which — and then waits on them, so it goes
-green only once every site it started did. Without that wait it would report
+Every workflow can still be run by hand from the Actions tab.
+**Deploy all sites** (`.github/workflows/deploy-all.yml`) stays manual-only and
+is the one to run when everything should ship regardless of what changed. It
+deploys nothing itself: it dispatches the four workflows below — tick-boxes
+choose which — and then waits on them, so it goes green only once every site it
+started did. Without that wait it would report
 success the moment the dispatches were accepted, which is the trap worth
 avoiding: the fan-out green and one site failing to ship three minutes later.
 Each site still gets its own run in the Actions tab, so a failure names the site

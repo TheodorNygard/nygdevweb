@@ -1,9 +1,22 @@
 name: Deploy run.nygard.dev
 
-# Manual-only, matching the nygdev.dev workflow: deploy on demand from the
-# Actions tab ("Run workflow"). Auto-deploy on push/PR is intentionally off.
+# Deploys on every push to master that touches the site, and on demand from the
+# Actions tab ("Run workflow").
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'sites/run/**'
+      - '.github/workflows/deploy-run.yml'
   workflow_dispatch:
+
+# A second push while a deploy is still uploading queues behind it rather than
+# racing it, so the last commit is always the one that ends up live. Not
+# cancel-in-progress: an upload cut off halfway is worse than one that finishes
+# and is immediately superseded.
+concurrency:
+  group: deploy-run
+  cancel-in-progress: false
 
 # OIDC (federated) auth to Azure — no long-lived secrets stored in GitHub.
 # id-token: write is for azure/login only; unlike the nygdev.dev workflow this
