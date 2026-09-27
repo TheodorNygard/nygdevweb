@@ -4,6 +4,13 @@ interface SheetProps {
     /** Named for assistive technology; the visible title is inside `children`. */
     label: string;
     onClose: () => void;
+
+    /**
+     * For a sheet that lays out its own scrolling: no padding, nothing clipped
+     * to scroll, and `children` bring a fixed head and a list that scrolls
+     * under it (the exercise picker). Flat content passed with this set has no
+     * scroll at all — whatever is past the bottom is simply cut off.
+     */
     tall?: boolean;
     children: ReactNode;
 }

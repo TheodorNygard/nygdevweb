@@ -603,11 +603,11 @@ npm run preview   # serve the built dist/ over HTTP
 | Path | What it holds |
 | --- | --- |
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
-| `auth.html` | MSAL's redirect URI. Loads `src/auth.ts` and nothing else — the hidden renewal iframe lands here on a ten-second clock, so the app must stay off it |
-| `src/lib/` | No React: the typed API client and its wire types, the block/session maths, formatting, the exercise library and the built-in day templates, the identity config, the AADSTS error map |
-| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useTemplates` (the two template lists and their writes), `useLibrary`, `useElapsed` |
-| `src/screens/` | Today, Plan, History, Session, Done |
-| `src/components/` | The tab bar, the bottom sheets — day, block, day plan, templates, exercise picker, finish — the stepper, the drag handle, the banner, the sign-in gate |
+| `auth.html` | MSAL's redirect URI. Loads `src/auth.ts` and nothing else — every sign-in and renewal comes back from Entra through it before the app loads, so the app stays off it |
+| `src/lib/` | No React: the typed API client and its wire types, the block/session maths and the local session totals, formatting, the exercise library and the built-in day templates, the identity config and MSAL instance, the renewal-redirect guard, the AADSTS error map, the held copy of the current block, the themes |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useHistory` (another block's sessions, read when it is opened), `useLastSets`, `useTemplates` (the two template lists and their writes), `useDragReorder`, `useLibrary`, `useTheme` |
+| `src/screens/` | Intro, Today, Plan, History, Session, Done |
+| `src/components/` | The tab bar, the masthead (and its theme switch), the bottom sheets — day, block, day plan, templates, exercise picker, finish — the stepper, the drag handle, the intro's effort graph, the banner, the sign-in gate |
 | `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
 | `dist/` | Build output. Gitignored; produced in CI and uploaded as-is |
 
@@ -621,8 +621,8 @@ Two build settings are there for what ships rather than for what compiles.
 `node_modules` is split in two: whatever `auth.html` reaches becomes the
 `bridge` chunk (~115 kB), and the rest — React, and the MSAL the app alone
 uses — becomes `vendor` (~325 kB). So an app edit reships ~70 kB instead of
-invalidating either, and the renewal iframe downloads the bridge rather than
-all of React. Left unassigned those shared modules fold back into `vendor`,
+invalidating either, and every return from Entra downloads the bridge rather
+than all of React before the app starts. Left unassigned those shared modules fold back into `vendor`,
 which is why `manualChunks` names the chunk rather than returning `undefined`.
 And `/assets/*` is served `immutable` for a year from
 `staticwebapp.config.json`, which is safe because every file under it is
@@ -688,15 +688,15 @@ are on it.
 as a hashed same-origin file, and `404.html` links `404.css` rather than
 carrying its own. The handful of inline `style` attributes in the app are
 attributes, not blocks, and CSP does not govern them without
-`style-src-attr` — MSAL's hidden renewal iframe relies on the same thing, since
-it sets `element.style.visibility` through the CSSOM.
+`style-src-attr` — MSAL's hidden renewal iframe would rely on the same thing,
+since it sets `element.style.visibility` through the CSSOM.
 
 `Cross-Origin-Embedder-Policy` is **omitted** here, where the other two sites
 set `credentialless`. It buys this page nothing — there is no
-`SharedArrayBuffer` and no cross-origin isolation to earn — and it costs
-something real: `credentialless` strips cookies from the sign-in iframe, so
-silent renewal fails on a session that would otherwise have worked. A header
-that only breaks a working path is not a security control.
+`SharedArrayBuffer` and no cross-origin isolation to earn — and it would cost
+the same fallback the `frame-src` row keeps: `credentialless` strips cookies
+from the sign-in iframe, so silent renewal through it could not work even
+where the browser allows the cookie.
 
 ### When sign-in fails
 
@@ -770,7 +770,9 @@ An API failure is a different banner, and it prints the API's own `message`
 unedited: those messages are written to be shown or logged as-is, and they name
 the field, what arrived and what was expected.
 
-Two messages the renewal iframe leaves in the console are worth telling apart.
+Two console messages from the renewal iframe are worth recognising, and both
+now say something about *which build* is running, since the current one never
+opens that frame.
 
 `Feature Policy: Skipping unsupported feature name "local-network-access"`,
 pointing into the vendor chunk, is MSAL's and not this app's:
@@ -785,10 +787,10 @@ https://gym.nygard.dev/auth.html#code=...` is not harmless, and it says the
 browser quotes back: a `frame-src` naming only `login.microsoftonline.com` is
 the policy from before `'self'` was added, and the renewal dies on its last
 step — the code comes back from Entra and the frame is not allowed to land on
-the bridge page that would broadcast it. Deploys are manual, so a committed
-header change ships when somebody runs the workflow and not before — and the
-same applies to gymbro.nygard.dev, which carries the same two directives. Check
-what is actually live rather than reading the file:
+the bridge page that would broadcast it. A header change ships with the push to
+`master` that carries it, so this is a deploy that failed or never ran — and
+the same applies to gymbro.nygard.dev, which carries the same two directives.
+Check what is actually live rather than reading the file:
 
 ```sh
 curl -sSI https://gym.nygard.dev/ | grep -i content-security-policy
@@ -886,11 +888,12 @@ the next session against.
 
 ### The domain layer is shared, and the design is not
 
-`sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and two of its
+`sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and five of its
 hooks through a `@gym` alias declared in both `vite.config.ts` and
 `tsconfig.app.json`. The wire types, the block maths (`repsInTank`,
 `setsForWeek`, `isRestWeek`, `progressOf`), the formatting, the `GymApi` client,
-the AADSTS error map, `useAuth` and `useResource` all live once, in
+the AADSTS error map, `useAuth`, `useResource`, `useHistory` (a block's
+sessions, read once and held), `useLibrary` and `useTheme` all live once, in
 `sites/gym/src`.
 
 That is the point of `lib/types.ts` being written as a transcription of the API

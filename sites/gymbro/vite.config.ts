@@ -73,11 +73,11 @@ export default defineConfig({
         assetsInlineLimit: 0,
 
         rollupOptions: {
-            // Two pages, not one. `auth.html` is MSAL's redirect URI: the
-            // hidden renewal iframe lands there, and it has ten seconds to load
-            // and broadcast before the renewal gives up. A separate entry is
-            // what keeps the app — React and all — off it. Paths are relative
-            // to `root`, which is this directory.
+            // Two pages, not one. `auth.html` is MSAL's redirect URI: every
+            // sign-in and renewal comes back from Entra through it before the
+            // app loads. A separate entry is what keeps the app — React and
+            // all — off it. Paths are relative to `root`, which is this
+            // directory.
             input: {
                 main: 'index.html',
                 auth: 'auth.html',

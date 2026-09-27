@@ -125,7 +125,7 @@ export function TemplateSheet({
     }
 
     return (
-        <Sheet label={`Templates for ${dayLabel}`} onClose={onClose} tall>
+        <Sheet label={`Templates for ${dayLabel}`} onClose={onClose}>
             <div className="sheet__eyebrow">TEMPLATES</div>
             <div className="sheet__title">{dayLabel}</div>
             <p className="day__sub" style={{ marginTop: 8 }}>

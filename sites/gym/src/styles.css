@@ -1705,6 +1705,7 @@ button {
        which pushing it off the bottom of the screen would not. */
     max-height: 92dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 20px 18px calc(28px + env(safe-area-inset-bottom, 0px));
     background: var(--sheet);
     border-radius: 22px 22px 0 0;
@@ -1891,6 +1892,7 @@ button {
 .picker__list {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 8px 10px calc(28px + env(safe-area-inset-bottom, 0px));
 }
 

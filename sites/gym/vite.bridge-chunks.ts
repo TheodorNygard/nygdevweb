@@ -26,10 +26,11 @@ type GetModuleInfo = (id: string) => ModuleInfo;
  * than invalidating all of it.
  *
  * Except for what auth.html touches, which gets a chunk of its own. That page
- * is fetched inside an iframe on a ten-second clock over gym wifi, so what it
- * downloads has to be the few MSAL modules its bridge reaches and not all of
- * React — naming the chunk is what pins that, since left unassigned the bundler
- * folds them back into `vendor` alongside everything the app pulled in.
+ * loads on every return from Entra — each sign-in and each renewal redirect —
+ * before the app does, over gym wifi, so what it downloads should be the few
+ * MSAL modules its bridge reaches and not all of React. Naming the chunk is
+ * what pins that, since left unassigned the bundler folds them back into
+ * `vendor` alongside everything the app pulled in.
  *
  * A factory rather than a bare function, because of the cache inside it: one
  * per build, so `vite build --watch` cannot answer a rebuild out of the
