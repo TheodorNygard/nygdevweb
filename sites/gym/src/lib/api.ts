@@ -74,6 +74,14 @@ export class NetworkError extends Error {
     }
 }
 
+/**
+ * What to show for a failure. The API writes its `message` to be shown as-is,
+ * which is why nothing on this side rewords it.
+ */
+export function messageOf(cause: unknown): string {
+    return cause instanceof Error ? cause.message : String(cause);
+}
+
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface Call {

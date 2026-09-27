@@ -16,7 +16,7 @@ import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
 import { useTheme } from './hooks/useTheme';
-import { GymApi } from './lib/api';
+import { GymApi, messageOf } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
 import { DoneScreen } from './screens/DoneScreen';
@@ -245,11 +245,6 @@ export function App() {
         setDayDetail(null);
     }, []);
 
-    const describe = useCallback(
-        (cause: unknown) => setActionError(cause instanceof Error ? cause.message : String(cause)),
-        [],
-    );
-
     // Drops the held block on the way out, and this is the last chance to:
     // signing out navigates to Entra, and the page is gone by the time the
     // browser comes back. The read is keyed on the account as well, so nobody
@@ -313,7 +308,7 @@ export function App() {
                 block.reload();
             }
         } catch (cause) {
-            describe(cause);
+            setActionError(messageOf(cause));
         }
     }
 
@@ -336,118 +331,86 @@ export function App() {
         block.reload();
     }
 
-    async function savePlan(patch: { name: string; weeks: number; days: DayInput[] }) {
-        if (!api || !meso) return;
-
-        setPlanBusy(true);
-
-        try {
-            await api.updateMesocycle(meso.id, patch);
-            block.reload();
-            blocks.reload();
-
-            // A shortened block can leave Today on a week that no longer
-            // exists, and the arrows would not let you back.
-            setWeek((value) => Math.min(value ?? 1, patch.weeks));
-            setWeekSettled(true);
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setPlanBusy(false);
-        }
-    }
-
-    async function switchBlock(mesoId: string) {
+    // Every Plan-tab write is the same shape: one call, both block reads
+    // refreshed behind it, and a failure in the banner. What differs is where
+    // the week, the tab and the block sheet land afterwards.
+    async function writePlan(action: (client: GymApi) => Promise<unknown>, after: () => void) {
         if (!api) return;
 
         setPlanBusy(true);
 
         try {
-            await api.switchMesocycle(mesoId);
-            setOpenBlock(null);
+            await action(api);
             block.reload();
             blocks.reload();
+            after();
+        } catch (cause) {
+            setActionError(messageOf(cause));
+        } finally {
+            setPlanBusy(false);
+        }
+    }
+
+    function savePlan(patch: { name: string; weeks: number; days: DayInput[] }) {
+        if (!meso) return;
+
+        void writePlan((client) => client.updateMesocycle(meso.id, patch), () => {
+            // A shortened block can leave Today on a week that no longer
+            // exists, and the arrows would not let you back.
+            setWeek((value) => Math.min(value ?? 1, patch.weeks));
+            setWeekSettled(true);
+        });
+    }
+
+    function switchBlock(mesoId: string) {
+        void writePlan((client) => client.switchMesocycle(mesoId), () => {
+            setOpenBlock(null);
 
             // The week is derived from the sessions in the block, so it has to
             // be re-derived: week 4 of the block you just left is not week 4 of
             // this one.
             chooseWeek(null);
             pickTab('today');
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setPlanBusy(false);
-        }
+        });
     }
 
-    async function copyBlock(source: MesocycleSummary) {
-        if (!api) return;
-
-        setPlanBusy(true);
-
-        try {
-            // No copy route needed: create takes the same three fields the
-            // source is made of, plans included, and creating is also
-            // switching. The sessions stay where they were logged.
-            await api.createMesocycle(
+    function copyBlock(source: MesocycleSummary) {
+        // No copy route needed: create takes the same three fields the source
+        // is made of, plans included, and creating is also switching. The
+        // sessions stay where they were logged.
+        void writePlan(
+            (client) => client.createMesocycle(
                 `${source.name} (copy)`,
                 source.weeks,
                 source.days.map((day) => ({ label: day.label, plan: day.plan })),
-            );
+            ),
+            () => {
+                setOpenBlock(null);
 
-            setOpenBlock(null);
-            block.reload();
-            blocks.reload();
-            chooseWeek(1);
-
-            // Stays on Plan rather than jumping to Today: a copy is almost
-            // always renamed straight afterwards, in the field at the top of
-            // this screen.
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setPlanBusy(false);
-        }
+                // Stays on Plan rather than jumping to Today: a copy is almost
+                // always renamed straight afterwards, in the field at the top
+                // of this screen.
+                chooseWeek(1);
+            },
+        );
     }
 
-    async function removeBlock(mesoId: string) {
-        if (!api) return;
-
-        setPlanBusy(true);
-
-        try {
-            await api.deleteMesocycle(mesoId);
+    function removeBlock(mesoId: string) {
+        void writePlan((client) => client.deleteMesocycle(mesoId), () => {
             setOpenBlock(null);
 
-            // Both lists, and the week with them: deleting the current block
+            // The week goes with both lists: deleting the current block
             // repoints the pointer at whatever is newest, so what Today shows
             // is a different block than it was a moment ago.
-            block.reload();
-            blocks.reload();
             chooseWeek(null);
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setPlanBusy(false);
-        }
+        });
     }
 
-    async function createPlan(plan: { name: string; weeks: number; days: DayInput[] }) {
-        if (!api) return;
-
-        setPlanBusy(true);
-
-        try {
-            await api.createMesocycle(plan.name, plan.weeks, plan.days);
-            block.reload();
-            blocks.reload();
+    function createPlan(plan: { name: string; weeks: number; days: DayInput[] }) {
+        void writePlan((client) => client.createMesocycle(plan.name, plan.weeks, plan.days), () => {
             chooseWeek(1);
             pickTab('today');
-        } catch (cause) {
-            describe(cause);
-        } finally {
-            setPlanBusy(false);
-        }
+        });
     }
 
     // A token failure while already signed in is a setup problem, not a
@@ -559,8 +522,8 @@ export function App() {
                                     library={library}
                                     templates={templates}
                                     busy={planBusy}
-                                    onSave={(patch) => { void savePlan(patch); }}
-                                    onCreate={(plan) => { void createPlan(plan); }}
+                                    onSave={savePlan}
+                                    onCreate={createPlan}
                                     onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
                                 />
@@ -679,9 +642,9 @@ export function App() {
                     block={openBlock}
                     volumeKg={blockVolume}
                     busy={planBusy}
-                    onSwitch={(mesoId) => { void switchBlock(mesoId); }}
-                    onCopy={(source) => { void copyBlock(source); }}
-                    onDelete={(mesoId) => { void removeBlock(mesoId); }}
+                    onSwitch={switchBlock}
+                    onCopy={copyBlock}
+                    onDelete={removeBlock}
                     onClose={() => setOpenBlock(null)}
                 />
             ) : null}

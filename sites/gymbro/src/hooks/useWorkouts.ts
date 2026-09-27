@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { type GymApi, type SessionDetail } from '../lib/gym';
+import { messageOf, type GymApi, type SessionDetail } from '../lib/gym';
 
 export interface WorkoutsState {
     /** Every session in the block, sets and all, newest first. */
@@ -109,7 +109,7 @@ export function useWorkouts(
                 // is one call, so a failure is the whole block rather than the
                 // one session it used to be.
                 setSessions([]);
-                setError(cause instanceof Error ? cause.message : String(cause));
+                setError(messageOf(cause));
             } finally {
                 if (!cancelled) setLoading(false);
             }

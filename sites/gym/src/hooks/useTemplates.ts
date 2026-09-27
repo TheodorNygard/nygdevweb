@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { GymApi } from '../lib/api';
+import { messageOf, type GymApi } from '../lib/api';
 import { loadTemplates } from '../lib/templates';
 import type { DayTemplate, PlannedExercise } from '../lib/types';
 
@@ -91,9 +91,7 @@ export function useTemplates(api: GymApi | null): TemplatesState {
             } catch (cause) {
                 if (cancelled) return;
 
-                // The API writes its `message` to be shown as-is, which is why
-                // it is not reworded here.
-                setError(cause instanceof Error ? cause.message : String(cause));
+                setError(messageOf(cause));
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -114,7 +112,7 @@ export function useTemplates(api: GymApi | null): TemplatesState {
             await action();
             setError(null);
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : String(cause));
+            setError(messageOf(cause));
         } finally {
             setBusy(false);
         }

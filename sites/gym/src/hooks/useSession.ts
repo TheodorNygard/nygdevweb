@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { reordered } from './useDragReorder';
-import { ApiError, type GymApi } from '../lib/api';
+import { ApiError, messageOf, type GymApi } from '../lib/api';
 import { localDate } from '../lib/format';
 import { computeTotals } from '../lib/totals';
 import type { SessionEntry, WorkSet, Workout } from '../lib/types';
@@ -58,11 +58,6 @@ function withEntries(workout: Workout, entries: SessionEntry[]): Workout {
     return { ...workout, entries, totals: computeTotals(entries) };
 }
 
-/** The API writes its `message` to be shown as-is, which is why it is not reworded. */
-function describe(cause: unknown): string {
-    return cause instanceof Error ? cause.message : String(cause);
-}
-
 /**
  * The open session, and the four guarded writes that change it.
  *
@@ -112,7 +107,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
             return fresh;
         } catch (cause) {
-            setError(describe(cause));
+            setError(messageOf(cause));
 
             return null;
         }
@@ -139,7 +134,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
             return started.workout;
         } catch (cause) {
-            setError(describe(cause));
+            setError(messageOf(cause));
 
             return null;
         } finally {
@@ -162,7 +157,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
             return fetched;
         } catch (cause) {
-            setError(describe(cause));
+            setError(messageOf(cause));
 
             return null;
         } finally {
@@ -213,7 +208,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                 return;
             }
 
-            setError(describe(cause));
+            setError(messageOf(cause));
 
             // Roll back only if nothing has been logged since. Two quick taps
             // are two writes in flight, and restoring the first one's
@@ -356,7 +351,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
 
             return true;
         } catch (cause) {
-            setError(describe(cause));
+            setError(messageOf(cause));
 
             return false;
         } finally {
