@@ -839,6 +839,38 @@ button {
     color: var(--accent-ink);
 }
 
+/* A day with nothing planned, or no name, cannot be saved — so it is the one
+   thing on the screen asking for attention: the handle filled in the accent,
+   and an empty name outlined in it. */
+.dayfield__plan--empty {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+}
+
+.dayfield__plan--empty:hover {
+    border-color: var(--accent-hi);
+    background: var(--accent-hi);
+    color: var(--on-accent);
+}
+
+.dayfield__input--empty {
+    border-color: rgba(var(--accent-rgb), 0.6);
+}
+
+.dayfield__input::placeholder {
+    color: var(--fg-35);
+}
+
+/* Under the save button, saying why it is disabled. */
+.save-blocker {
+    margin: 10px 0 0;
+    font: 400 13px/1.5 var(--sans);
+    color: var(--accent-ink);
+    text-align: center;
+}
+
 /* One planned exercise in the day-plan sheet: the name, and the two steppers
    that say how much of it. */
 .planned {
