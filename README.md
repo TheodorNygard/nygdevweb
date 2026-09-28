@@ -483,7 +483,7 @@ nothing about a session depends on the library being reachable.
 
 ### Day templates come from both places at once
 
-A **template** is a named plan — Push, Lower A — that the Plan tab drops into a
+A **template** is a named plan — Push, Lower · Squat — that the Plan tab drops into a
 day of a block. There are two kinds and they arrive by different routes, which
 is the whole design rather than an accident of history:
 
