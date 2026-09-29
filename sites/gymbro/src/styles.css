@@ -12,7 +12,7 @@
  * Themed, within that, the same way: every colour is a token on `:root`, a
  * theme is a `[data-theme]` block that redefines them, and the attribute is
  * written by the logger's `lib/theme` before the first render. The two sites
- * carry the same three themes — Graphite by default, then Orchis and Cobalt — each
+ * carry the same three themes — Cobalt by default, then Graphite and Orchis — each
  * transcribed into its own stylesheet, since the token sets differ.
  */
 
@@ -28,16 +28,16 @@
 @import '@fontsource/jetbrains-mono/latin-700.css';
 
 :root {
-    --bg: #0b0c0e;
-    --rail: #0e1013;
-    --card: #121418;
-    --row: #14161a;
-    --row-hover: #1a1d22;
-    --fg: #f2f3f5;
-    --accent: #d6ff3f;
-    --accent-hi: #e6ff7a;
+    --bg: #0b1220;
+    --rail: #0e1626;
+    --card: #111a2b;
+    --row: #131d30;
+    --row-hover: #1a2740;
+    --fg: #eef3fb;
+    --accent: #5aa9ff;
+    --accent-hi: #8cc4ff;
 
-    /* What sits on the accent: lime is bright, so near-black text reads on it.
+    /* What sits on the accent: the accent is bright, so near-black text reads on it.
        A theme with a saturated accent flips this to white. */
     --on-accent: var(--bg);
     --on-accent-rgb: var(--bg-rgb);
@@ -49,30 +49,30 @@
 
     /* The channels behind `--bg` and `--accent`, for the tints below: an
        alpha on the accent has to follow the accent when a theme changes it. */
-    --bg-rgb: 11, 12, 14;
-    --accent-rgb: 214, 255, 63;
+    --bg-rgb: 11, 18, 32;
+    --accent-rgb: 90, 169, 255;
 
     /* A surface tinted toward the accent — the notice banner. */
-    --accent-bg: #1a1d12;
+    --accent-bg: #12203a;
 
-    --fg-80: rgba(242, 243, 245, 0.8);
-    --fg-72: rgba(242, 243, 245, 0.72);
-    --fg-62: rgba(242, 243, 245, 0.62);
-    --fg-60: rgba(242, 243, 245, 0.6);
-    --fg-55: rgba(242, 243, 245, 0.55);
-    --fg-50: rgba(242, 243, 245, 0.5);
-    --fg-45: rgba(242, 243, 245, 0.45);
-    --fg-40: rgba(242, 243, 245, 0.4);
-    --fg-35: rgba(242, 243, 245, 0.35);
-    --fg-32: rgba(242, 243, 245, 0.32);
-    --fg-30: rgba(242, 243, 245, 0.3);
-    --fg-28: rgba(242, 243, 245, 0.28);
+    --fg-80: rgba(238, 243, 251, 0.82);
+    --fg-72: rgba(238, 243, 251, 0.74);
+    --fg-62: rgba(238, 243, 251, 0.64);
+    --fg-60: rgba(238, 243, 251, 0.62);
+    --fg-55: rgba(238, 243, 251, 0.57);
+    --fg-50: rgba(238, 243, 251, 0.52);
+    --fg-45: rgba(238, 243, 251, 0.47);
+    --fg-40: rgba(238, 243, 251, 0.42);
+    --fg-35: rgba(238, 243, 251, 0.37);
+    --fg-32: rgba(238, 243, 251, 0.34);
+    --fg-30: rgba(238, 243, 251, 0.32);
+    --fg-28: rgba(238, 243, 251, 0.3);
 
-    --line: rgba(255, 255, 255, 0.08);
-    --line-strong: rgba(255, 255, 255, 0.14);
-    --hair: rgba(255, 255, 255, 0.07);
-    --fill: rgba(255, 255, 255, 0.06);
-    --fill-soft: rgba(255, 255, 255, 0.045);
+    --line: rgba(190, 215, 255, 0.1);
+    --line-strong: rgba(190, 215, 255, 0.16);
+    --hair: rgba(190, 215, 255, 0.08);
+    --fill: rgba(190, 215, 255, 0.07);
+    --fill-soft: rgba(190, 215, 255, 0.045);
 
     --accent-06: rgba(var(--accent-rgb), 0.06);
     --accent-14: rgba(var(--accent-rgb), 0.14);
@@ -140,43 +140,40 @@
 }
 
 /*
- * Cobalt — deep navy surfaces, a sidebar a step darker than the canvas, and a
- * sky-blue accent that keeps near-black on its fills, as lime does. See the
- * logger's stylesheet.
+ * Graphite — the original: near-black surfaces and acid lime. Bright enough to
+ * be both a fill and a word on the background, so it keeps near-black on the
+ * fill and needs no separate ink. It was the `:root` default until Cobalt took
+ * that over; now it is a block like Orchis.
  */
-:root[data-theme="cobalt"] {
-    --bg: #0b1220;
-    --rail: #0e1626;
-    --card: #111a2b;
-    --row: #131d30;
-    --row-hover: #1a2740;
-    --fg: #eef3fb;
-    --accent: #5aa9ff;
-    --accent-hi: #8cc4ff;
-
-    --bg-rgb: 11, 18, 32;
-    --accent-rgb: 90, 169, 255;
-
-    --accent-bg: #12203a;
-
-    --fg-80: rgba(238, 243, 251, 0.82);
-    --fg-72: rgba(238, 243, 251, 0.74);
-    --fg-62: rgba(238, 243, 251, 0.64);
-    --fg-60: rgba(238, 243, 251, 0.62);
-    --fg-55: rgba(238, 243, 251, 0.57);
-    --fg-50: rgba(238, 243, 251, 0.52);
-    --fg-45: rgba(238, 243, 251, 0.47);
-    --fg-40: rgba(238, 243, 251, 0.42);
-    --fg-35: rgba(238, 243, 251, 0.37);
-    --fg-32: rgba(238, 243, 251, 0.34);
-    --fg-30: rgba(238, 243, 251, 0.32);
-    --fg-28: rgba(238, 243, 251, 0.3);
-
-    --line: rgba(190, 215, 255, 0.1);
-    --line-strong: rgba(190, 215, 255, 0.16);
-    --hair: rgba(190, 215, 255, 0.08);
-    --fill: rgba(190, 215, 255, 0.07);
-    --fill-soft: rgba(190, 215, 255, 0.045);
+:root[data-theme="graphite"] {
+    --bg: #0b0c0e;
+    --rail: #0e1013;
+    --card: #121418;
+    --row: #14161a;
+    --row-hover: #1a1d22;
+    --fg: #f2f3f5;
+    --accent: #d6ff3f;
+    --accent-hi: #e6ff7a;
+    --bg-rgb: 11, 12, 14;
+    --accent-rgb: 214, 255, 63;
+    --accent-bg: #1a1d12;
+    --fg-80: rgba(242, 243, 245, 0.8);
+    --fg-72: rgba(242, 243, 245, 0.72);
+    --fg-62: rgba(242, 243, 245, 0.62);
+    --fg-60: rgba(242, 243, 245, 0.6);
+    --fg-55: rgba(242, 243, 245, 0.55);
+    --fg-50: rgba(242, 243, 245, 0.5);
+    --fg-45: rgba(242, 243, 245, 0.45);
+    --fg-40: rgba(242, 243, 245, 0.4);
+    --fg-35: rgba(242, 243, 245, 0.35);
+    --fg-32: rgba(242, 243, 245, 0.32);
+    --fg-30: rgba(242, 243, 245, 0.3);
+    --fg-28: rgba(242, 243, 245, 0.28);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --hair: rgba(255, 255, 255, 0.07);
+    --fill: rgba(255, 255, 255, 0.06);
+    --fill-soft: rgba(255, 255, 255, 0.045);
 }
 
 * {
