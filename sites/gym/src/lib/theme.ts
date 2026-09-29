@@ -9,12 +9,17 @@
  * matches the screen under it.
  *
  * Both sites are dark, and so is every theme here. What a theme changes is
- * the greys and the accent — Graphite's near-black and acid lime, Orchis's
- * lifted neutrals and purple, or Cobalt's navy and sky blue — not whether the
+ * the greys and the accent — Cobalt's navy and sky blue, Graphite's near-black
+ * and acid lime, or Orchis's lifted neutrals and purple — not whether the
  * screen is dark. A light variant would be a different design, not a theme.
  */
 
 export const THEMES = [
+    {
+        id: 'cobalt',
+        label: 'Cobalt',
+        note: 'Deep navy, sky blue.',
+    },
     {
         id: 'graphite',
         label: 'Graphite',
@@ -25,17 +30,12 @@ export const THEMES = [
         label: 'Orchis',
         note: 'Neutral greys and purple, after the GTK theme.',
     },
-    {
-        id: 'cobalt',
-        label: 'Cobalt',
-        note: 'Deep navy, sky blue.',
-    },
 ] as const;
 
 export type Theme = (typeof THEMES)[number]['id'];
 
 /** The `:root` defaults are this theme, so it is also what an unset attribute means. */
-export const DEFAULT_THEME: Theme = 'graphite';
+export const DEFAULT_THEME: Theme = 'cobalt';
 
 /**
  * One key rather than one per account. A theme is a preference of the phone

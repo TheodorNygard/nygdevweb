@@ -11,7 +11,7 @@
  *
  * Themed, within that. Every colour is a token on `:root`, and a theme is a
  * `[data-theme]` block that redefines them — nothing below the tokens knows
- * which theme is on. Graphite is the `:root` default; Orchis and Cobalt follow it. The
+ * which theme is on. Cobalt is the `:root` default; Graphite and Orchis follow it. The
  * attribute is written by `lib/theme` before the first render.
  */
 
@@ -28,22 +28,22 @@
 @import '@fontsource/jetbrains-mono/latin-700.css';
 
 :root {
-    --bg: #0b0c0e;
-    --card: #121418;
-    --sheet: #14161a;
-    --row: #14161a;
-    --row-hover: #1a1d22;
-    --fg: #f2f3f5;
-    --accent: #d6ff3f;
-    --accent-hi: #e6ff7a;
+    --bg: #0b1220;
+    --card: #111a2b;
+    --sheet: #131d30;
+    --row: #131d30;
+    --row-hover: #1a2740;
+    --fg: #eef3fb;
+    --accent: #5aa9ff;
+    --accent-hi: #8cc4ff;
 
-    /* What sits on the accent: lime is bright, so near-black text reads on it.
+    /* What sits on the accent: the accent is bright, so near-black text reads on it.
        A theme with a saturated accent flips this to white. */
     --on-accent: var(--bg);
     --on-accent-rgb: var(--bg-rgb);
 
     /* The accent as *text* on the dark background — eyebrows, row values,
-       the masthead mark. Lime is bright enough to be both the fill of a
+       the masthead mark. A bright accent can be to be both the fill of a
        button and a word on near-black; a saturated purple is not, since a
        fill dark enough for white text on it is too dark to read as text
        itself. So the two are separate tokens, and only a theme that needs
@@ -53,24 +53,24 @@
     /* The channels behind `--bg` and `--accent`, for the tints below and the
        dozens of `rgba(var(--accent-rgb), …)` in the rules: an alpha on the
        accent has to follow the accent when a theme changes it. */
-    --bg-rgb: 11, 12, 14;
-    --accent-rgb: 214, 255, 63;
+    --bg-rgb: 11, 18, 32;
+    --accent-rgb: 90, 169, 255;
 
     /* A surface tinted toward the accent — the notice banner. */
-    --accent-bg: #1b1f14;
+    --accent-bg: #12203a;
 
-    --fg-70: rgba(242, 243, 245, 0.7);
-    --fg-60: rgba(242, 243, 245, 0.6);
-    --fg-50: rgba(242, 243, 245, 0.5);
-    --fg-45: rgba(242, 243, 245, 0.45);
-    --fg-40: rgba(242, 243, 245, 0.4);
-    --fg-35: rgba(242, 243, 245, 0.35);
-    --fg-28: rgba(242, 243, 245, 0.28);
+    --fg-70: rgba(238, 243, 251, 0.72);
+    --fg-60: rgba(238, 243, 251, 0.62);
+    --fg-50: rgba(238, 243, 251, 0.52);
+    --fg-45: rgba(238, 243, 251, 0.47);
+    --fg-40: rgba(238, 243, 251, 0.42);
+    --fg-35: rgba(238, 243, 251, 0.37);
+    --fg-28: rgba(238, 243, 251, 0.3);
 
-    --line: rgba(255, 255, 255, 0.08);
-    --line-strong: rgba(255, 255, 255, 0.14);
-    --fill: rgba(255, 255, 255, 0.06);
-    --fill-soft: rgba(255, 255, 255, 0.03);
+    --line: rgba(190, 215, 255, 0.1);
+    --line-strong: rgba(190, 215, 255, 0.16);
+    --fill: rgba(190, 215, 255, 0.07);
+    --fill-soft: rgba(190, 215, 255, 0.035);
 
     --sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
     --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -133,37 +133,34 @@
 }
 
 /*
- * Cobalt — deep navy surfaces and a sky-blue accent. Like Graphite, the accent
- * is bright enough to be both a fill and a word on the background, so it keeps
- * near-black on the fill and needs no separate ink.
+ * Graphite — the original: near-black surfaces and acid lime. Bright enough to
+ * be both a fill and a word on the background, so it keeps near-black on the
+ * fill and needs no separate ink. It was the `:root` default until Cobalt took
+ * that over; now it is a block like Orchis.
  */
-:root[data-theme="cobalt"] {
-    --bg: #0b1220;
-    --card: #111a2b;
-    --sheet: #131d30;
-    --row: #131d30;
-    --row-hover: #1a2740;
-    --fg: #eef3fb;
-    --accent: #5aa9ff;
-    --accent-hi: #8cc4ff;
-
-    --bg-rgb: 11, 18, 32;
-    --accent-rgb: 90, 169, 255;
-
-    --accent-bg: #12203a;
-
-    --fg-70: rgba(238, 243, 251, 0.72);
-    --fg-60: rgba(238, 243, 251, 0.62);
-    --fg-50: rgba(238, 243, 251, 0.52);
-    --fg-45: rgba(238, 243, 251, 0.47);
-    --fg-40: rgba(238, 243, 251, 0.42);
-    --fg-35: rgba(238, 243, 251, 0.37);
-    --fg-28: rgba(238, 243, 251, 0.3);
-
-    --line: rgba(190, 215, 255, 0.1);
-    --line-strong: rgba(190, 215, 255, 0.16);
-    --fill: rgba(190, 215, 255, 0.07);
-    --fill-soft: rgba(190, 215, 255, 0.035);
+:root[data-theme="graphite"] {
+    --bg: #0b0c0e;
+    --card: #121418;
+    --sheet: #14161a;
+    --row: #14161a;
+    --row-hover: #1a1d22;
+    --fg: #f2f3f5;
+    --accent: #d6ff3f;
+    --accent-hi: #e6ff7a;
+    --bg-rgb: 11, 12, 14;
+    --accent-rgb: 214, 255, 63;
+    --accent-bg: #1b1f14;
+    --fg-70: rgba(242, 243, 245, 0.7);
+    --fg-60: rgba(242, 243, 245, 0.6);
+    --fg-50: rgba(242, 243, 245, 0.5);
+    --fg-45: rgba(242, 243, 245, 0.45);
+    --fg-40: rgba(242, 243, 245, 0.4);
+    --fg-35: rgba(242, 243, 245, 0.35);
+    --fg-28: rgba(242, 243, 245, 0.28);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --fill: rgba(255, 255, 255, 0.06);
+    --fill-soft: rgba(255, 255, 255, 0.03);
 }
 
 * {
