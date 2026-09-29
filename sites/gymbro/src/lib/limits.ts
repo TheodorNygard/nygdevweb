@@ -19,3 +19,6 @@ export const MAX_SETS = 60;
 
 /** What a new day is called before it is named: its position, as in the logger. */
 export const DEFAULT_DAY_LABELS = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6'];
+
+/** Longest a block name may be — the length its `maxLength` field stops at. */
+export const MAX_NAME = 80;

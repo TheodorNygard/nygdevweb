@@ -14,10 +14,11 @@ import {
     useAuth,
     useHistory,
     useLibrary,
+    useTemplates,
     useTheme,
     type SessionSummary,
 } from './lib/gym';
-import { DEFAULT_DAY_LABELS, MIN_DAYS } from './lib/limits';
+import { DEFAULT_DAY_LABELS, MAX_NAME, MIN_DAYS } from './lib/limits';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { BlockScreen, draftOf, isDirty, isSaveable, type Draft } from './screens/BlockScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -30,6 +31,9 @@ const NO_IDS: string[] = [];
 /** What a block starts as: five weeks of four unnamed days. */
 const NEW_BLOCK_WEEKS = 5;
 const NEW_BLOCK_DAYS = 4;
+
+/** What a copied block is called until it is renamed. */
+const COPY_SUFFIX = ' (copy)';
 
 export function App() {
     const auth = useAuth();
@@ -49,6 +53,13 @@ export function App() {
     const [view, setView] = useState<View>('dashboard');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [theme, pickTheme] = useTheme();
+
+    // Only read once the builder is opened: templates are used by nothing else
+    // here, and the built-in half is a CDN fetch a session that only reads the
+    // dashboard would be paying for. Held after that — the hook keeps what it has
+    // when `api` goes back to null, so returning to the builder shows the list at
+    // once while it is read again.
+    const templates = useTemplates(view === 'block' ? api : null);
 
     // Edits in flight, by block id. Keyed rather than single so that clicking
     // another block in the sidebar — the ordinary thing to do here — cannot
@@ -81,7 +92,12 @@ export function App() {
         if (selectedId === null || blocks.blocks.length === 0) return;
         if (blocks.blocks.some((block) => block.id === selectedId)) return;
 
-        setSelectedId(blocks.blocks[0]?.id ?? null);
+        // The block the phone opens on, if it is still there: deleting the one
+        // being read is the ordinary way to land here, and the API repoints the
+        // phone at the newest block left.
+        const fallback = blocks.blocks.find((block) => block.isCurrent) ?? blocks.blocks[0];
+
+        setSelectedId(fallback?.id ?? null);
     }, [blocks.blocks, selectedId]);
 
     // `load` is stable across renders; the state object around it is not, so
@@ -113,6 +129,14 @@ export function App() {
 
     const draft = selected ? drafts[selected.id] ?? draftOf(selected) : null;
     const dirty = selected !== null && draft !== null && isDirty(draft, selected);
+
+    // What deleting the block would take with it, from its own sessions. Null
+    // until they have been read, and the confirmation waits on it.
+    const blockVolumeKg = sessionsRead
+        ? blockSessions
+            .filter((session) => session.status === 'submitted')
+            .reduce((total, session) => total + session.volumeKg, 0)
+        : null;
 
     // Clamped: shortening a block can leave the map pointing past its own end.
     const week = selected
@@ -208,6 +232,56 @@ export function App() {
             setNotice(
                 'Block created, and the phone now opens on it. Name it and plan the days here; '
                 + 'the block you were training is still in the list.',
+            );
+        });
+    }
+
+    /**
+     * A new block from the plan on screen — drafted edits included — the way the
+     * logger's "copy its shape" does it: create takes the same three fields the
+     * source is made of, plans and all, so there is no copy route. The source
+     * keeps whatever it was, draft and all; creating is also switching, which is
+     * why the notice says so.
+     */
+    function copyBlock(from: Draft) {
+        const name = `${from.name.trim().slice(0, MAX_NAME - COPY_SUFFIX.length)}${COPY_SUFFIX}`;
+
+        void write(async (client) => {
+            const created = await client.createMesocycle(
+                name,
+                from.weeks,
+                from.days.map((day) => ({ label: day.label.trim(), plan: day.plan })),
+            );
+
+            setSelectedId(created.id);
+            blocks.reload();
+            setNotice(
+                `Copied to ${created.name}, and the phone now opens on it. Rename it in the `
+                + 'block name field; the original is unchanged.',
+            );
+        });
+    }
+
+    function removeBlock() {
+        if (!selected) return;
+
+        const gone = selected;
+
+        void write(async (client) => {
+            await client.deleteMesocycle(gone.id);
+
+            setDrafts((held) => {
+                const { [gone.id]: _dropped, ...rest } = held;
+
+                return rest;
+            });
+
+            // The list still holds it until the read below lands, and the effect
+            // above moves the selection off a block that is gone.
+            blocks.reload();
+            setNotice(
+                `Deleted ${gone.name} and `
+                + (gone.sessionCount === 1 ? '1 logged session.' : `${gone.sessionCount} logged sessions.`),
             );
         });
     }
@@ -330,7 +404,7 @@ export function App() {
                                 onClick={save}
                                 disabled={busy || !isSaveable(draft)}
                             >
-                                {isSaveable(draft) ? 'Save changes' : 'Name every day'}
+                                {isSaveable(draft) ? 'Save changes' : 'Add the missing names'}
                             </button>
                         ) : null}
                     </div>
@@ -360,8 +434,12 @@ export function App() {
                             onDraft={setDraft}
                             library={library}
                             week={week}
+                            templates={templates}
+                            volumeKg={blockVolumeKg}
                             busy={busy}
                             onMakeCurrent={makeCurrent}
+                            onCopy={copyBlock}
+                            onDelete={removeBlock}
                         />
                     ) : view === 'library' ? (
                         <LibraryScreen library={library} block={selected} />

@@ -35,6 +35,12 @@ export { useHistory } from '@gym/hooks/useHistory';
 
 export { useLibrary } from '@gym/hooks/useLibrary';
 
+export { useTemplates, type TemplatesState } from '@gym/hooks/useTemplates';
+
+export { reordered, useDragReorder } from '@gym/hooks/useDragReorder';
+
+export { setsIn } from '@gym/lib/templates';
+
 export { useTheme } from '@gym/hooks/useTheme';
 
 export { applyTheme, readTheme, THEMES, type Theme } from '@gym/lib/theme';
@@ -54,8 +60,10 @@ export { kg, num, rpeLabel, sessionDateLabel } from '@gym/lib/format';
 
 export type {
     DayInput,
+    DayTemplate,
     ExerciseLibrary,
     MesocycleSummary,
+    PlannedExercise,
     SessionDetail,
     SessionSummary,
 } from '@gym/lib/types';

@@ -1,23 +1,26 @@
 import { useState } from 'react';
 
+import { DayCard } from '../components/DayCard';
+import { DeleteBlockModal } from '../components/DeleteBlockModal';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { Stepper } from '../components/Stepper';
+import { TemplateModal } from '../components/TemplateModal';
 import { catalogue, GROUPS, groupOf, NO_GROUP } from '../lib/groups';
 import {
     daysForWeek,
-    equipmentFor,
     isRestWeek,
     repsInTank,
     setsForWeek,
     type DayInput,
     type ExerciseLibrary,
     type MesocycleSummary,
+    type TemplatesState,
 } from '../lib/gym';
 import {
     DEFAULT_DAY_LABELS,
     MAX_DAYS,
+    MAX_NAME,
     MAX_PLANNED_PER_DAY,
-    MAX_SETS,
     MAX_WEEKS,
     MIN_DAYS,
     MIN_WEEKS,
@@ -39,6 +42,13 @@ export function draftOf(block: MesocycleSummary): Draft {
         weeks: block.weeks,
         days: block.days.map((day) => ({ label: day.label, plan: [...day.plan] })),
     };
+}
+
+/** "D1", "D1 and D3", "D1, D2 and D4". */
+function listOf(items: string[]): string {
+    if (items.length <= 1) return items.join('');
+
+    return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 function sameDay(a: DayInput, b: DayInput): boolean {
@@ -96,8 +106,21 @@ interface BlockScreenProps {
     /** The week the group panel counts, so a rest week reads as one. */
     week: number;
 
+    /** Saved and built-in day plans, for the modal behind each day's Templates button. */
+    templates: TemplatesState;
+
+    /**
+     * Total volume logged in the block, or null while its sessions are still being
+     * read — the delete waits on it so the confirmation never understates.
+     */
+    volumeKg: number | null;
+
     busy: boolean;
     onMakeCurrent: () => void;
+
+    /** Creates a block from a draft — the one on screen, edits included. */
+    onCopy: (draft: Draft) => void;
+    onDelete: () => void;
 }
 
 /**
@@ -116,10 +139,16 @@ export function BlockScreen({
     onDraft,
     library,
     week,
+    templates,
+    volumeKg,
     busy,
     onMakeCurrent,
+    onCopy,
+    onDelete,
 }: BlockScreenProps) {
     const [picking, setPicking] = useState<number | null>(null);
+    const [templating, setTemplating] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     function writeDays(days: DayInput[]) {
         onDraft({ ...draft, days });
@@ -179,6 +208,14 @@ export function BlockScreen({
     const plannedNames = draft.days.flatMap((day) => day.plan.map((one) => one.exerciseName));
     const options = catalogue(library, plannedNames);
     const pickingDay = picking === null ? null : draft.days[picking];
+    const templatingDay = templating === null ? null : draft.days[templating];
+
+    // Days that plan nothing, as "D1", "D3". Not a reason to refuse Save — a fresh
+    // block starts with every day empty — but worth saying, since an empty day
+    // opens in the logger as a blank session.
+    const unplanned = draft.days
+        .map((day, index) => (day.plan.length === 0 ? `D${index + 1}` : null))
+        .filter((badge): badge is string => badge !== null);
 
     return (
         <div className="view">
@@ -190,6 +227,7 @@ export function BlockScreen({
                         value={draft.name}
                         onChange={(event) => onDraft({ ...draft, name: event.target.value })}
                         aria-label="Block name"
+                        maxLength={MAX_NAME}
                     />
                 </label>
                 <Stepper
@@ -219,133 +257,69 @@ export function BlockScreen({
 
                     <div className="builder__days">
                         {draft.days.map((day, index) => (
-                            <section key={index} className="day">
-                                <div className="day__head">
-                                    <span className="day__n">{`D${index + 1}`}</span>
-                                    <input
-                                        className="day__name"
-                                        value={day.label}
-                                        onChange={(event) => editDay(index, (current) => ({
-                                            ...current,
-                                            label: event.target.value,
-                                        }))}
-                                        aria-label={`Label for day ${index + 1}`}
-                                    />
-                                </div>
-
-                                <div className="day__counts">
-                                    <span>{`${day.plan.length} EXERCISES`}</span>
-                                    <span>
-                                        {`${day.plan.reduce((t, p) => t + p.sets, 0)} SETS`}
-                                    </span>
-                                </div>
-
-                                <div className="day__plan">
-                                    {day.plan.map((planned, position) => (
-                                        <div
-                                            key={`${planned.exerciseName}:${position}`}
-                                            className="plan-item"
-                                        >
-                                            <div className="plan-item__head">
-                                                <span className="plan-item__text">
-                                                    <span className="plan-item__name">
-                                                        {planned.exerciseName}
-                                                    </span>
-                                                    <span className="plan-item__meta">
-                                                        {equipmentFor(
-                                                            library,
-                                                            planned.exerciseName,
-                                                        )}
-                                                        {` · ${groupOf(planned.exerciseName)}`}
-                                                    </span>
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    className="icon-button"
-                                                    aria-label={`Remove ${planned.exerciseName}`}
-                                                    onClick={() => editDay(index, (current) => ({
-                                                        ...current,
-                                                        plan: current.plan.filter(
-                                                            (_, at) => at !== position,
-                                                        ),
-                                                    }))}
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-
-                                            <div className="plan-item__sets">
-                                                <button
-                                                    type="button"
-                                                    className="tick tick--small"
-                                                    aria-label={`One fewer set of ${planned.exerciseName}`}
-                                                    disabled={planned.sets <= 1}
-                                                    onClick={() => editDay(index, (current) => ({
-                                                        ...current,
-                                                        plan: current.plan.map((one, at) => (
-                                                            at === position
-                                                                ? { ...one, sets: one.sets - 1 }
-                                                                : one
-                                                        )),
-                                                    }))}
-                                                >
-                                                    −
-                                                </button>
-                                                <span className="plan-item__count">
-                                                    {planned.sets}
-                                                    <span className="plan-item__unit"> SETS</span>
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    className="tick tick--small"
-                                                    aria-label={`One more set of ${planned.exerciseName}`}
-                                                    disabled={planned.sets >= MAX_SETS}
-                                                    onClick={() => editDay(index, (current) => ({
-                                                        ...current,
-                                                        plan: current.plan.map((one, at) => (
-                                                            at === position
-                                                                ? { ...one, sets: one.sets + 1 }
-                                                                : one
-                                                        )),
-                                                    }))}
-                                                >
-                                                    +
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <button
-                                    type="button"
-                                    className="day__add"
-                                    disabled={day.plan.length >= MAX_PLANNED_PER_DAY}
-                                    onClick={() => setPicking(index)}
-                                >
-                                    {day.plan.length >= MAX_PLANNED_PER_DAY
-                                        ? `${MAX_PLANNED_PER_DAY} is the most a day can plan`
-                                        : '+ Add exercise'}
-                                </button>
-                            </section>
+                            <DayCard
+                                // The index is the identity, legitimately: a day *is* its
+                                // position — the `dayIndex` sessions are filed under.
+                                key={index}
+                                day={day}
+                                index={index}
+                                library={library}
+                                onChange={(next) => editDay(index, () => next)}
+                                onAdd={() => setPicking(index)}
+                                onTemplates={() => setTemplating(index)}
+                            />
                         ))}
                     </div>
 
-                    {block.isCurrent ? null : (
-                        <div className="builder__heading" style={{ marginTop: 22 }}>
-                            <span className="builder__hint">
-                                This is not the block the phone opens on. Editing it is safe
-                                either way — nothing here changes what is being trained.
-                            </span>
+                    {unplanned.length > 0 ? (
+                        <p className="builder__warn">
+                            {`${listOf(unplanned)} ${unplanned.length === 1 ? 'has' : 'have'} no `
+                                + 'exercises. It can still be saved, but a day with nothing on it '
+                                + 'opens in the logger as a blank session — which is the problem '
+                                + 'the plan exists to solve.'}
+                        </p>
+                    ) : null}
+
+                    <div className="builder__heading builder__actions">
+                        <span className="builder__hint">
+                            {block.isCurrent
+                                ? 'This is the block the phone opens on.'
+                                : 'This is not the block the phone opens on. Editing it is safe '
+                                    + 'either way — nothing here changes what is being trained.'}
+                        </span>
+                        <span className="builder__buttons">
+                            {block.isCurrent ? null : (
+                                <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={onMakeCurrent}
+                                    disabled={busy}
+                                >
+                                    Train this block
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 className="ghost"
-                                onClick={onMakeCurrent}
+                                onClick={() => onCopy(draft)}
+                                disabled={busy || !isSaveable(draft)}
+                                title={
+                                    'Creates a new block from the plan on screen, edits included. '
+                                    + 'This one is left as it is.'
+                                }
+                            >
+                                Copy to a new block
+                            </button>
+                            <button
+                                type="button"
+                                className="ghost ghost--danger"
+                                onClick={() => setDeleting(true)}
                                 disabled={busy}
                             >
-                                Train this block
+                                Delete block
                             </button>
-                        </div>
-                    )}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="builder__aside">
@@ -450,6 +424,29 @@ export function BlockScreen({
                     </section>
                 </div>
             </div>
+
+            {templating !== null && templatingDay ? (
+                <TemplateModal
+                    dayLabel={templatingDay.label}
+                    plan={templatingDay.plan}
+                    templates={templates}
+                    onApply={(plan) => editDay(templating, (current) => ({ ...current, plan }))}
+                    onClose={() => setTemplating(null)}
+                />
+            ) : null}
+
+            {deleting ? (
+                <DeleteBlockModal
+                    block={block}
+                    volumeKg={volumeKg}
+                    busy={busy}
+                    onDelete={() => {
+                        setDeleting(false);
+                        onDelete();
+                    }}
+                    onClose={() => setDeleting(false)}
+                />
+            ) : null}
 
             {picking !== null && pickingDay ? (
                 <ExercisePicker

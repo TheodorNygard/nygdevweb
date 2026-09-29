@@ -836,7 +836,7 @@ Four views, from `Gymbro Desktop.dc.html`:
 | View | What it is |
 | --- | --- |
 | **Dashboard** | The block from above: progress, the block map week by week, sets and volume logged, the reps-in-tank ramp, what is up next, and the last five sessions |
-| **Block** | The builder. Name, 3–8 weeks, 2–6 days, and the plan on each day — with sets-per-muscle-group and the ramp updating beside it as the cards change |
+| **Block** | The builder. Name, 3–8 weeks, 2–6 days, and the plan on each day — reorderable by dragging, fillable from day templates — with sets-per-muscle-group and the ramp updating beside it as the cards change. Copy a block to a new one, or delete it |
 | **Library** | Every exercise the planner can reach, with how many sets of the selected block each one accounts for |
 | **Analytics** | One lift at a time: the top set of every session in the block, charted, with the sessions under it |
 
@@ -853,6 +853,29 @@ this block** button for when moving the phone is what you meant.
 `POST /gym/mesocycles` creates and switches in the same transaction — creating
 *is* switching on this API — so the planner says so in a banner rather than
 letting the phone quietly move under you.
+
+### Planning parity with the logger
+
+gymbro is the preferred place to plan, so anything the logger's Plan tab can do
+to a block the Block view can too: name it, resize it, name and plan each day,
+reorder a day's exercises by dragging (order is what a started session opens
+with), fill a day from a saved or built-in template and save a day as one
+(`GET/POST/PUT/DELETE /gym/templates`, the same list the phone reads), copy a
+block's shape to a new one, make it the current block, and delete it.
+
+The deletes share the logger's rule: a block takes every session logged in it,
+so the confirmation names the session count and volume, and stays disabled until
+the block's sessions have been read — it never understates.
+
+One deliberate difference: Save is not blocked by a day with no exercises. The
+logger refuses it; here a fresh block starts with every day empty, so refusing
+would make an incremental plan unsavable until the last day was filled. The
+builder says which days are empty instead.
+
+Exercises are still typed names, not records. Neither app can *create* one in any
+lasting sense — the API has no `/gym/exercises` route, so a custom name lives only
+inside the plans and sessions that use it. A real exercise library of your own
+needs that route first.
 
 ### One read, and one more for the chart
 
@@ -888,13 +911,13 @@ the next session against.
 
 ### The domain layer is shared, and the design is not
 
-`sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and five of its
+`sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and a handful of its
 hooks through a `@gym` alias declared in both `vite.config.ts` and
 `tsconfig.app.json`. The wire types, the block maths (`repsInTank`,
 `setsForWeek`, `isRestWeek`, `progressOf`), the formatting, the `GymApi` client,
 the AADSTS error map, `useAuth`, `useResource`, `useHistory` (a block's
-sessions, read once and held), `useLibrary` and `useTheme` all live once, in
-`sites/gym/src`.
+sessions, read once and held), `useLibrary`, `useTemplates`, `useDragReorder`
+and `useTheme` all live once, in `sites/gym/src`.
 
 That is the point of `lib/types.ts` being written as a transcription of the API
 rather than as what the screens want: a route that changes shape becomes a type

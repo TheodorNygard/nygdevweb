@@ -1388,6 +1388,7 @@ a:hover {
 }
 
 .plan-item {
+    position: relative;
     padding: 11px;
     border-radius: 12px;
     background: var(--fill-soft);
@@ -1437,6 +1438,122 @@ a:hover {
     font: 400 10px/1 var(--mono);
     letter-spacing: 0.12em;
     color: var(--fg-35);
+}
+
+/* The grip a planned exercise is picked up by, and the row while it is carried.
+   `touch-action: none` is load-bearing: without it the browser reads the first
+   pointermove as a scroll and takes the drag back. */
+.grip {
+    flex: none;
+    width: 22px;
+    height: 26px;
+    margin-left: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--fg-28);
+    touch-action: none;
+    cursor: grab;
+}
+
+.grip:hover,
+.grip:focus-visible {
+    background: var(--fill);
+    color: var(--fg-60);
+}
+
+.grip__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 3px);
+    grid-template-rows: repeat(3, 3px);
+    gap: 3px;
+}
+
+.grip__grid span {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.dragrow--active {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    cursor: grabbing;
+}
+
+.day__name--empty {
+    border-color: rgba(255, 120, 120, 0.4);
+}
+
+.day__name::placeholder {
+    color: var(--fg-35);
+    font-weight: 400;
+}
+
+.day__tpl {
+    height: 32px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--fg-40);
+    font: 500 12px/1 var(--sans);
+}
+
+.day__tpl:hover {
+    background: var(--fill);
+    color: var(--accent-ink);
+}
+
+/* Under the day cards: what is wrong with the plan that Save does not refuse,
+   then the actions on the block as a whole. */
+.builder__warn {
+    margin: 16px 0 0;
+    font: 400 12px/1.5 var(--sans);
+    color: var(--accent-ink);
+    max-width: 62ch;
+    text-wrap: pretty;
+}
+
+.builder__actions {
+    margin-top: 22px;
+    align-items: center;
+}
+
+.builder__buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ghost--danger {
+    border-color: rgba(255, 120, 120, 0.3);
+    color: #ff8b82;
+}
+
+.ghost--danger:hover:not(:disabled) {
+    border-color: rgba(255, 120, 120, 0.6);
+    color: #ffa9a2;
+}
+
+.danger {
+    height: 38px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 120, 120, 0.45);
+    border-radius: 12px;
+    background: rgba(255, 120, 120, 0.1);
+    color: #ff8b82;
+    font: 600 13px/1 var(--sans);
+}
+
+.danger:hover:not(:disabled) {
+    background: rgba(255, 120, 120, 0.18);
+}
+
+.danger:disabled {
+    opacity: 0.5;
 }
 
 .groups {
@@ -1853,6 +1970,48 @@ a:hover {
     flex-wrap: wrap;
 }
 
+.modal__lede {
+    margin: 12px 0 0;
+    font: 400 13px/1.55 var(--sans);
+    color: var(--fg-50);
+    text-wrap: pretty;
+}
+
+.modal__panel--narrow {
+    max-width: 460px;
+}
+
+.modal__eyebrow--danger {
+    color: #ff8b82;
+}
+
+.modal__actions {
+    flex: none;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px 18px;
+}
+
+/* A modal body that is sections rather than one list. */
+.modal__body--sections {
+    padding: 4px 20px 22px;
+    gap: 0;
+}
+
+.modal__section {
+    margin-top: 22px;
+    margin-bottom: 10px;
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.16em;
+    color: var(--fg-35);
+}
+
+.modal__body--sections .empty {
+    padding: 4px 0;
+    font-size: 13px;
+}
+
 .modal__body {
     flex: 1;
     min-height: 0;
@@ -2057,4 +2216,124 @@ a:hover {
     font: 600 11px/1 var(--mono);
     letter-spacing: 0.3em;
     color: var(--fg-30);
+}
+
+/* ------------------------------------------------------------- templates -- */
+
+.tpl__save {
+    display: flex;
+    gap: 8px;
+}
+
+.tpl__name-input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 500 14px/1 var(--sans);
+    outline: none;
+}
+
+.tpl__name-input:focus {
+    border-color: var(--accent-40);
+}
+
+.tpl__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* A template row is not a `.pick`, because a saved one has a second control on
+   it. Same ground and same rhythm as the picker's rows. */
+.tpl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 8px;
+    border-radius: 12px;
+}
+
+.tpl--alt {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.tpl:hover {
+    background: var(--row-hover);
+}
+
+.tpl__apply {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    padding: 12px 14px;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
+}
+
+.tpl__name {
+    display: block;
+    font: 500 15px/1.2 var(--sans);
+}
+
+.tpl__sub {
+    display: block;
+    margin-top: 5px;
+    font: 400 11px/1.2 var(--mono);
+    letter-spacing: 0.06em;
+    color: var(--fg-40);
+}
+
+/* The delete confirmation, in place of the row it asks about. */
+.tpl--confirming {
+    justify-content: space-between;
+    padding: 9px 10px 9px 14px;
+    background: rgba(255, 120, 120, 0.06);
+}
+
+.tpl--confirming .tpl__sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--fg-80);
+}
+
+.tpl__actions {
+    display: flex;
+    gap: 6px;
+    flex: none;
+}
+
+.tpl__keep,
+.tpl__delete {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: transparent;
+    font: 500 13px/1 var(--sans);
+}
+
+.tpl__keep {
+    border: 1px solid var(--line-strong);
+    color: var(--fg-50);
+}
+
+.tpl__delete {
+    border: 1px solid rgba(255, 120, 120, 0.35);
+    color: #ff8b82;
+}
+
+.tpl__delete:disabled {
+    opacity: 0.5;
+}
+
+.tpl__error {
+    margin: 12px 0 0;
+    font: 400 13px/1.5 var(--sans);
+    color: #ff8b82;
 }
