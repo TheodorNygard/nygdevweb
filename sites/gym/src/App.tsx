@@ -16,6 +16,7 @@ import { useLibrary } from './hooks/useLibrary';
 import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
 import { useTheme } from './hooks/useTheme';
+import { useUpdateCheck } from './hooks/useUpdateCheck';
 import { GymApi, messageOf } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
@@ -72,6 +73,11 @@ export function App() {
     const [screen, setScreen] = useState<Screen>('tabs');
     const [tab, setTab] = useState<Tab>('today');
     const [theme, pickTheme] = useTheme();
+
+    // A newer build is deployed. Dismissed for the rest of this page's life: the
+    // banner is a nudge, and a reload is what brings the new build in anyway.
+    const updateAvailable = useUpdateCheck();
+    const [updateDismissed, setUpdateDismissed] = useState(false);
 
     // Which tabs have been opened. Today is read on sign-in because the app
     // opens on it; the other two each cost a call of their own, and most
@@ -479,6 +485,20 @@ export function App() {
                     label="Heads up"
                     message={session.notice}
                     onDismiss={session.dismiss}
+                />
+            ) : null}
+
+            {updateAvailable && !updateDismissed && !banner && !bannerIsNotice ? (
+                <Banner
+                    kind="notice"
+                    label="Update available"
+                    message="A newer version of GymLog is ready. Reload to get it."
+                    action={{
+                        label: 'Reload',
+                        busy: false,
+                        onClick: () => window.location.reload(),
+                    }}
+                    onDismiss={() => setUpdateDismissed(true)}
                 />
             ) : null}
 

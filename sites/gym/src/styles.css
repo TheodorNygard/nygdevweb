@@ -2148,6 +2148,14 @@ button {
     opacity: 0.5;
 }
 
+/* The notice's button is the point of the notice, so it is the accent rather than
+   the error banner's red outline. */
+.banner--notice .banner__action {
+    border-color: transparent;
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
 .banner__code {
     display: block;
     font: 600 10px/1 var(--mono);

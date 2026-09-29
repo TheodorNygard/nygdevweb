@@ -629,6 +629,14 @@ And `/assets/*` is served `immutable` for a year from
 content-hashed. `index.html` and `auth.html` are `no-cache` for the same
 reason — they are the files that name the hashes.
 
+That covers a page load, not an installed app that is resumed rather than
+reloaded, which can run the build it started with for days. gym.nygard.dev has
+no service worker to notice, so `useUpdateCheck` asks: every ten minutes while
+visible, and on returning to the foreground once ten have passed, it fetches
+`/index.html` with `no-store` and compares its hashed entry script to the one
+running. A difference shows an *Update available* banner with a **Reload**
+button. It never reloads by itself, and stays silent offline and in `vite dev`.
+
 **Neither `npm run dev` nor `npm run preview` carries the CSP.** Those headers
 come from `staticwebapp.config.json`, and only Azure reads that file — Vite
 serves `dist/` without them, and the dev server additionally injects inline
