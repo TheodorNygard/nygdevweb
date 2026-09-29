@@ -17,5 +17,5 @@ export const MAX_PLANNED_PER_DAY = 20;
 /** Sets on one planned exercise. The stepper stops here rather than at the API's. */
 export const MAX_SETS = 60;
 
-/** What a new day is called before it is named. The logger's list, same order. */
-export const DEFAULT_DAY_LABELS = ['Upper A', 'Lower A', 'Upper B', 'Lower B', 'Push', 'Pull'];
+/** What a new day is called before it is named: its position, as in the logger. */
+export const DEFAULT_DAY_LABELS = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6'];
