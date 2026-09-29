@@ -10,8 +10,16 @@
  */
 export const CLIENT_ID = 'f6922f08-71f3-492d-953d-a294fb5acf16';
 
-/** Not the tenant GUID, because the GUID is not public and this file is. */
-export const AUTHORITY = 'https://login.microsoftonline.com/organizations';
+/**
+ * The tenant by its verified domain rather than its GUID, because the GUID is
+ * not public and this file is.
+ *
+ * **Not `/organizations`.** That endpoint has no tenant context, so a guest
+ * (B2B) user — whose account lives in another directory — is shown the generic
+ * picker and has to find "Sign-in options → Sign in to an organization" and
+ * type a domain. A tenant-specific authority is that same step done for them.
+ */
+export const AUTHORITY = 'https://login.microsoftonline.com/nygard.dev';
 
 /**
  * The scope the access token is minted for. Its audience has to be in
