@@ -19,8 +19,13 @@ const MAX_WEEKS = 8;
 const MIN_DAYS = 2;
 const MAX_DAYS = 6;
 
-/** What a new day is called before it is named. The prototype's list. */
-const DEFAULT_DAYS = ['Upper A', 'Lower A', 'Upper B', 'Lower B', 'Push', 'Pull'];
+/**
+ * What a new day is called before it is named — its position, the same
+ * fallback `lib/block` uses for a day with no label.
+ */
+function defaultLabel(index: number): string {
+    return `Day ${index + 1}`;
+}
 
 interface Draft {
     name: string;
@@ -36,7 +41,7 @@ function draftOf(mesocycle: Mesocycle | null): Draft {
         return {
             name: 'Block 1',
             weeks: 5,
-            days: DEFAULT_DAYS.slice(0, 4).map((label) => ({ label, plan: [] })),
+            days: Array.from({ length: 4 }, (_, index) => ({ label: defaultLabel(index), plan: [] })),
         };
     }
 
@@ -45,6 +50,13 @@ function draftOf(mesocycle: Mesocycle | null): Draft {
         weeks: mesocycle.weeks,
         days: mesocycle.days.map((day) => ({ label: day.label, plan: day.plan })),
     };
+}
+
+/** "D1", "D1 and D3", "D1, D2 and D4". */
+function listOf(items: string[]): string {
+    if (items.length <= 1) return items.join('');
+
+    return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 function samePlan(a: DayInput, b: DayInput): boolean {
@@ -136,7 +148,7 @@ export function PlanScreen({
 
         while (days.length < count) {
             days.push({
-                label: DEFAULT_DAYS[days.length] ?? `Day ${days.length + 1}`,
+                label: defaultLabel(days.length),
                 plan: [],
             });
         }
@@ -200,8 +212,24 @@ export function PlanScreen({
     // What the deload comes out at for this cadence, for the note under the map.
     const restRuns = daysForWeek(draft.days.length, draft.weeks, draft.weeks);
 
-    const canSave = draft.name.trim().length > 0
-        && draft.days.every((day) => day.label.trim().length > 0);
+    // Every day needs a name and at least one exercise: a day with nothing in
+    // it opens in the logger as a blank session, which is the problem the plan
+    // exists to solve.
+    const unnamed = draft.days.some((day) => day.label.trim().length === 0);
+    const unplanned = draft.days
+        .map((day, index) => (day.plan.length === 0 ? `D${index + 1}` : null))
+        .filter((badge): badge is string => badge !== null);
+
+    const canSave = draft.name.trim().length > 0 && !unnamed && unplanned.length === 0;
+
+    // Why Save is disabled, said under it rather than left to guesswork.
+    const blocker = draft.name.trim().length === 0
+        ? 'Name the block before saving.'
+        : unnamed
+            ? 'Give every day a name before saving.'
+            : unplanned.length > 0
+                ? `Pick at least one exercise for ${listOf(unplanned)} before saving.`
+                : null;
 
     return (
         <div className="screen">
@@ -250,7 +278,10 @@ export function PlanScreen({
                     <div className="dayfield" key={index}>
                         <span className="dayfield__badge">D{index + 1}</span>
                         <input
-                            className="dayfield__input"
+                            className={day.label.trim().length === 0
+                                ? 'dayfield__input dayfield__input--empty'
+                                : 'dayfield__input'}
+                            placeholder="Name this day"
                             value={day.label}
                             onChange={(event) => rename(index, event.target.value)}
                             aria-label={`Label for day ${index + 1}`}
@@ -258,11 +289,13 @@ export function PlanScreen({
                         />
                         <button
                             type="button"
-                            className="dayfield__plan"
+                            className={day.plan.length === 0
+                                ? 'dayfield__plan dayfield__plan--empty'
+                                : 'dayfield__plan'}
                             onClick={() => setPlanningDay(index)}
-                            aria-label={`Plan ${day.label}`}
+                            aria-label={`Plan ${day.label || `day ${index + 1}`}`}
                         >
-                            {day.plan.length === 0 ? 'plan' : `${day.plan.length} ex`}
+                            {day.plan.length === 0 ? '+ PLAN' : `${day.plan.length} ex`}
                         </button>
                     </div>
                 ))}
@@ -334,6 +367,7 @@ export function PlanScreen({
                             ? dirty ? 'Save changes' : 'Plan saved'
                             : 'Create mesocycle'}
                 </button>
+                {blocker && !busy ? <p className="save-blocker">{blocker}</p> : null}
             </div>
 
             {exists ? (
