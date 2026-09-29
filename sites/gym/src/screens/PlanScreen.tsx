@@ -19,8 +19,13 @@ const MAX_WEEKS = 8;
 const MIN_DAYS = 2;
 const MAX_DAYS = 6;
 
-/** What a new day is called before it is named. The prototype's list. */
-const DEFAULT_DAYS = ['Upper A', 'Lower A', 'Upper B', 'Lower B', 'Push', 'Pull'];
+/**
+ * What a new day is called before it is named — its position, the same
+ * fallback `lib/block` uses for a day with no label.
+ */
+function defaultLabel(index: number): string {
+    return `Day ${index + 1}`;
+}
 
 interface Draft {
     name: string;
@@ -36,7 +41,7 @@ function draftOf(mesocycle: Mesocycle | null): Draft {
         return {
             name: 'Block 1',
             weeks: 5,
-            days: DEFAULT_DAYS.slice(0, 4).map((label) => ({ label, plan: [] })),
+            days: Array.from({ length: 4 }, (_, index) => ({ label: defaultLabel(index), plan: [] })),
         };
     }
 
@@ -143,7 +148,7 @@ export function PlanScreen({
 
         while (days.length < count) {
             days.push({
-                label: DEFAULT_DAYS[days.length] ?? `Day ${days.length + 1}`,
+                label: defaultLabel(days.length),
                 plan: [],
             });
         }
