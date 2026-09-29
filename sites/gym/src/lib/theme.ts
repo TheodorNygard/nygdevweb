@@ -9,9 +9,9 @@
  * matches the screen under it.
  *
  * Both sites are dark, and so is every theme here. What a theme changes is
- * the greys and the accent — Graphite's near-black and acid lime, or Orchis's
- * lifted neutrals and purple — not whether the screen is dark. A light variant
- * would be a different design, not a theme.
+ * the greys and the accent — Graphite's near-black and acid lime, Orchis's
+ * lifted neutrals and purple, or Cobalt's navy and sky blue — not whether the
+ * screen is dark. A light variant would be a different design, not a theme.
  */
 
 export const THEMES = [
@@ -24,6 +24,11 @@ export const THEMES = [
         id: 'orchis',
         label: 'Orchis',
         note: 'Neutral greys and purple, after the GTK theme.',
+    },
+    {
+        id: 'cobalt',
+        label: 'Cobalt',
+        note: 'Deep navy, sky blue.',
     },
 ] as const;
 

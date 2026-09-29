@@ -12,7 +12,7 @@
  * Themed, within that, the same way: every colour is a token on `:root`, a
  * theme is a `[data-theme]` block that redefines them, and the attribute is
  * written by the logger's `lib/theme` before the first render. The two sites
- * carry the same two themes — Graphite by default, Orchis after it — each
+ * carry the same three themes — Graphite by default, then Orchis and Cobalt — each
  * transcribed into its own stylesheet, since the token sets differ.
  */
 
@@ -137,6 +137,46 @@
     --hair: rgba(255, 255, 255, 0.09);
     --fill: rgba(255, 255, 255, 0.07);
     --fill-soft: rgba(255, 255, 255, 0.05);
+}
+
+/*
+ * Cobalt — deep navy surfaces, a sidebar a step darker than the canvas, and a
+ * sky-blue accent that keeps near-black on its fills, as lime does. See the
+ * logger's stylesheet.
+ */
+:root[data-theme="cobalt"] {
+    --bg: #0b1220;
+    --rail: #0e1626;
+    --card: #111a2b;
+    --row: #131d30;
+    --row-hover: #1a2740;
+    --fg: #eef3fb;
+    --accent: #5aa9ff;
+    --accent-hi: #8cc4ff;
+
+    --bg-rgb: 11, 18, 32;
+    --accent-rgb: 90, 169, 255;
+
+    --accent-bg: #12203a;
+
+    --fg-80: rgba(238, 243, 251, 0.82);
+    --fg-72: rgba(238, 243, 251, 0.74);
+    --fg-62: rgba(238, 243, 251, 0.64);
+    --fg-60: rgba(238, 243, 251, 0.62);
+    --fg-55: rgba(238, 243, 251, 0.57);
+    --fg-50: rgba(238, 243, 251, 0.52);
+    --fg-45: rgba(238, 243, 251, 0.47);
+    --fg-40: rgba(238, 243, 251, 0.42);
+    --fg-35: rgba(238, 243, 251, 0.37);
+    --fg-32: rgba(238, 243, 251, 0.34);
+    --fg-30: rgba(238, 243, 251, 0.32);
+    --fg-28: rgba(238, 243, 251, 0.3);
+
+    --line: rgba(190, 215, 255, 0.1);
+    --line-strong: rgba(190, 215, 255, 0.16);
+    --hair: rgba(190, 215, 255, 0.08);
+    --fill: rgba(190, 215, 255, 0.07);
+    --fill-soft: rgba(190, 215, 255, 0.045);
 }
 
 * {

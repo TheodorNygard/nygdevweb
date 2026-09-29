@@ -11,7 +11,7 @@
  *
  * Themed, within that. Every colour is a token on `:root`, and a theme is a
  * `[data-theme]` block that redefines them — nothing below the tokens knows
- * which theme is on. Graphite is the `:root` default; Orchis follows it. The
+ * which theme is on. Graphite is the `:root` default; Orchis and Cobalt follow it. The
  * attribute is written by `lib/theme` before the first render.
  */
 
@@ -130,6 +130,40 @@
     --line-strong: rgba(255, 255, 255, 0.16);
     --fill: rgba(255, 255, 255, 0.07);
     --fill-soft: rgba(255, 255, 255, 0.04);
+}
+
+/*
+ * Cobalt — deep navy surfaces and a sky-blue accent. Like Graphite, the accent
+ * is bright enough to be both a fill and a word on the background, so it keeps
+ * near-black on the fill and needs no separate ink.
+ */
+:root[data-theme="cobalt"] {
+    --bg: #0b1220;
+    --card: #111a2b;
+    --sheet: #131d30;
+    --row: #131d30;
+    --row-hover: #1a2740;
+    --fg: #eef3fb;
+    --accent: #5aa9ff;
+    --accent-hi: #8cc4ff;
+
+    --bg-rgb: 11, 18, 32;
+    --accent-rgb: 90, 169, 255;
+
+    --accent-bg: #12203a;
+
+    --fg-70: rgba(238, 243, 251, 0.72);
+    --fg-60: rgba(238, 243, 251, 0.62);
+    --fg-50: rgba(238, 243, 251, 0.52);
+    --fg-45: rgba(238, 243, 251, 0.47);
+    --fg-40: rgba(238, 243, 251, 0.42);
+    --fg-35: rgba(238, 243, 251, 0.37);
+    --fg-28: rgba(238, 243, 251, 0.3);
+
+    --line: rgba(190, 215, 255, 0.1);
+    --line-strong: rgba(190, 215, 255, 0.16);
+    --fill: rgba(190, 215, 255, 0.07);
+    --fill-soft: rgba(190, 215, 255, 0.035);
 }
 
 * {

@@ -16,8 +16,8 @@ interface MastheadProps {
  * drawn in the accent, so the tap answers itself: the word changes colour with
  * everything else.
  *
- * Nothing on the mark says what it does, deliberately. There are two themes,
- * the tap is reversible in one more, and a caption under the wordmark would be
+ * Nothing on the mark says what it does, deliberately. There are three themes,
+ * the tap cycles back round, and a caption under the wordmark would be
  * a label on the only element of this app that is allowed to be a flourish.
  * The accessible name says it in words.
  */
