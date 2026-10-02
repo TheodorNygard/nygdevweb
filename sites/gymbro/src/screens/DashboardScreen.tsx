@@ -8,12 +8,16 @@ import {
     rpeLabel,
     sessionDateLabel,
     setsForWeek,
+    type ExerciseLibrary,
     type MesocycleSummary,
     type SessionSummary,
 } from '../lib/gym';
 
 interface DashboardScreenProps {
     block: MesocycleSummary;
+
+    /** Where an exercise's muscle group is read from — see `groupOf`. */
+    library: ExerciseLibrary | null;
     sessions: SessionSummary[];
     loading: boolean;
     week: number;
@@ -38,6 +42,7 @@ const BAR_BASE = 112;
  */
 export function DashboardScreen({
     block,
+    library,
     sessions,
     loading,
     week,
@@ -239,7 +244,7 @@ export function DashboardScreen({
                                     <span className="row__title">{planned.exerciseName}</span>
                                     <span className="row__meta">
                                         {`${setsForWeek(planned.sets, week, block.weeks)} × `}
-                                        {groupOf(planned.exerciseName)}
+                                        {groupOf(planned.exerciseName, library)}
                                     </span>
                                 </div>
                             ))}

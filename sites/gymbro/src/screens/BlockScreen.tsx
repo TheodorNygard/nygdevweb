@@ -187,7 +187,7 @@ export function BlockScreen({
 
     for (const day of weekDays) {
         for (const planned of day.plan) {
-            const group = groupOf(planned.exerciseName);
+            const group = groupOf(planned.exerciseName, library);
 
             if (group === NO_GROUP) continue;
 
@@ -200,7 +200,7 @@ export function BlockScreen({
 
     const ungrouped = draft.days.reduce(
         (total, day) => total + day.plan.filter(
-            (planned) => groupOf(planned.exerciseName) === NO_GROUP,
+            (planned) => groupOf(planned.exerciseName, library) === NO_GROUP,
         ).length,
         0,
     );

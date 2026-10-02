@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import { reordered } from './useDragReorder';
 import { ApiError, messageOf, type GymApi } from '../lib/api';
+import { swapped } from '../lib/block';
 import { localDate } from '../lib/format';
 import { computeTotals } from '../lib/totals';
 import type { SessionEntry, WorkSet, Workout } from '../lib/types';
@@ -35,6 +36,21 @@ export interface SessionActions {
     removeSet: (entryIndex: number, setIndex: number) => Promise<void>;
 
     /**
+     * Corrects a logged set in place — on the session being logged, or on one
+     * opened from History after it was submitted. The totals follow locally on
+     * the tap and on the server whenever anything is next read, because none
+     * of them is stored.
+     */
+    editSet: (entryIndex: number, setIndex: number, set: WorkSet) => Promise<void>;
+
+    /**
+     * Swaps an exercise for another. Replaced where it stands if nothing was
+     * logged on it; otherwise its sets stay and `to` goes in after it. See
+     * `swapped()` in `lib/block`, which is the same rule the API applies.
+     */
+    swapEntry: (entryIndex: number, to: string) => Promise<void>;
+
+    /**
      * Takes an exercise out of the session. Offered only once its last set is
      * gone: the API refuses to remove an entry that still holds sets, because
      * an exercise that was lifted is a logged workout rather than a mis-tap.
@@ -59,7 +75,7 @@ function withEntries(workout: Workout, entries: SessionEntry[]): Workout {
 }
 
 /**
- * The open session, and the four guarded writes that change it.
+ * The open session, and the guarded writes that change it.
  *
  * Every write applies locally first and asks the API second. That is not
  * optimism for its own sake: the button being tapped is one a user hits between
@@ -278,6 +294,59 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         );
     }, [write]);
 
+    const editSet = useCallback(async (
+        entryIndex: number,
+        setIndex: number,
+        set: WorkSet,
+    ): Promise<void> => {
+        const entry = current.current?.entries[entryIndex];
+
+        if (!entry || setIndex >= entry.sets.length) return;
+
+        const expectedSetCount = entry.sets.length;
+
+        await write(
+            (session) => withEntries(session, session.entries.map((one, index) => (
+                index === entryIndex
+                    ? { ...one, sets: one.sets.map((logged, at) => (at === setIndex ? set : logged)) }
+                    : one
+            ))),
+            (client, session) => client.editSet(session.id, entryIndex, setIndex, {
+                exerciseName: entry.exerciseName,
+                expectedSetCount,
+                weightKg: set.weightKg,
+                reps: set.reps,
+                rpe: set.rpe,
+            }),
+            'This session had changed elsewhere. Reloaded — edit the set again.',
+        );
+    }, [write]);
+
+    const swapEntry = useCallback(async (entryIndex: number, to: string): Promise<void> => {
+        const entry = current.current?.entries[entryIndex];
+        const expectedEntryCount = current.current?.entries.length;
+
+        if (!entry || expectedEntryCount === undefined || entry.exerciseName === to) return;
+
+        // Which of the two shapes this swap is, stated rather than left to the
+        // server to discover: a set tapped a moment ago may still be in flight,
+        // and the count is what makes the API refuse a swap that raced it
+        // instead of replacing an exercise that has just been lifted.
+        const expectedSetCount = entry.sets.length;
+
+        await write(
+            (session) => withEntries(session, swapped(session.entries, entryIndex, to).entries),
+            (client, session) => client.swapEntry(session.id, {
+                entryIndex,
+                exerciseName: entry.exerciseName,
+                expectedEntryCount,
+                expectedSetCount,
+                to,
+            }),
+            'This session had changed elsewhere. Reloaded — swap it again.',
+        );
+    }, [write]);
+
     const removeEntry = useCallback(async (entryIndex: number): Promise<void> => {
         const entry = current.current?.entries[entryIndex];
         const expectedEntryCount = current.current?.entries.length;
@@ -376,6 +445,8 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         addEntry,
         logSet,
         removeSet,
+        editSet,
+        swapEntry,
         removeEntry,
         reorderEntry,
         submit,

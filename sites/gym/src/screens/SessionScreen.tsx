@@ -1,30 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { DragHandle } from '../components/DragHandle';
+import { ExercisePicker } from '../components/ExercisePicker';
+import { SetSheet } from '../components/SetSheet';
 import { Stepper } from '../components/Stepper';
 import { useDragReorder } from '../hooks/useDragReorder';
 import type { LastSets } from '../hooks/useLastSets';
 import {
     completesTarget,
     isRestWeek,
-    plannedFor,
     repsInTank,
-    setsForWeek,
+    swappedAway,
+    targetsFor,
     workingSetCount,
 } from '../lib/block';
 import { MIN_WORKING_RPE, isWarmUpRpe, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
+import {
+    MAX_REPS,
+    MAX_WEIGHT_KG,
+    REP_STEP,
+    RPE_MAX,
+    RPE_MIN,
+    WEIGHT_STEP,
+    clamp,
+} from '../lib/steps';
 import type { ExerciseLibrary, PlannedExercise, WorkSet, Workout } from '../lib/types';
 
-/** The design's steps: 2.5 kg of weight, one rep, half a point of RPE. */
-const WEIGHT_STEP = 2.5;
-const REP_STEP = 1;
-const RPE_MIN = 5;
-const RPE_MAX = 10;
-
-/** The API's bounds, so a typed number cannot compose a set it would refuse. */
-const MAX_WEIGHT_KG = 1000;
-const MAX_REPS = 200;
+/**
+ * How long a set's delete stays armed after the first tap. Long enough to reach
+ * for the second tap, short enough that a row left armed does not sit there
+ * waiting for a stray thumb several sets later.
+ */
+const DELETE_ARMED_MS = 3000;
 
 /**
  * What an exercise opens on when nothing is known about it: no weight at all.
@@ -51,9 +59,27 @@ function rpeForTank(tank: number): number {
     return Math.min(RPE_MAX, Math.max(MIN_WORKING_RPE, 10 - tank));
 }
 
-/** A typed number, held inside the bounds the API would accept. */
-function clamp(value: number, low: number, high: number): number {
-    return Math.min(high, Math.max(low, value));
+/**
+ * What each set of an exercise is called on screen. Working sets are numbered
+ * 1, 2, 3 and warm-ups are not numbered at all — a warm-up that consumed a
+ * number would put "3 of 3" beside a row labelled 4.
+ */
+function setLabelsOf(sets: readonly WorkSet[]): string[] {
+    let counted = 0;
+
+    return sets.map((set) => {
+        if (isWarmUpRpe(set.rpe)) return 'W';
+
+        counted += 1;
+
+        return String(counted);
+    });
+}
+
+/** A set by its position: which exercise, and which of its sets. */
+interface SetRef {
+    entryIndex: number;
+    setIndex: number;
 }
 
 /**
@@ -103,7 +129,20 @@ interface SessionScreenProps {
     savedAt: number | null;
     onAddExercise: () => void;
     onLogSet: (entryIndex: number, set: WorkSet) => void;
+
+    /** Confirmed on the row first — the one destructive thing a set row does. */
     onRemoveSet: (entryIndex: number, setIndex: number) => void;
+
+    /** Corrects a logged set in place. No confirmation; see `SetSheet`. */
+    onEditSet: (entryIndex: number, setIndex: number, set: WorkSet) => void;
+
+    /**
+     * Swaps an exercise for another — replaced where it stands if nothing is
+     * logged on it, inserted after it otherwise, so its sets are never moved or
+     * lost. The picker that chooses `to` is this screen's own, because where
+     * the logger lands afterwards depends on which of the two it was.
+     */
+    onSwapEntry: (entryIndex: number, to: string) => void;
 
     /**
      * Takes an exercise out of the session — offered only once it holds no
@@ -153,6 +192,16 @@ interface SessionScreenProps {
  *
  * Warm-ups do not count toward that target — see `workingSetCount` — so ramping
  * up to a working weight cannot finish an exercise by itself.
+ *
+ * When the equipment is taken, the ⇄ on an exercise swaps it: its variations
+ * first, then anything else doing the same job. Sets already logged stay on the
+ * exercise they were lifted on, and the substitute owes what the plan had left
+ * — see `targetsFor`.
+ *
+ * Every logged set can be corrected by tapping it, and deleted by tapping its ×
+ * twice. That holds on a submitted workout too, which is opened here from the
+ * day sheet to be edited: the finish bar becomes a way back rather than a
+ * second submit.
  */
 export function SessionScreen({
     workout,
@@ -165,6 +214,8 @@ export function SessionScreen({
     onAddExercise,
     onLogSet,
     onRemoveSet,
+    onEditSet,
+    onSwapEntry,
     onRemoveEntry,
     onReorderEntry,
     onFinish,
@@ -184,6 +235,11 @@ export function SessionScreen({
     // to an exercise opens on what you last lifted.
     const [pending, setPending] = useState<Record<number, Pending>>({});
 
+    // Where the logger goes when the list next grows, if not to the bottom. A
+    // swap that keeps the sets inserts its substitute straight after the
+    // original, and that — not the last exercise — is what is about to be done.
+    const [growthFocus, setGrowthFocus] = useState<number | null>(null);
+
     // A new exercise was added while this screen was open: focus it, because
     // adding one is always immediately followed by logging against it. Only
     // when the list *grew* — a removal changes the count too, and jumping the
@@ -196,7 +252,32 @@ export function SessionScreen({
 
         setEntryCount(workout.entries.length);
 
-        if (grew) setActiveIndex(workout.entries.length - 1);
+        if (grew) {
+            setActiveIndex(growthFocus ?? workout.entries.length - 1);
+            setGrowthFocus(null);
+        }
+    }
+
+    // The exercise the swap picker is open for, the set being corrected, and
+    // the set whose delete has had its first tap. All three are positions, so
+    // anything that moves positions — a drag, a removal, a swap — clears them
+    // rather than leaving them pointing at whatever moved into the slot.
+    const [swapping, setSwapping] = useState<number | null>(null);
+    const [editing, setEditing] = useState<SetRef | null>(null);
+    const [armed, setArmed] = useState<SetRef | null>(null);
+
+    useEffect(() => {
+        if (!armed) return;
+
+        const timer = window.setTimeout(() => setArmed(null), DELETE_ARMED_MS);
+
+        return () => window.clearTimeout(timer);
+    }, [armed]);
+
+    function forgetPositions() {
+        setSwapping(null);
+        setEditing(null);
+        setArmed(null);
     }
 
     // One target for the whole session: how deep into each set to go, read off
@@ -205,15 +286,15 @@ export function SessionScreen({
     const tank = repsInTank(workout.week, weeks);
     const targetRpe = rpeForTank(tank);
 
-    /**
-     * How many sets this week wants of one entry, or none if it is not planned.
-     * The plan's count in a training week; half of it in the rest week, which
-     * is the whole of what the deload changes — same exercises, less of them.
-     */
-    function targetSetsFor(entryIndex: number): number | undefined {
-        const target = plannedFor(plan, workout.entries, entryIndex);
+    // How many sets this week wants of each entry, or none where nothing is
+    // planned. The plan's count in a training week; half of it in the rest
+    // week, which is the whole of what the deload changes — same exercises,
+    // less of them. Across a swap the count is shared rather than repeated:
+    // the substitute owes what the original had left.
+    const targets = targetsFor(plan, workout.entries, workout.week, weeks);
 
-        return target ? setsForWeek(target.sets, workout.week, weeks) : undefined;
+    function targetSetsFor(entryIndex: number): number | undefined {
+        return targets[entryIndex];
     }
 
     function valuesFor(entryIndex: number): Pending {
@@ -257,6 +338,7 @@ export function SessionScreen({
     // whatever exercise the drag just moved into it rather than the one the
     // user actually had open.
     function reorderEntry(from: number, to: number) {
+        forgetPositions();
         setActiveIndex((current) => (current === null ? null : remapIndex(current, from, to)));
 
         setPending((current) => {
@@ -279,6 +361,7 @@ export function SessionScreen({
      * because the thing it was open on is gone.
      */
     function removeEntry(entryIndex: number) {
+        forgetPositions();
         setActiveIndex((index) => {
             if (index === null || index === entryIndex) return null;
 
@@ -303,6 +386,49 @@ export function SessionScreen({
     }
 
     /**
+     * Swaps an exercise and puts the logger where the next set belongs.
+     *
+     * The two shapes move positions differently. Replaced in place, nothing
+     * shifts — but what the steppers held was for the old exercise, and the
+     * substitute should open on its own last weight rather than on a number
+     * lifted on something else. Inserted after, everything below moves down one
+     * and the logger moves to the substitute, which is what is about to be done.
+     */
+    function swapEntry(entryIndex: number, to: string) {
+        const entry = workout.entries[entryIndex];
+
+        if (!entry || entry.exerciseName === to) return;
+
+        forgetPositions();
+
+        if (entry.sets.length === 0) {
+            setPending((held) => {
+                const next = { ...held };
+
+                delete next[entryIndex];
+
+                return next;
+            });
+            setActiveIndex(entryIndex);
+        } else {
+            setPending((held) => {
+                const next: Record<number, Pending> = {};
+
+                for (const [key, value] of Object.entries(held)) {
+                    const index = Number(key);
+
+                    next[index > entryIndex ? index + 1 : index] = value;
+                }
+
+                return next;
+            });
+            setGrowthFocus(entryIndex + 1);
+        }
+
+        onSwapEntry(entryIndex, to);
+    }
+
+    /**
      * The next exercise below this one that still owes sets, or null when the
      * rest of the workout is done.
      *
@@ -314,12 +440,14 @@ export function SessionScreen({
      *
      * An unplanned exercise — one added during the session — always counts as
      * owing sets. It has no target to have met, and it was added on purpose.
+     * One that was swapped away from owes nothing: its substitute, further
+     * down, is carrying what is left.
      */
     function nextUnmet(from: number): number | null {
         for (let index = from + 1; index < workout.entries.length; index += 1) {
             const entry = workout.entries[index];
 
-            if (!entry) continue;
+            if (!entry || swappedAway(workout.entries, index)) continue;
 
             const target = targetSetsFor(index);
 
@@ -378,6 +506,11 @@ export function SessionScreen({
     });
 
     const totals = workout.totals;
+    const submitted = workout.status === 'submitted';
+
+    const swappingEntry = swapping === null ? undefined : workout.entries[swapping];
+    const editingEntry = editing === null ? undefined : workout.entries[editing.entryIndex];
+    const editingSet = editing === null ? undefined : editingEntry?.sets[editing.setIndex];
 
     return (
         <div className="session">
@@ -395,7 +528,9 @@ export function SessionScreen({
                                     hour: '2-digit',
                                     minute: '2-digit',
                                 })}`
-                                : 'Every set saves as you log it'}
+                                : submitted
+                                    ? 'Submitted · edits save as you make them'
+                                    : 'Every set saves as you log it'}
                         </span>
                     </div>
                 </div>
@@ -439,18 +574,15 @@ export function SessionScreen({
                         (total, set) => total + set.weightKg * set.reps,
                         0,
                     );
+                    const setLabels = setLabelsOf(entry.sets);
+                    const away = swappedAway(workout.entries, entryIndex);
 
-                    // Working sets are numbered 1, 2, 3 and warm-ups are not
-                    // numbered at all — a warm-up that consumed a number would
-                    // put "3 of 3" beside a row labelled 4.
-                    let counted = 0;
-                    const setLabels = entry.sets.map((set) => {
-                        if (isWarmUpRpe(set.rpe)) return 'W';
-
-                        counted += 1;
-
-                        return String(counted);
-                    });
+                    // Named only when it says something: an entry swapped back
+                    // to its own original is standing in for itself.
+                    const standsInFor = entry.swappedFrom !== undefined
+                        && entry.swappedFrom !== entry.exerciseName
+                        ? entry.swappedFrom
+                        : null;
 
                     const row = rowProps(entryIndex);
                     const articleClassName = row.className
@@ -486,9 +618,18 @@ export function SessionScreen({
                                         </span>
                                         <span className="exercise__eq">
                                             {equipmentFor(library, entry.exerciseName)}
-                                            {targetSets === undefined
-                                                ? ''
-                                                : ` · target ${targetSets} sets`}
+                                            {/* A substitute names what it
+                                                stands in for in place of its
+                                                target — the counter beside it
+                                                already says how many it owes,
+                                                and both will not fit a phone. */}
+                                            {away
+                                                ? ' · swapped'
+                                                : standsInFor
+                                                    ? ` · for ${standsInFor}`
+                                                    : targetSets === undefined
+                                                        ? ''
+                                                        : ` · target ${targetSets} sets`}
                                         </span>
                                     </span>
                                     <span
@@ -504,6 +645,23 @@ export function SessionScreen({
                                                 : 'no sets yet'}
                                     </span>
                                 </button>
+                                {/* Not on a finished workout, where there is no
+                                    machine to be waiting for, and not on an
+                                    exercise already swapped away from — its
+                                    substitute is the one to swap again. */}
+                                {!submitted && !away ? (
+                                    <button
+                                        type="button"
+                                        className="exercise__swap"
+                                        onClick={() => {
+                                            setArmed(null);
+                                            setSwapping(entryIndex);
+                                        }}
+                                        aria-label={`Swap ${entry.exerciseName} for another exercise`}
+                                    >
+                                        ⇄
+                                    </button>
+                                ) : null}
                                 {entry.sets.length === 0 ? (
                                     <button
                                         type="button"
@@ -518,38 +676,78 @@ export function SessionScreen({
 
                             {entry.sets.length > 0 ? (
                                 <div className="sets">
-                                    {entry.sets.map((set, setIndex) => (
-                                        <div
-                                            className={isWarmUpRpe(set.rpe)
-                                                ? 'set set--warmup'
-                                                : 'set'}
-                                            key={`${setIndex}-${set.weightKg}-${set.reps}`}
-                                        >
-                                            <span className="set__no">
-                                                {setLabels[setIndex]}
-                                            </span>
-                                            <span className="set__main">
-                                                {num(set.weightKg)} kg × {num(set.reps)}
-                                            </span>
-                                            <span
-                                                className={set.rpe === null
-                                                    ? 'set__rpe set__rpe--none'
-                                                    : 'set__rpe'}
+                                    {entry.sets.map((set, setIndex) => {
+                                        const isArmed = armed?.entryIndex === entryIndex
+                                            && armed.setIndex === setIndex;
+                                        const setName = setLabels[setIndex] === 'W'
+                                            ? 'warm-up'
+                                            : `set ${setLabels[setIndex] ?? setIndex + 1}`;
+
+                                        return (
+                                            <div
+                                                className={isWarmUpRpe(set.rpe)
+                                                    ? 'set set--warmup'
+                                                    : 'set'}
+                                                key={`${setIndex}-${set.weightKg}-${set.reps}`}
                                             >
-                                                {set.rpe === null
-                                                    ? 'no RPE'
-                                                    : `RPE ${num(set.rpe)}`}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                className="set__del"
-                                                onClick={() => onRemoveSet(entryIndex, setIndex)}
-                                                aria-label={`Remove set ${setIndex + 1}`}
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ))}
+                                                {/* The row is the edit: the
+                                                    numbers being corrected are
+                                                    the thing to tap. */}
+                                                <button
+                                                    type="button"
+                                                    className="set__edit"
+                                                    onClick={() => {
+                                                        setArmed(null);
+                                                        setEditing({ entryIndex, setIndex });
+                                                    }}
+                                                    aria-label={`Edit ${setName}: ${num(set.weightKg)} kg × ${num(set.reps)}`}
+                                                >
+                                                    <span className="set__no">
+                                                        {setLabels[setIndex]}
+                                                    </span>
+                                                    <span className="set__main">
+                                                        {num(set.weightKg)} kg × {num(set.reps)}
+                                                    </span>
+                                                    <span
+                                                        className={set.rpe === null
+                                                            ? 'set__rpe set__rpe--none'
+                                                            : 'set__rpe'}
+                                                    >
+                                                        {set.rpe === null
+                                                            ? 'no RPE'
+                                                            : `RPE ${num(set.rpe)}`}
+                                                    </span>
+                                                </button>
+                                                {/* Two taps, the second on a
+                                                    control that says what it
+                                                    does. A set deleted by a
+                                                    thumb brushing the × is a
+                                                    logged lift gone. */}
+                                                {isArmed ? (
+                                                    <button
+                                                        type="button"
+                                                        className="set__del set__del--armed"
+                                                        onClick={() => {
+                                                            setArmed(null);
+                                                            onRemoveSet(entryIndex, setIndex);
+                                                        }}
+                                                        aria-label={`Confirm deleting ${setName}`}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="set__del"
+                                                        onClick={() => setArmed({ entryIndex, setIndex })}
+                                                        aria-label={`Delete ${setName}`}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             ) : null}
 
@@ -662,10 +860,53 @@ export function SessionScreen({
             </div>
 
             <div className="finish-bar">
-                <button type="button" className="finish-bar__button" onClick={onFinish}>
-                    Finish &amp; submit workout
-                </button>
+                {submitted ? (
+                    // Already submitted: every edit saved as it was made, so
+                    // there is nothing left to finish — only a way back.
+                    <button type="button" className="finish-bar__button" onClick={onBack}>
+                        Done editing
+                    </button>
+                ) : (
+                    <button type="button" className="finish-bar__button" onClick={onFinish}>
+                        Finish &amp; submit workout
+                    </button>
+                )}
             </div>
+
+            {swapping !== null && swappingEntry ? (
+                <ExercisePicker
+                    library={library}
+                    busy={false}
+                    swapping={{
+                        exerciseName: swappingEntry.exerciseName,
+                        ...(swappingEntry.swappedFrom === undefined
+                            ? {}
+                            : { swappedFrom: swappingEntry.swappedFrom }),
+                        note: swappingEntry.sets.length === 0
+                            ? 'Takes its place in this workout. The day’s plan is not changed.'
+                            : `The ${swappingEntry.sets.length} set${swappingEntry.sets.length === 1 ? '' : 's'} `
+                                + 'logged on it stay there. What you pick goes in after it, '
+                                + 'for whatever the plan has left.',
+                    }}
+                    onPick={(name) => swapEntry(swapping, name)}
+                    onClose={() => setSwapping(null)}
+                />
+            ) : null}
+
+            {editing !== null && editingEntry && editingSet ? (
+                <SetSheet
+                    exerciseName={editingEntry.exerciseName}
+                    setLabel={setLabelsOf(editingEntry.sets)[editing.setIndex] === 'W'
+                        ? 'Warm-up'
+                        : `Set ${setLabelsOf(editingEntry.sets)[editing.setIndex] ?? editing.setIndex + 1}`}
+                    set={editingSet}
+                    onSave={(set) => {
+                        setEditing(null);
+                        onEditSet(editing.entryIndex, editing.setIndex, set);
+                    }}
+                    onClose={() => setEditing(null)}
+                />
+            ) : null}
         </div>
     );
 }

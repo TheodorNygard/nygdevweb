@@ -93,7 +93,7 @@ export function DayCard({ day, index, library, onChange, onAdd, onTemplates }: D
                                     <span className="plan-item__name">{planned.exerciseName}</span>
                                     <span className="plan-item__meta">
                                         {equipmentFor(library, planned.exerciseName)}
-                                        {` · ${groupOf(planned.exerciseName)}`}
+                                        {` · ${groupOf(planned.exerciseName, library)}`}
                                     </span>
                                 </span>
                                 <button

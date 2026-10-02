@@ -364,6 +364,73 @@ The draft on the Plan tab carries whole days rather than labels, and that is
 load-bearing: `days` is replaced wholesale by the PATCH, so a draft holding
 only labels is how a rename would silently clear every plan in the block.
 
+### When the machine is taken: variations and swaps
+
+A busy gym is the case this is built for — eight people waiting for the rack —
+so changing an exercise mid-workout is two taps and loses nothing.
+
+**Variations are exercises of their own**, linked to a parent in the library
+(`Preacher Curl` → `Bicep Curl`), not a variant attribute on one exercise. An
+entry stores a name, so a variation gets its own history, its own last-weight
+and its own top sets for free — which is the point: thirty kilos on a preacher
+bench and thirty standing are different lifts, and a chart that mixed them
+would show progress every time you switched to the easier one. What a variation
+counts toward is read off the library instead: `group` puts preacher curls in
+gymbro's arms tally, and `variationOf` is there for any screen that wants a
+family rollup. Nothing on the wire changed, so every session ever logged is
+still valid. `gym/README.md` in NygDevAzure has the full argument and the
+library's rules.
+
+**The ⇄ on an exercise swaps it.** The picker opens on suggestions rather than
+the alphabet: the exercise's variations, then other exercises doing the same
+job (`pattern`), then the rest of its muscle group — and the equipment chips
+filter those too, which answers "what can I do with the dumbbells that are
+free". What the swap writes depends on whether anything was lifted:
+
+- **Nothing logged** — the exercise is replaced where it stands, and the
+  substitute inherits its planned set count.
+- **Sets logged** — they stay exactly where they are, on the exercise they were
+  lifted on, and the substitute goes in straight after it owing **what the plan
+  had left**: four planned squats, two done, is two sets of leg press. The
+  original reads *swapped* and owes nothing more; the logger moves to the
+  substitute.
+
+The substitute records `swappedFrom` on the session, always naming the
+*original*, so a second swap still knows what the plan asked for. Targets
+across a swap are `targetsFor` in `src/lib/block.ts`; the swap itself is
+`swapped()` beside it, the same rule the API applies in `GymSession.WithSwap`.
+The same ⇄ is on each exercise in the Plan tab's day sheet, where it simply
+renames the slot — the day's plan in every week — and keeps its set count.
+
+### Correcting a set after the fact
+
+**Tap a logged set to edit it.** The sheet has the logger's own steppers and
+RPE slider, opens on the set as logged, and saves on one tap with **no
+confirmation** — the old values are on screen as you change them, and nothing
+derived is stored, so there is nothing to warn about. The set keeps its
+position; it is a `PUT` on the set rather than a delete and a re-log, which
+would move a corrected first set to the bottom.
+
+**Deleting is two taps**: the × turns into a red *Delete* that has to be tapped
+again, and disarms itself after three seconds. It was one tap before, which was
+fine while a set could only be deleted seconds after it was logged; it is not
+fine on a workout from three weeks ago.
+
+**A submitted workout is edited on the same screen.** The day sheet offers
+*Edit sets in this session* on any submitted session, in any block — correcting
+what was logged does not change which block the next workout goes into, so
+unlike Start it is not limited to the block being trained. The finish bar
+becomes *Done editing*, and swapping is hidden, since there is no machine to
+wait for in the past.
+
+Volume, average RPE, the block map's ticks and gymbro's top-set chart are all
+summed from the sets whenever they are read, so an edit needs no recalculation
+anywhere: the screen recomputes locally on the tap, and leaving reloads
+whichever list the session belongs to. The one thing deliberately *not*
+revisited is a day's plan captured from its first workout — that became a plan
+the moment it was captured, and a corrected set count three weeks later does
+not rewrite it.
+
 ### The block list, and the one destructive button in the app
 
 The Plan tab lists every block, newest first, marks the one being trained and
@@ -422,8 +489,8 @@ backend that was modelled after it cannot support them honestly:
   session opened tomorrow. The stopwatch survives on the live session and on
   the "Workout logged" screen — where it is genuinely known — and History shows
   the session's **date** in its place.
-- **Equipment on a logged exercise.** The API stores an entry's name and
-  nothing else, on purpose. The chip under an exercise name is a lookup into
+- **Equipment on a logged exercise.** The API stores an entry's name — and, for
+  a swap, the name it replaced — and no equipment, on purpose. The chip under an exercise name is a lookup into
   the shipped library, and reads `CUSTOM` for a name the user typed.
 
 One screen exists that the prototype does not have: the **duplicate list** on
@@ -477,8 +544,10 @@ The fetch sends **no** `Authorization` header, deliberately: adding one would
 turn a simple cross-origin GET into a preflight the blob endpoint has no CORS
 rule for. If it fails anyway — offline, or a missing CORS rule, which fail
 identically as a bare `TypeError` — `src/lib/library.ts` answers with a bundled
-copy of the same twenty names, because a picker with nothing in it would block
-logging entirely. Custom names are typed inline and post with the entry, so
+copy of the same file, because a picker with nothing in it would block logging
+entirely, and a swap sheet with nothing to suggest would fail at exactly the
+moment the signal is worst. Editing `gym/exercises.json` means editing that copy
+too. Custom names are typed inline and post with the entry, so
 nothing about a session depends on the library being reachable.
 
 ### Day templates come from both places at once
@@ -604,10 +673,10 @@ npm run preview   # serve the built dist/ over HTTP
 | --- | --- |
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
 | `auth.html` | MSAL's redirect URI. Loads `src/auth.ts` and nothing else — every sign-in and renewal comes back from Entra through it before the app loads, so the app stays off it |
-| `src/lib/` | No React: the typed API client and its wire types, the block/session maths and the local session totals, formatting, the exercise library and the built-in day templates, the identity config and MSAL instance, the renewal-redirect guard, the AADSTS error map, the held copy of the current block, the themes |
+| `src/lib/` | No React: the typed API client and its wire types, the block/session maths (targets, swaps) and the local session totals, formatting, the steps and bounds a set is composed from, the exercise library and its swap suggestions, the built-in day templates, the identity config and MSAL instance, the renewal-redirect guard, the AADSTS error map, the held copy of the current block, the themes |
 | `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useHistory` (another block's sessions, read when it is opened), `useLastSets`, `useTemplates` (the two template lists and their writes), `useDragReorder`, `useLibrary`, `useTheme` |
 | `src/screens/` | Intro, Today, Plan, History, Session, Done |
-| `src/components/` | The tab bar, the masthead (and its theme switch), the bottom sheets — day, block, day plan, templates, exercise picker, finish — the stepper, the drag handle, the intro's effort graph, the banner, the sign-in gate |
+| `src/components/` | The tab bar, the masthead (and its theme switch), the bottom sheets — day, block, day plan, templates, exercise picker (add and swap), set editor, finish — the stepper, the drag handle, the intro's effort graph, the banner, the sign-in gate |
 | `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
 | `dist/` | Build output. Gitignored; produced in CI and uploaded as-is |
 
@@ -948,14 +1017,23 @@ sets differ (the planner has a rail and a hairline the phone has no use for).
 The picker here is two chips in the rail's foot, above the note about the
 phone — this site has no wordmark at the top right to make the switch.
 
-### Muscle groups exist here and nowhere else
+### Muscle groups come from the library
 
-The API stores an exercise as a name; the library blob adds equipment and stops.
-Grouping is a planning question — it is what makes "eleven sets of chest this
-week" answerable — so `src/lib/groups.ts` holds a map from the shipped twenty
-names to seven groups, and nothing on the wire carries it. A name the map does
-not know reads as `—` and counts toward nothing, which is deliberate: a wrong
-group would silently skew the one panel that exists to be trusted.
+The API stores an exercise as a name. Grouping is a planning question — it is
+what makes "eleven sets of chest this week" answerable — and it used to live
+only here, as a map in `src/lib/groups.ts` from the shipped twenty names to
+seven groups. The library blob now carries `group` on every exercise, because
+the logger needs it too, to suggest a swap; `groupOf` reads it from there, so a
+variation such as `Preacher Curl` counts toward arms without this site having
+heard of it. The old map stays as the fallback for a library cached from before
+the field existed.
+
+Nothing on the wire carries a group either way. A name neither source knows
+reads as `—` and counts toward nothing, which is deliberate: a wrong group would
+silently skew the one panel that exists to be trusted.
+
+A variation is charted as its own lift in Analytics, by the same reasoning the
+logger tracks it separately: its loads are not the bar's loads.
 
 **There are no custom exercises of your own here, and there is no route for
 them.** No `/gym/exercises` endpoint exists — the built-in library is a static

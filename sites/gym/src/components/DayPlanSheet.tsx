@@ -67,9 +67,15 @@ export function DayPlanSheet({
     const [picking, setPicking] = useState(false);
     const [templating, setTemplating] = useState(false);
 
+    // The planned exercise the swap picker is open for, by position.
+    const [swapping, setSwapping] = useState<number | null>(null);
+
     const { rowProps, handleProps } = useDragReorder(plan.length, (from, to) => {
+        setSwapping(null);
         onChange(reordered(plan, from, to));
     });
+
+    const swappingEntry = swapping === null ? undefined : plan[swapping];
 
     function replace(index: number, patch: Partial<PlannedExercise>) {
         onChange(plan.map((entry, position) => (
@@ -144,6 +150,14 @@ export function DayPlanSheet({
                                         </div>
                                         <button
                                             type="button"
+                                            className="exercise__swap"
+                                            onClick={() => setSwapping(index)}
+                                            aria-label={`Swap ${entry.exerciseName} for another exercise`}
+                                        >
+                                            ⇄
+                                        </button>
+                                        <button
+                                            type="button"
                                             className="set__del"
                                             onClick={() => remove(index)}
                                             aria-label={`Remove ${entry.exerciseName} from the plan`}
@@ -199,6 +213,30 @@ export function DayPlanSheet({
                     busy={false}
                     onPick={add}
                     onClose={() => setPicking(false)}
+                />
+            ) : null}
+
+            {/* Swapping in the plan is a rename of the slot and nothing more:
+                the set count stays, and so does the position. It is an edit
+                to the draft like any other, saved with the block — so the
+                exercise a machine at your gym never seems free for can be
+                planned out of every week at once, rather than swapped in
+                each session. */}
+            {swapping !== null && swappingEntry ? (
+                <ExercisePicker
+                    library={library}
+                    busy={false}
+                    swapping={{
+                        exerciseName: swappingEntry.exerciseName,
+                        note: `Keeps its ${swappingEntry.sets} set${swappingEntry.sets === 1 ? '' : 's'} `
+                            + `and its place, in ${label} of every week. Workouts already logged `
+                            + 'keep what they were.',
+                    }}
+                    onPick={(exerciseName) => {
+                        setSwapping(null);
+                        replace(swapping, { exerciseName });
+                    }}
+                    onClose={() => setSwapping(null)}
                 />
             ) : null}
 

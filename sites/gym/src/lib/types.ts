@@ -20,6 +20,14 @@ export interface WorkSet {
  */
 export interface SessionEntry {
     exerciseName: string;
+
+    /**
+     * The exercise this one was swapped in for, when it was — always the
+     * *original*, so a second swap still names what the plan asked for. Absent
+     * rather than null on every other entry, which is how the API sends it.
+     */
+    swappedFrom?: string;
+
     sets: WorkSet[];
 }
 
@@ -177,6 +185,27 @@ export interface RemoveEntryResult {
 }
 
 /**
+ * `POST …/entries/swap`. `entryIndex` is where the substitute now sits; `replaced`
+ * says whether it took the original's place (nothing was logged on it) or went in
+ * straight after it (something was, and stays where it was lifted).
+ */
+export interface SwapEntryResult {
+    alreadyApplied: boolean;
+    entryIndex: number;
+    entryCount: number;
+    replaced: boolean;
+    exerciseName: string;
+}
+
+/** `PUT …/sets/{j}`. `alreadyApplied` means the set already held these values. */
+export interface EditSetResult {
+    alreadyApplied: boolean;
+    entryIndex: number;
+    setIndex: number;
+    setCount: number;
+}
+
+/**
  * `POST …/entries/move`. `alreadyApplied` is the same rule as `alreadyRecorded`
  * elsewhere: it means this exact move already landed, not that it failed.
  *
@@ -191,11 +220,37 @@ export interface EntryMoveResult {
     entryCount: number;
 }
 
+/**
+ * One exercise in the shipped library.
+ *
+ * A variation is an exercise of its own with `variationOf` naming its family's
+ * root — `Preacher Curl` → `Bicep Curl` — rather than an attribute on one. An
+ * entry stores a name, so a variation has its own history and its own top sets
+ * for free, and what it counts toward is read off `group` and `variationOf`
+ * rather than written anywhere.
+ *
+ * All three descriptive fields are optional: a library cached from before they
+ * existed still works, and simply has nothing to suggest a swap from.
+ */
+export interface LibraryExercise {
+    name: string;
+    equipment: string;
+
+    /** The family's root, for a variation. Never another variation. */
+    variationOf?: string;
+
+    /** The job the movement does — `horizontal-push`, `hinge`, `curl`. */
+    pattern?: string;
+
+    /** The muscle group it is planned against, one of gymbro's seven. */
+    group?: string;
+}
+
 /** The library published on the CDN, not by the API. */
 export interface ExerciseLibrary {
     version: string;
     equipment: string[];
-    exercises: { name: string; equipment: string }[];
+    exercises: LibraryExercise[];
 }
 
 /**

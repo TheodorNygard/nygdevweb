@@ -39,6 +39,13 @@ interface DaySheetProps {
     onSelect: (sessionId: string) => void;
     onStart: () => void;
     onResume: (sessionId: string) => void;
+
+    /**
+     * Opens a submitted session on the logging screen to correct its sets.
+     * Offered on any block, unlike Start: correcting what was logged changes
+     * nothing about which block the next workout goes into.
+     */
+    onEdit: (sessionId: string) => void;
     onDelete: (sessionId: string) => void;
     onClose: () => void;
 }
@@ -73,6 +80,7 @@ export function DaySheet({
     onSelect,
     onStart,
     onResume,
+    onEdit,
     onDelete,
     onClose,
 }: DaySheetProps) {
@@ -227,6 +235,18 @@ export function DaySheet({
                     A block you are not training. Open it from Plan to log against it again.
                 </p>
             )}
+
+            {selected && selected.status === 'submitted' ? (
+                <button
+                    type="button"
+                    className="add-exercise stack-8"
+                    style={{ width: '100%' }}
+                    disabled={busy}
+                    onClick={() => onEdit(selected.id)}
+                >
+                    Edit sets in this session
+                </button>
+            ) : null}
 
             {selected && selected.status === 'submitted' ? (
                 confirmingDelete === selected.id ? (

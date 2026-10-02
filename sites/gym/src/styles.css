@@ -1372,6 +1372,27 @@ button {
     font: 400 19px/1 var(--sans);
 }
 
+/* Swapping the exercise for another — the machine is taken. Unboxed like the ×
+   beside it, so the head stays one quiet line, but brighter than it because it
+   is the one reached for mid-workout, and a full 44px wide for the same
+   reason. */
+.exercise__swap {
+    flex: none;
+    width: 44px;
+    height: 40px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--fg-50);
+    font: 400 19px/1 var(--sans);
+}
+
+.exercise__swap:hover,
+.exercise__swap:active {
+    background: rgba(var(--accent-rgb), 0.1);
+    color: var(--accent-ink);
+}
+
 .sets {
     padding: 0 10px 4px;
     display: flex;
@@ -1381,12 +1402,28 @@ button {
 
 .set {
     display: grid;
-    grid-template-columns: 26px 1fr auto 44px;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    gap: 8px;
-    padding: 9px 6px;
+    gap: 4px;
+    padding: 0 0 0 6px;
     border-radius: 10px;
     background: var(--fill-soft);
+}
+
+/* Everything on the row but its delete, and the tap that opens the set to be
+   corrected. A button of its own because the delete beside it is one too, and
+   two nested buttons is not valid HTML. */
+.set__edit {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 4px 0;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
 }
 
 .set__no {
@@ -1422,12 +1459,24 @@ button {
 }
 
 .set__del {
-    width: 44px;
+    min-width: 44px;
     height: 36px;
     border: none;
     background: transparent;
     color: var(--fg-28);
     font: 400 17px/1 var(--sans);
+}
+
+/* The second tap of a delete. It says what it does, in the same red the other
+   destructive buttons use, and it is wider than the × it replaced so the thumb
+   that armed it has to mean the second tap. */
+.set__del--armed {
+    margin-right: 4px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 120, 110, 0.35);
+    border-radius: 9px;
+    color: #ff8b82;
+    font: 600 13px/1 var(--sans);
 }
 
 .logger {
@@ -2008,6 +2057,22 @@ button {
     padding: 18px 14px;
     font: 400 14px/1.5 var(--sans);
     color: var(--fg-40);
+}
+
+/* What a swap will do to the sets already logged, under the title. */
+.picker__note {
+    margin: 8px 0 0;
+    font: 400 13px/1.4 var(--sans);
+    color: var(--fg-50);
+}
+
+/* The heading over each tier of swap suggestions. */
+.picker__section {
+    display: block;
+    padding: 16px 14px 6px;
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.16em;
+    color: var(--fg-35);
 }
 
 /* ----------------------------------------------------------- templates --- */

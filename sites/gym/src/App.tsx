@@ -108,6 +108,13 @@ export function App() {
     const session = useSession(api);
     const library = useLibrary();
 
+    // The block the open session belongs to when it is not the one being
+    // trained — a submitted workout opened from History to be corrected. Null
+    // is the current block, which is every session Start or Resume opens. It
+    // has to be carried for the same reason `OpenDay.block` is: a session's
+    // week and day index mean nothing without knowing whose they are.
+    const [sessionBlock, setSessionBlock] = useState<MesocycleSummary | null>(null);
+
     // The block list, read by Plan and History alike — so either one opening is
     // what pays for it, and the second gets it for nothing.
     const blocks = useBlocks(opened.plan || opened.history ? api : null);
@@ -126,7 +133,13 @@ export function App() {
     // What the open session's exercises were last done with. Keyed off the
     // session rather than fetched by the screen, so it is in hand by the time
     // the first logger opens.
-    const lastSets = useLastSets(api, block.block?.sessions ?? NO_SESSIONS, session.workout);
+    const lastSets = useLastSets(
+        api,
+        sessionBlock
+            ? history.sessions[sessionBlock.id] ?? NO_SESSIONS
+            : block.block?.sessions ?? NO_SESSIONS,
+        session.workout,
+    );
 
     // Null until the block arrives: the week being trained is derived from the
     // sessions in it, and guessing 1 first would flash the wrong week.
@@ -282,6 +295,7 @@ export function App() {
 
         if (!started) return;
 
+        setSessionBlock(null);
         closeDay();
         setScreen('session');
     }
@@ -291,6 +305,22 @@ export function App() {
 
         if (!opened) return;
 
+        setSessionBlock(null);
+        closeDay();
+        setScreen('session');
+    }
+
+    // A submitted workout, opened on the logging screen to be corrected. The
+    // same screen and the same guarded writes as a draft — only the finish bar
+    // differs — and it may belong to a block other than the one being trained,
+    // which is why the day sheet's block comes along.
+    async function editSession(sessionId: string) {
+        const from = openDay?.block ?? null;
+        const opened = await session.open(sessionId);
+
+        if (!opened) return;
+
+        setSessionBlock(from);
         closeDay();
         setScreen('session');
     }
@@ -597,10 +627,10 @@ export function App() {
             {screen === 'session' && session.workout ? (
                 <SessionScreen
                     workout={session.workout}
-                    label={`W${session.workout.week} · ${dayLabel(meso, session.workout.dayIndex)}`}
+                    label={`W${session.workout.week} · ${dayLabel(sessionBlock ?? meso, session.workout.dayIndex)}`}
                     library={library}
-                    plan={meso?.days[session.workout.dayIndex]?.plan ?? []}
-                    weeks={meso?.weeks ?? session.workout.week}
+                    plan={(sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
+                    weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
                     lastSets={lastSets}
                     savedAt={session.savedAt}
                     onAddExercise={() => setPicking(true)}
@@ -608,13 +638,28 @@ export function App() {
                     onRemoveSet={(entryIndex, setIndex) => {
                         void session.removeSet(entryIndex, setIndex);
                     }}
+                    onEditSet={(entryIndex, setIndex, set) => {
+                        void session.editSet(entryIndex, setIndex, set);
+                    }}
+                    onSwapEntry={(entryIndex, to) => { void session.swapEntry(entryIndex, to); }}
                     onRemoveEntry={(entryIndex) => { void session.removeEntry(entryIndex); }}
                     onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
                     onFinish={() => setFinishing(true)}
                     onBack={() => {
                         session.close();
                         setScreen('tabs');
-                        block.reload();
+
+                        // The totals on the block map and in History are the
+                        // server's, summed from the sets on every read — so a
+                        // reload of whichever list holds this session is all an
+                        // edit needs to show everywhere.
+                        if (sessionBlock) {
+                            history.reload(sessionBlock.id);
+                        } else {
+                            block.reload();
+                        }
+
+                        setSessionBlock(null);
                     }}
                 />
             ) : null}
@@ -652,6 +697,7 @@ export function App() {
                     onSelect={setDaySessionId}
                     onStart={() => { void startOn(openDay.dayIndex); }}
                     onResume={(sessionId) => { void resume(sessionId); }}
+                    onEdit={(sessionId) => { void editSession(sessionId); }}
                     onDelete={(sessionId) => { void removeSession(sessionId); }}
                     onClose={closeDay}
                 />

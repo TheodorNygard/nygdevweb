@@ -286,6 +286,9 @@ export function setsForWeek(planned: number, week: number, weeks: number): numbe
  * exercises are only appended. The name check keeps that position from being
  * trusted blindly; the name lookup behind it covers a planned exercise that
  * ended up out of order.
+ *
+ * A swapped entry is matched on what it was swapped in for: the leg press that
+ * replaced a planned squat is the squat's slot, as far as the plan is concerned.
  */
 export function plannedFor(
     plan: readonly PlannedExercise[],
@@ -296,9 +299,109 @@ export function plannedFor(
 
     if (!entry) return undefined;
 
+    const name = originalOf(entry);
     const positional = plan[entryIndex];
 
-    if (positional && positional.exerciseName === entry.exerciseName) return positional;
+    if (positional && positional.exerciseName === name) return positional;
 
-    return plan.find((planned) => planned.exerciseName === entry.exerciseName);
+    return plan.find((planned) => planned.exerciseName === name);
+}
+
+/** The exercise an entry stands for: the one it was swapped in for, or itself. */
+export function originalOf(entry: SessionEntry): string {
+    return entry.swappedFrom ?? entry.exerciseName;
+}
+
+/**
+ * Whether an entry was swapped away from after it was lifted — some later entry
+ * was swapped in for the same original. Its sets stay as the record of what was
+ * done on it, but it owes nothing more: the substitute after it carries what
+ * the plan still asks for. An entry replaced before it was lifted is not here
+ * at all; the substitute took its slot.
+ */
+export function swappedAway(entries: readonly SessionEntry[], entryIndex: number): boolean {
+    const entry = entries[entryIndex];
+
+    if (!entry) return false;
+
+    const original = originalOf(entry);
+
+    return entries.some((later, index) => index > entryIndex && later.swappedFrom === original);
+}
+
+/**
+ * The entries with one exercise swapped for another — the same rule the API
+ * applies in `GymSession.WithSwap`, done locally so the swap shows on the tap.
+ *
+ * Nothing logged on the exercise: it is replaced where it stands. Sets logged on
+ * it: they stay exactly where they were lifted, and the substitute goes in
+ * straight after. `swappedFrom` always names the original, so a second swap
+ * still points at the plan; putting the original back into an untouched slot
+ * clears it.
+ */
+export function swapped(
+    entries: readonly SessionEntry[],
+    entryIndex: number,
+    to: string,
+): { entries: SessionEntry[]; at: number; replaced: boolean } {
+    const next = [...entries];
+    const current = entries[entryIndex];
+
+    if (!current) return { entries: next, at: entryIndex, replaced: false };
+
+    const original = originalOf(current);
+
+    if (current.sets.length === 0) {
+        next[entryIndex] = original === to
+            ? { exerciseName: to, sets: [] }
+            : { exerciseName: to, swappedFrom: original, sets: [] };
+
+        return { entries: next, at: entryIndex, replaced: true };
+    }
+
+    next.splice(entryIndex + 1, 0, { exerciseName: to, swappedFrom: original, sets: [] });
+
+    return { entries: next, at: entryIndex + 1, replaced: false };
+}
+
+/**
+ * How many sets each entry of a session owes this week, or `undefined` for one
+ * the plan has nothing to say about.
+ *
+ * The plan's count, halved in the rest week — and, across a swap, shared rather
+ * than repeated. Four planned sets of squat, two of them done before the rack
+ * was taken, is two sets of leg press: the substitute owes what the original
+ * had left, counted in working sets like everything else here. The original
+ * itself, once swapped away from, owes nothing (`undefined`), and its sets stay
+ * as the record of what was lifted on it.
+ *
+ * A substitute with nothing left to owe — swapped in after the target was
+ * already met — has no target either, the same as any exercise added on top of
+ * the plan.
+ */
+export function targetsFor(
+    plan: readonly PlannedExercise[],
+    entries: readonly SessionEntry[],
+    week: number,
+    weeks: number,
+): (number | undefined)[] {
+    return entries.map((entry, index) => {
+        if (swappedAway(entries, index)) return undefined;
+
+        const planned = plannedFor(plan, entries, index);
+
+        if (!planned) return undefined;
+
+        const asked = setsForWeek(planned.sets, week, weeks);
+
+        if (entry.swappedFrom === undefined) return asked;
+
+        const done = entries
+            .slice(0, index)
+            .filter((earlier) => originalOf(earlier) === entry.swappedFrom)
+            .reduce((total, earlier) => total + workingSetCount(earlier.sets), 0);
+        const left = asked - done;
+
+        return left > 0 ? left : undefined;
+    });
 }

@@ -1,18 +1,20 @@
 import { type ExerciseLibrary } from './gym';
 
 /**
- * Muscle groups, and the one thing on this site with no counterpart on the wire.
+ * Muscle groups — the question that makes "eleven sets of chest this week"
+ * answerable.
  *
- * The API stores an exercise as a name and nothing else, and the library blob
- * adds equipment and stops there. Grouping is a planning question — it is what
- * makes "eleven sets of chest this week" answerable — and it is asked on a
- * desktop screen with room for the panel, so it is answered here.
+ * The API stores an exercise as a name and nothing else. The library blob is
+ * where a name's group lives: `group` on each exercise, which the logger also
+ * reads to suggest a swap. That is what lets a variation — `Preacher Curl`,
+ * `Hack Squat` — count toward its group here without this file having heard of
+ * it.
  *
- * A map rather than a field means it costs nothing anywhere else: no migration,
- * no second copy of the library, and a phone that keeps logging names it has
- * never heard of. What it costs instead is that a name typed on the phone has
- * no group, which is what {@link groupOf} answers with a dash rather than a
- * guess — a wrong group silently skews the panel that exists to be trusted.
+ * The map below is what the blob said before it carried groups, and it is kept
+ * as the fallback for a library cached from then. A name neither knows — one
+ * typed on the phone — has no group, which is what {@link groupOf} answers with
+ * a dash rather than a guess: a wrong group silently skews the panel that
+ * exists to be trusted.
  */
 export const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Posterior', 'Calves'];
 
@@ -20,11 +22,11 @@ export const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Posterior
 export const NO_GROUP = '—';
 
 /**
- * The shipped library's twenty names, grouped.
+ * The library's original twenty names, grouped — the fallback for a cached
+ * library that predates `group`.
  *
- * Keyed on the name alone, deliberately: the library lists "Bench Press" twice,
- * once on a bar and once on dumbbells, and both are chest. Equipment changes
- * how a movement is loaded rather than what it trains.
+ * Keyed on the name alone, deliberately: equipment changes how a movement is
+ * loaded rather than what it trains.
  */
 const GROUP_BY_NAME: Record<string, string> = {
     'Bench Press': 'Chest',
@@ -48,9 +50,15 @@ const GROUP_BY_NAME: Record<string, string> = {
     'Calf Raise': 'Calves',
 };
 
-/** The group for an exercise name, or {@link NO_GROUP} for one nobody has grouped. */
-export function groupOf(name: string): string {
-    return GROUP_BY_NAME[name] ?? NO_GROUP;
+/**
+ * The group for an exercise name, or {@link NO_GROUP} for one nobody has
+ * grouped. The library's own `group` first; the map only for a library too old
+ * to carry one.
+ */
+export function groupOf(name: string, library: ExerciseLibrary | null): string {
+    const listed = library?.exercises.find((exercise) => exercise.name === name)?.group;
+
+    return listed ?? GROUP_BY_NAME[name] ?? NO_GROUP;
 }
 
 /**
@@ -74,7 +82,7 @@ export function catalogue(
     const shipped = (library?.exercises ?? []).map((exercise) => ({
         name: exercise.name,
         equipment: exercise.equipment,
-        group: groupOf(exercise.name),
+        group: groupOf(exercise.name, library),
     }));
 
     const known = new Set(shipped.map((exercise) => exercise.name));
@@ -84,7 +92,7 @@ export function catalogue(
         if (known.has(name)) continue;
 
         known.add(name);
-        custom.push({ name, equipment: 'Custom', group: groupOf(name) });
+        custom.push({ name, equipment: 'Custom', group: groupOf(name, library) });
     }
 
     // Custom first: it is the short list, and the one somebody is looking for

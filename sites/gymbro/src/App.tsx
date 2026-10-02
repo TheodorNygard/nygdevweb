@@ -421,6 +421,7 @@ export function App() {
                     ) : view === 'dashboard' ? (
                         <DashboardScreen
                             block={selected}
+                            library={library}
                             sessions={blockSessions}
                             loading={history.loading === selected.id}
                             week={week}

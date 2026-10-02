@@ -3,6 +3,7 @@ import type {
     CurrentBlock,
     DayInput,
     DayTemplate,
+    EditSetResult,
     EntryMoveResult,
     EntryResult,
     Mesocycle,
@@ -14,6 +15,7 @@ import type {
     SessionSummary,
     SetResult,
     StartedWorkout,
+    SwapEntryResult,
     Workout,
 } from './types';
 
@@ -56,9 +58,10 @@ export class ApiError extends Error {
     }
 
     /**
-     * A removal's guard did not hold — the session holds a different number of
-     * exercises, or a different one at that index. Nothing was written, and
-     * like the two above the fix is a re-read rather than a message.
+     * A removal's, a swap's or a set edit's guard did not hold — the session
+     * holds a different number of exercises, a different one at that index, or
+     * a different number of sets on it. Nothing was written, and like the two
+     * above the fix is a re-read rather than a message.
      */
     get isEntryConflict(): boolean {
         return this.code === 'entry_conflict';
@@ -416,6 +419,62 @@ export class GymApi {
             method: 'DELETE',
             path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/${entryIndex}`
                 + `/sets/${setIndex}?expectedSetCount=${expectedSetCount}`,
+        });
+    }
+
+    /**
+     * Corrects a logged set in place, on a draft or a submitted session alike.
+     *
+     * Guarded by which exercise the entry is and how many sets it holds — the
+     * two things that change what `setIndex` points at. No confirmation is
+     * asked for on screen and none is needed: the old values are what the
+     * user is looking at as they change them, and nothing derived is stored, so
+     * the next read of any total is already right.
+     */
+    editSet(
+        sessionId: string,
+        entryIndex: number,
+        setIndex: number,
+        edit: {
+            exerciseName: string;
+            expectedSetCount: number;
+            weightKg: number;
+            reps: number;
+            rpe: number | null;
+        },
+    ): Promise<EditSetResult> {
+        return this.send<EditSetResult>({
+            method: 'PUT',
+            path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/${entryIndex}`
+                + `/sets/${setIndex}`,
+            body: edit,
+        });
+    }
+
+    /**
+     * Swaps one exercise for another. Nothing logged on it: replaced where it
+     * stands. Sets logged on it: they stay, and `to` is inserted after it — a
+     * set is never moved onto an exercise it was not lifted on.
+     *
+     * `expectedSetCount` is part of the guard and decides that shape, so the
+     * caller says which one it is asking for; a set still in flight when the
+     * swap lands makes the counts disagree and the swap is refused rather than
+     * applied to the wrong shape.
+     */
+    swapEntry(
+        sessionId: string,
+        swap: {
+            entryIndex: number;
+            exerciseName: string;
+            expectedEntryCount: number;
+            expectedSetCount: number;
+            to: string;
+        },
+    ): Promise<SwapEntryResult> {
+        return this.send<SwapEntryResult>({
+            method: 'POST',
+            path: `/gym/workouts/${encodeURIComponent(sessionId)}/entries/swap`,
+            body: swap,
         });
     }
 
