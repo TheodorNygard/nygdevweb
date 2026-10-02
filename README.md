@@ -399,12 +399,18 @@ dumbbells that are free". What the swap writes depends on what was lifted:
   had left**: four planned squats, two done, is two sets of leg press. The
   original reads *swapped* and owes nothing more; the logger moves to the
   substitute.
-- **Sets logged, on a finished workout** — the swap is a correction instead: the
-  sets were done on the substitute and logged under the planned name, so they
-  **move with it**, and their history and top sets land on the exercise they
-  were actually lifted on. There is nothing left to log, so leaving them behind
-  for an empty substitute would mean nothing. The picker's note says which of
-  the two a swap is about to do. (`withSets` on the API's swap route.)
+- **Sets logged, moved with it** — the swap is a correction instead: the sets
+  were done on the substitute and logged under the planned name, so they **move
+  with it**, and their history and top sets land on the exercise they were
+  actually lifted on. Mid-workout that is **Move sets too**, a two-way choice
+  above the suggestions that is off each time the picker opens — a taken
+  machine is the common reason to swap — so a correction is three taps; the
+  logger stays open on the same sets under their right name. On a finished
+  workout it is the only shape and there is no choice: there is nothing left to
+  log, so leaving the sets behind for an empty substitute would mean nothing.
+  Nor is there on an exercise already swapped away from, whose substitute is
+  below it: a second would split what the plan has left three ways. The picker's note
+  says which a swap is about to do. (`withSets` on the API's swap route.)
 
 The substitute records `swappedFrom` on the session, always naming the
 *original*, so a second swap still knows what the plan asked for. Targets
@@ -431,9 +437,8 @@ fine on a workout from three weeks ago.
 *Edit sets in this session* on any submitted session, in any block — correcting
 what was logged does not change which block the next workout goes into, so
 unlike Start it is not limited to the block being trained. The finish bar
-becomes *Done editing*, and ⇄ becomes the correction described above — on every
-exercise, including one swapped away from mid-workout, since its sets may have
-been done on something else too.
+becomes *Done editing*, and ⇄ is only ever the correction described above, so
+the picker does not ask.
 
 Volume, average RPE, the block map's ticks and gymbro's top-set chart are all
 summed from the sets whenever they are read, so an edit needs no recalculation

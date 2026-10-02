@@ -79,14 +79,14 @@ function setLabelsOf(sets: readonly WorkSet[]): string[] {
 /**
  * What a swap is about to do, said under the picker's title — because the same
  * button does three different things depending on what is logged and whether
- * the workout is finished.
+ * the sets go with it.
  */
-function swapNote(setCount: number, submitted: boolean): string {
+function swapNote(setCount: number, withSets: boolean): string {
     if (setCount === 0) return 'Takes its place in this workout. The day’s plan is not changed.';
 
     const sets = setCount === 1 ? 'The set' : `The ${setCount} sets`;
 
-    return submitted
+    return withSets
         ? `${sets} logged on it ${setCount === 1 ? 'moves' : 'move'} to what you pick — for when `
             + `${setCount === 1 ? 'it was' : 'they were'} really done on something else. `
             + (setCount === 1 ? 'Its history goes with it.' : 'Their history goes with them.')
@@ -157,9 +157,10 @@ interface SessionScreenProps {
     /**
      * Swaps an exercise for another — replaced where it stands if nothing is
      * logged on it, inserted after it otherwise, so its sets are never lost.
-     * `withSets` moves them with it instead, which is what a swap on a finished
-     * workout means. The picker that chooses `to` is this screen's own,
-     * because where the logger lands afterwards depends on the shape.
+     * `withSets` moves them with it instead: always on a finished workout, and
+     * mid-workout when the user says so. The picker that chooses `to` is this
+     * screen's own, because where the logger lands afterwards depends on the
+     * shape.
      */
     onSwapEntry: (entryIndex: number, to: string, withSets: boolean) => void;
 
@@ -215,7 +216,9 @@ interface SessionScreenProps {
  * When the equipment is taken, the ⇄ on an exercise swaps it: its variations
  * first, then anything else doing the same job. Sets already logged stay on the
  * exercise they were lifted on, and the substitute owes what the plan had left
- * — see `targetsFor`.
+ * — see `targetsFor`. Or, one tap more, they move with it: the curls were done
+ * on the cable and logged as dumbbell curls, which is a correction rather than
+ * a swap, and the sets' history belongs on the cable.
  *
  * Every logged set can be corrected by tapping it, and deleted by tapping its ×
  * twice. That holds on a submitted workout too, which is opened here from the
@@ -285,6 +288,11 @@ export function SessionScreen({
     // rather than leaving them pointing at whatever moved into the slot.
     const [swapping, setSwapping] = useState<number | null>(null);
     const [editing, setEditing] = useState<SetRef | null>(null);
+
+    // Whether the swap being picked moves the logged sets along with it, where
+    // that is a choice at all (see `carryChoice` below). Off each time the
+    // picker opens: the equipment being taken is the common reason to swap.
+    const [moveSets, setMoveSets] = useState(false);
     const [armed, setArmed] = useState<SetRef | null>(null);
 
     useEffect(() => {
@@ -415,15 +423,14 @@ export function SessionScreen({
      * lifted on something else. Inserted after, everything below moves down one
      * and the logger moves to the substitute, which is what is about to be done.
      *
-     * On a finished workout the sets go with the swap: there is nothing left to
-     * log, so a swap there can only mean they were done on something else.
+     * Moving the sets with it is the in-place shape with the sets kept, so the
+     * logger stays where it is — open on the same sets under their right name,
+     * with the steppers reading the last of them.
      */
-    function swapEntry(entryIndex: number, to: string) {
+    function swapEntry(entryIndex: number, to: string, withSets: boolean) {
         const entry = workout.entries[entryIndex];
 
         if (!entry || entry.exerciseName === to) return;
-
-        const withSets = workout.status === 'submitted';
 
         forgetPositions();
 
@@ -535,6 +542,16 @@ export function SessionScreen({
     const submitted = workout.status === 'submitted';
 
     const swappingEntry = swapping === null ? undefined : workout.entries[swapping];
+
+    // What a swap does with the sets already logged. A finished workout has
+    // nothing left to log, so they can only have been done on something else.
+    // An exercise already swapped away from has its substitute below it, and a
+    // second one would split what the plan has left three ways, so its sets
+    // can only be corrected too. Anywhere else with sets, it is the user's
+    // call — and with none, there is nothing to carry.
+    const swappingAway = swapping !== null && swappedAway(workout.entries, swapping);
+    const carryChoice = !submitted && !swappingAway && (swappingEntry?.sets.length ?? 0) > 0;
+    const carriesSets = submitted || swappingAway || (carryChoice && moveSets);
     const editingEntry = editing === null ? undefined : workout.entries[editing.entryIndex];
     const editingSet = editing === null ? undefined : editingEntry?.sets[editing.setIndex];
 
@@ -671,25 +688,22 @@ export function SessionScreen({
                                                 : 'no sets yet'}
                                     </span>
                                 </button>
-                                {/* Not on an exercise already swapped away from
-                                    mid-workout — its substitute is the one to
-                                    swap again. On a finished workout every
-                                    exercise can be corrected, that one
-                                    included: its sets may have been done on
-                                    something else too. */}
-                                {submitted || !away ? (
-                                    <button
-                                        type="button"
-                                        className="exercise__swap"
-                                        onClick={() => {
-                                            setArmed(null);
-                                            setSwapping(entryIndex);
-                                        }}
-                                        aria-label={`Swap ${entry.exerciseName} for another exercise`}
-                                    >
-                                        ⇄
-                                    </button>
-                                ) : null}
+                                {/* On every exercise, one already swapped away
+                                    from included: its sets may have been done
+                                    on something else too, and correcting
+                                    that is the one swap it can still make. */}
+                                <button
+                                    type="button"
+                                    className="exercise__swap"
+                                    onClick={() => {
+                                        setArmed(null);
+                                        setMoveSets(false);
+                                        setSwapping(entryIndex);
+                                    }}
+                                    aria-label={`Swap ${entry.exerciseName} for another exercise`}
+                                >
+                                    ⇄
+                                </button>
                                 {entry.sets.length === 0 ? (
                                     <button
                                         type="button"
@@ -910,9 +924,12 @@ export function SessionScreen({
                         ...(swappingEntry.swappedFrom === undefined
                             ? {}
                             : { swappedFrom: swappingEntry.swappedFrom }),
-                        note: swapNote(swappingEntry.sets.length, submitted),
+                        note: swapNote(swappingEntry.sets.length, carriesSets),
+                        ...(carryChoice
+                            ? { carry: { withSets: moveSets, onChange: setMoveSets } }
+                            : {}),
                     }}
-                    onPick={(name) => swapEntry(swapping, name)}
+                    onPick={(name) => swapEntry(swapping, name, carriesSets)}
                     onClose={() => setSwapping(null)}
                 />
             ) : null}

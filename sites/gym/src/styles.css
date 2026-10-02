@@ -2081,6 +2081,31 @@ button {
     color: var(--fg-50);
 }
 
+/* Mid-workout, on an exercise with sets: whether they stay or go with the
+   swap. Two halves of one control, like the tab bar, so it reads as a choice
+   rather than two more things to pick. */
+.picker__carry {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.picker__carry-option {
+    flex: 1;
+    height: 40px;
+    border: none;
+    border-radius: 12px;
+    background: var(--fill);
+    color: var(--fg-60);
+    font: 600 13px/1 var(--sans);
+    letter-spacing: -0.01em;
+}
+
+.picker__carry-option--on {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
 /* The heading over each tier of swap suggestions. */
 .picker__section {
     display: block;

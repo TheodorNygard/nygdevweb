@@ -20,6 +20,18 @@ export interface Swapping {
 
     /** One line on what the swap will do here — keep the sets, change the plan. */
     note: string;
+
+    /**
+     * Whether the sets logged on the exercise go with the swap, when that is
+     * the user's to choose: mid-workout, on an exercise with sets, where a swap
+     * can mean either thing — the equipment is taken and the rest goes on
+     * something else, or the sets already logged were done on something else.
+     * Absent where only one of those is possible.
+     */
+    carry?: {
+        withSets: boolean;
+        onChange: (withSets: boolean) => void;
+    };
 }
 
 /** One suggested exercise, and the muscles it shares when that is why. */
@@ -54,7 +66,9 @@ interface ExercisePickerProps {
  * the muscles it shares (see `alternativesFor`). The equipment chips filter
  * those too, which is the other half of the question — "what can I do with the
  * dumbbells that are free". Swapping to a variation is therefore two taps from
- * the logging screen: the swap button, then the variation.
+ * the logging screen: the swap button, then the variation. Moving the sets
+ * already logged along with it — they were done on the variation all along —
+ * is one more, on the choice above the note.
  */
 export function ExercisePicker({ library, busy, swapping, onPick, onClose }: ExercisePickerProps) {
     const [query, setQuery] = useState('');
@@ -103,6 +117,7 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
         && !(library?.exercises ?? []).some((exercise) => exercise.name.toLowerCase() === needle);
 
     const title = swapping ? `Swap ${swapping.exerciseName}` : 'Add exercise';
+    const carry = swapping?.carry;
 
     function item(exercise: LibraryExercise, shared: string[] | null = null) {
         return (
@@ -135,6 +150,26 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                         {swapping ? 'Cancel' : 'Done'}
                     </button>
                 </div>
+                {/* Before the suggestions rather than after a pick: the choice
+                    is about the sets, not the exercise, and asking after the
+                    tap would make the common swap cost one more. */}
+                {carry ? (
+                    <div className="picker__carry" role="group" aria-label="The sets logged on it">
+                        {[false, true].map((withSets) => (
+                            <button
+                                key={String(withSets)}
+                                type="button"
+                                className={withSets === carry.withSets
+                                    ? 'picker__carry-option picker__carry-option--on'
+                                    : 'picker__carry-option'}
+                                aria-pressed={withSets === carry.withSets}
+                                onClick={() => carry.onChange(withSets)}
+                            >
+                                {withSets ? 'Move sets too' : 'Keep sets here'}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
                 {swapping ? <p className="picker__note">{swapping.note}</p> : null}
                 <input
                     className="picker__search"

@@ -457,9 +457,9 @@ export class GymApi {
      * set is never moved onto an exercise it was not lifted on.
      *
      * Unless it was: `withSets` says the sets logged on it were done on `to`,
-     * so it is replaced where it stands and they go with it. That is the swap a
-     * finished workout makes, where there is nothing left to log and the only
-     * thing to fix is the name the sets were recorded under.
+     * so it is replaced where it stands and they go with it — fixing the name
+     * the sets were recorded under. Always the swap a finished workout makes,
+     * where there is nothing left to log; mid-workout, when the user says so.
      *
      * `expectedSetCount` is part of the guard and decides that shape, so the
      * caller says which one it is asking for; a set still in flight when the
