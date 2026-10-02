@@ -76,6 +76,24 @@ function setLabelsOf(sets: readonly WorkSet[]): string[] {
     });
 }
 
+/**
+ * What a swap is about to do, said under the picker's title — because the same
+ * button does three different things depending on what is logged and whether
+ * the workout is finished.
+ */
+function swapNote(setCount: number, submitted: boolean): string {
+    if (setCount === 0) return 'Takes its place in this workout. The day’s plan is not changed.';
+
+    const sets = setCount === 1 ? 'The set' : `The ${setCount} sets`;
+
+    return submitted
+        ? `${sets} logged on it ${setCount === 1 ? 'moves' : 'move'} to what you pick — for when `
+            + `${setCount === 1 ? 'it was' : 'they were'} really done on something else. `
+            + (setCount === 1 ? 'Its history goes with it.' : 'Their history goes with them.')
+        : `${sets} logged on it ${setCount === 1 ? 'stays' : 'stay'} there. What you pick goes `
+            + 'in after it, for whatever the plan has left.';
+}
+
 /** A set by its position: which exercise, and which of its sets. */
 interface SetRef {
     entryIndex: number;
@@ -138,11 +156,12 @@ interface SessionScreenProps {
 
     /**
      * Swaps an exercise for another — replaced where it stands if nothing is
-     * logged on it, inserted after it otherwise, so its sets are never moved or
-     * lost. The picker that chooses `to` is this screen's own, because where
-     * the logger lands afterwards depends on which of the two it was.
+     * logged on it, inserted after it otherwise, so its sets are never lost.
+     * `withSets` moves them with it instead, which is what a swap on a finished
+     * workout means. The picker that chooses `to` is this screen's own,
+     * because where the logger lands afterwards depends on the shape.
      */
-    onSwapEntry: (entryIndex: number, to: string) => void;
+    onSwapEntry: (entryIndex: number, to: string, withSets: boolean) => void;
 
     /**
      * Takes an exercise out of the session — offered only once it holds no
@@ -201,7 +220,9 @@ interface SessionScreenProps {
  * Every logged set can be corrected by tapping it, and deleted by tapping its ×
  * twice. That holds on a submitted workout too, which is opened here from the
  * day sheet to be edited: the finish bar becomes a way back rather than a
- * second submit.
+ * second submit, and ⇄ becomes a correction — the sets logged on an exercise
+ * move to the one they were actually done on, rather than staying behind for a
+ * substitute there is nothing left to log against.
  */
 export function SessionScreen({
     workout,
@@ -393,15 +414,20 @@ export function SessionScreen({
      * substitute should open on its own last weight rather than on a number
      * lifted on something else. Inserted after, everything below moves down one
      * and the logger moves to the substitute, which is what is about to be done.
+     *
+     * On a finished workout the sets go with the swap: there is nothing left to
+     * log, so a swap there can only mean they were done on something else.
      */
     function swapEntry(entryIndex: number, to: string) {
         const entry = workout.entries[entryIndex];
 
         if (!entry || entry.exerciseName === to) return;
 
+        const withSets = workout.status === 'submitted';
+
         forgetPositions();
 
-        if (entry.sets.length === 0) {
+        if (entry.sets.length === 0 || withSets) {
             setPending((held) => {
                 const next = { ...held };
 
@@ -425,7 +451,7 @@ export function SessionScreen({
             setGrowthFocus(entryIndex + 1);
         }
 
-        onSwapEntry(entryIndex, to);
+        onSwapEntry(entryIndex, to, withSets);
     }
 
     /**
@@ -645,11 +671,13 @@ export function SessionScreen({
                                                 : 'no sets yet'}
                                     </span>
                                 </button>
-                                {/* Not on a finished workout, where there is no
-                                    machine to be waiting for, and not on an
-                                    exercise already swapped away from — its
-                                    substitute is the one to swap again. */}
-                                {!submitted && !away ? (
+                                {/* Not on an exercise already swapped away from
+                                    mid-workout — its substitute is the one to
+                                    swap again. On a finished workout every
+                                    exercise can be corrected, that one
+                                    included: its sets may have been done on
+                                    something else too. */}
+                                {submitted || !away ? (
                                     <button
                                         type="button"
                                         className="exercise__swap"
@@ -882,11 +910,7 @@ export function SessionScreen({
                         ...(swappingEntry.swappedFrom === undefined
                             ? {}
                             : { swappedFrom: swappingEntry.swappedFrom }),
-                        note: swappingEntry.sets.length === 0
-                            ? 'Takes its place in this workout. The day’s plan is not changed.'
-                            : `The ${swappingEntry.sets.length} set${swappingEntry.sets.length === 1 ? '' : 's'} `
-                                + 'logged on it stay there. What you pick goes in after it, '
-                                + 'for whatever the plan has left.',
+                        note: swapNote(swappingEntry.sets.length, submitted),
                     }}
                     onPick={(name) => swapEntry(swapping, name)}
                     onClose={() => setSwapping(null)}

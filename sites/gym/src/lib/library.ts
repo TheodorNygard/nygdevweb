@@ -21,59 +21,60 @@ const FALLBACK: ExerciseLibrary = {
     version: 'bundled',
     equipment: ['Bar', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight'],
     exercises: [
-        { name: 'Bench Press', equipment: 'Bar', group: 'Chest', pattern: 'horizontal-push' },
-        { name: 'Dumbbell Bench Press', equipment: 'Dumbbell', group: 'Chest', pattern: 'horizontal-push', variationOf: 'Bench Press' },
-        { name: 'Incline Bench Press', equipment: 'Bar', group: 'Chest', pattern: 'horizontal-push', variationOf: 'Bench Press' },
-        { name: 'Incline Dumbbell Press', equipment: 'Dumbbell', group: 'Chest', pattern: 'horizontal-push', variationOf: 'Bench Press' },
-        { name: 'Machine Chest Press', equipment: 'Machine', group: 'Chest', pattern: 'horizontal-push', variationOf: 'Bench Press' },
-        { name: 'Push-up', equipment: 'Bodyweight', group: 'Chest', pattern: 'horizontal-push' },
-        { name: 'Overhead Press', equipment: 'Bar', group: 'Shoulders', pattern: 'vertical-push' },
-        { name: 'Dumbbell Shoulder Press', equipment: 'Dumbbell', group: 'Shoulders', pattern: 'vertical-push', variationOf: 'Overhead Press' },
-        { name: 'Machine Shoulder Press', equipment: 'Machine', group: 'Shoulders', pattern: 'vertical-push', variationOf: 'Overhead Press' },
-        { name: 'Squat', equipment: 'Bar', group: 'Quads', pattern: 'squat' },
-        { name: 'Front Squat', equipment: 'Bar', group: 'Quads', pattern: 'squat', variationOf: 'Squat' },
-        { name: 'Hack Squat', equipment: 'Machine', group: 'Quads', pattern: 'squat', variationOf: 'Squat' },
-        { name: 'Goblet Squat', equipment: 'Dumbbell', group: 'Quads', pattern: 'squat', variationOf: 'Squat' },
-        { name: 'Deadlift', equipment: 'Bar', group: 'Posterior', pattern: 'hinge' },
-        { name: 'Trap Bar Deadlift', equipment: 'Bar', group: 'Posterior', pattern: 'hinge', variationOf: 'Deadlift' },
-        { name: 'Sumo Deadlift', equipment: 'Bar', group: 'Posterior', pattern: 'hinge', variationOf: 'Deadlift' },
-        { name: 'Romanian Deadlift', equipment: 'Bar', group: 'Posterior', pattern: 'hinge' },
-        { name: 'Dumbbell Romanian Deadlift', equipment: 'Dumbbell', group: 'Posterior', pattern: 'hinge', variationOf: 'Romanian Deadlift' },
-        { name: 'Barbell Row', equipment: 'Bar', group: 'Back', pattern: 'horizontal-pull' },
-        { name: 'Dumbbell Row', equipment: 'Dumbbell', group: 'Back', pattern: 'horizontal-pull', variationOf: 'Barbell Row' },
-        { name: 'Chest-Supported Row', equipment: 'Machine', group: 'Back', pattern: 'horizontal-pull', variationOf: 'Barbell Row' },
-        { name: 'Pull-up', equipment: 'Bodyweight', group: 'Back', pattern: 'vertical-pull' },
-        { name: 'Chin-up', equipment: 'Bodyweight', group: 'Back', pattern: 'vertical-pull', variationOf: 'Pull-up' },
-        { name: 'Assisted Pull-up', equipment: 'Machine', group: 'Back', pattern: 'vertical-pull', variationOf: 'Pull-up' },
-        { name: 'Dip', equipment: 'Bodyweight', group: 'Chest' },
-        { name: 'Assisted Dip', equipment: 'Machine', group: 'Chest', variationOf: 'Dip' },
-        { name: 'Lat Pulldown', equipment: 'Cable', group: 'Back', pattern: 'vertical-pull' },
-        { name: 'Close-Grip Lat Pulldown', equipment: 'Cable', group: 'Back', pattern: 'vertical-pull', variationOf: 'Lat Pulldown' },
-        { name: 'Seated Row', equipment: 'Cable', group: 'Back', pattern: 'horizontal-pull' },
-        { name: 'Cable Fly', equipment: 'Cable', group: 'Chest', pattern: 'fly' },
-        { name: 'Dumbbell Fly', equipment: 'Dumbbell', group: 'Chest', pattern: 'fly', variationOf: 'Cable Fly' },
-        { name: 'Pec Deck', equipment: 'Machine', group: 'Chest', pattern: 'fly', variationOf: 'Cable Fly' },
-        { name: 'Triceps Pushdown', equipment: 'Cable', group: 'Arms', pattern: 'triceps-extension' },
-        { name: 'Rope Pushdown', equipment: 'Cable', group: 'Arms', pattern: 'triceps-extension', variationOf: 'Triceps Pushdown' },
-        { name: 'Overhead Triceps Extension', equipment: 'Cable', group: 'Arms', pattern: 'triceps-extension' },
-        { name: 'Skull Crusher', equipment: 'Bar', group: 'Arms', pattern: 'triceps-extension' },
-        { name: 'Leg Press', equipment: 'Machine', group: 'Quads', pattern: 'squat' },
-        { name: 'Bulgarian Split Squat', equipment: 'Dumbbell', group: 'Quads', pattern: 'squat' },
-        { name: 'Leg Extension', equipment: 'Machine', group: 'Quads', pattern: 'leg-extension' },
-        { name: 'Leg Curl', equipment: 'Machine', group: 'Posterior', pattern: 'leg-curl' },
-        { name: 'Seated Leg Curl', equipment: 'Machine', group: 'Posterior', pattern: 'leg-curl', variationOf: 'Leg Curl' },
-        { name: 'Lying Leg Curl', equipment: 'Machine', group: 'Posterior', pattern: 'leg-curl', variationOf: 'Leg Curl' },
-        { name: 'Calf Raise', equipment: 'Machine', group: 'Calves', pattern: 'calf-raise' },
-        { name: 'Seated Calf Raise', equipment: 'Machine', group: 'Calves', pattern: 'calf-raise', variationOf: 'Calf Raise' },
-        { name: 'Single-Leg Calf Raise', equipment: 'Bodyweight', group: 'Calves', pattern: 'calf-raise', variationOf: 'Calf Raise' },
-        { name: 'Lateral Raise', equipment: 'Dumbbell', group: 'Shoulders', pattern: 'lateral-raise' },
-        { name: 'Cable Lateral Raise', equipment: 'Cable', group: 'Shoulders', pattern: 'lateral-raise', variationOf: 'Lateral Raise' },
-        { name: 'Machine Lateral Raise', equipment: 'Machine', group: 'Shoulders', pattern: 'lateral-raise', variationOf: 'Lateral Raise' },
-        { name: 'Bicep Curl', equipment: 'Dumbbell', group: 'Arms', pattern: 'curl' },
-        { name: 'Preacher Curl', equipment: 'Bar', group: 'Arms', pattern: 'curl', variationOf: 'Bicep Curl' },
-        { name: 'Reverse-Grip Curl', equipment: 'Bar', group: 'Arms', pattern: 'curl', variationOf: 'Bicep Curl' },
-        { name: 'Hammer Curl', equipment: 'Dumbbell', group: 'Arms', pattern: 'curl', variationOf: 'Bicep Curl' },
-        { name: 'Cable Curl', equipment: 'Cable', group: 'Arms', pattern: 'curl', variationOf: 'Bicep Curl' },
+        { name: 'Bench Press', equipment: 'Bar', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'], pattern: 'horizontal-push' },
+        { name: 'Dumbbell Bench Press', equipment: 'Dumbbell', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'], pattern: 'horizontal-push', variationOf: 'Bench Press' },
+        { name: 'Incline Bench Press', equipment: 'Bar', group: 'Chest', muscles: ['Chest', 'Front Delts', 'Triceps'], pattern: 'horizontal-push', variationOf: 'Bench Press' },
+        { name: 'Incline Dumbbell Press', equipment: 'Dumbbell', group: 'Chest', muscles: ['Chest', 'Front Delts', 'Triceps'], pattern: 'horizontal-push', variationOf: 'Bench Press' },
+        { name: 'Machine Chest Press', equipment: 'Machine', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'], pattern: 'horizontal-push', variationOf: 'Bench Press' },
+        { name: 'Close-Grip Bench Press', equipment: 'Bar', group: 'Chest', muscles: ['Triceps', 'Chest', 'Front Delts'], pattern: 'horizontal-push', variationOf: 'Bench Press' },
+        { name: 'Push-up', equipment: 'Bodyweight', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'], pattern: 'horizontal-push' },
+        { name: 'Overhead Press', equipment: 'Bar', group: 'Shoulders', muscles: ['Front Delts', 'Triceps', 'Side Delts'], pattern: 'vertical-push' },
+        { name: 'Dumbbell Shoulder Press', equipment: 'Dumbbell', group: 'Shoulders', muscles: ['Front Delts', 'Side Delts', 'Triceps'], pattern: 'vertical-push', variationOf: 'Overhead Press' },
+        { name: 'Machine Shoulder Press', equipment: 'Machine', group: 'Shoulders', muscles: ['Front Delts', 'Triceps', 'Side Delts'], pattern: 'vertical-push', variationOf: 'Overhead Press' },
+        { name: 'Squat', equipment: 'Bar', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat' },
+        { name: 'Front Squat', equipment: 'Bar', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat', variationOf: 'Squat' },
+        { name: 'Hack Squat', equipment: 'Machine', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat', variationOf: 'Squat' },
+        { name: 'Goblet Squat', equipment: 'Dumbbell', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat', variationOf: 'Squat' },
+        { name: 'Deadlift', equipment: 'Bar', group: 'Posterior', muscles: ['Glutes', 'Hamstrings', 'Lower Back'], pattern: 'hinge' },
+        { name: 'Trap Bar Deadlift', equipment: 'Bar', group: 'Posterior', muscles: ['Glutes', 'Quads', 'Hamstrings'], pattern: 'hinge', variationOf: 'Deadlift' },
+        { name: 'Sumo Deadlift', equipment: 'Bar', group: 'Posterior', muscles: ['Glutes', 'Hamstrings', 'Quads'], pattern: 'hinge', variationOf: 'Deadlift' },
+        { name: 'Romanian Deadlift', equipment: 'Bar', group: 'Posterior', muscles: ['Hamstrings', 'Glutes', 'Lower Back'], pattern: 'hinge' },
+        { name: 'Dumbbell Romanian Deadlift', equipment: 'Dumbbell', group: 'Posterior', muscles: ['Hamstrings', 'Glutes', 'Lower Back'], pattern: 'hinge', variationOf: 'Romanian Deadlift' },
+        { name: 'Barbell Row', equipment: 'Bar', group: 'Back', muscles: ['Upper Back', 'Lats', 'Rear Delts'], pattern: 'horizontal-pull' },
+        { name: 'Dumbbell Row', equipment: 'Dumbbell', group: 'Back', muscles: ['Lats', 'Upper Back', 'Rear Delts'], pattern: 'horizontal-pull', variationOf: 'Barbell Row' },
+        { name: 'Chest-Supported Row', equipment: 'Machine', group: 'Back', muscles: ['Upper Back', 'Lats', 'Rear Delts'], pattern: 'horizontal-pull', variationOf: 'Barbell Row' },
+        { name: 'Pull-up', equipment: 'Bodyweight', group: 'Back', muscles: ['Lats', 'Upper Back', 'Biceps'], pattern: 'vertical-pull' },
+        { name: 'Chin-up', equipment: 'Bodyweight', group: 'Back', muscles: ['Lats', 'Biceps', 'Upper Back'], pattern: 'vertical-pull', variationOf: 'Pull-up' },
+        { name: 'Assisted Pull-up', equipment: 'Machine', group: 'Back', muscles: ['Lats', 'Upper Back', 'Biceps'], pattern: 'vertical-pull', variationOf: 'Pull-up' },
+        { name: 'Dip', equipment: 'Bodyweight', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'] },
+        { name: 'Assisted Dip', equipment: 'Machine', group: 'Chest', muscles: ['Chest', 'Triceps', 'Front Delts'], variationOf: 'Dip' },
+        { name: 'Lat Pulldown', equipment: 'Cable', group: 'Back', muscles: ['Lats', 'Upper Back', 'Biceps'], pattern: 'vertical-pull' },
+        { name: 'Close-Grip Lat Pulldown', equipment: 'Cable', group: 'Back', muscles: ['Lats', 'Biceps', 'Upper Back'], pattern: 'vertical-pull', variationOf: 'Lat Pulldown' },
+        { name: 'Seated Row', equipment: 'Cable', group: 'Back', muscles: ['Upper Back', 'Lats', 'Rear Delts'], pattern: 'horizontal-pull' },
+        { name: 'Cable Fly', equipment: 'Cable', group: 'Chest', muscles: ['Chest', 'Front Delts'], pattern: 'fly' },
+        { name: 'Dumbbell Fly', equipment: 'Dumbbell', group: 'Chest', muscles: ['Chest', 'Front Delts'], pattern: 'fly', variationOf: 'Cable Fly' },
+        { name: 'Pec Deck', equipment: 'Machine', group: 'Chest', muscles: ['Chest'], pattern: 'fly', variationOf: 'Cable Fly' },
+        { name: 'Triceps Pushdown', equipment: 'Cable', group: 'Arms', muscles: ['Triceps'], pattern: 'triceps-extension' },
+        { name: 'Rope Pushdown', equipment: 'Cable', group: 'Arms', muscles: ['Triceps'], pattern: 'triceps-extension', variationOf: 'Triceps Pushdown' },
+        { name: 'Overhead Triceps Extension', equipment: 'Cable', group: 'Arms', muscles: ['Triceps'], pattern: 'triceps-extension' },
+        { name: 'Skull Crusher', equipment: 'Bar', group: 'Arms', muscles: ['Triceps'], pattern: 'triceps-extension' },
+        { name: 'Leg Press', equipment: 'Machine', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat' },
+        { name: 'Bulgarian Split Squat', equipment: 'Dumbbell', group: 'Quads', muscles: ['Quads', 'Glutes'], pattern: 'squat' },
+        { name: 'Leg Extension', equipment: 'Machine', group: 'Quads', muscles: ['Quads'], pattern: 'leg-extension' },
+        { name: 'Leg Curl', equipment: 'Machine', group: 'Posterior', muscles: ['Hamstrings'], pattern: 'leg-curl' },
+        { name: 'Seated Leg Curl', equipment: 'Machine', group: 'Posterior', muscles: ['Hamstrings'], pattern: 'leg-curl', variationOf: 'Leg Curl' },
+        { name: 'Lying Leg Curl', equipment: 'Machine', group: 'Posterior', muscles: ['Hamstrings'], pattern: 'leg-curl', variationOf: 'Leg Curl' },
+        { name: 'Calf Raise', equipment: 'Machine', group: 'Calves', muscles: ['Calves'], pattern: 'calf-raise' },
+        { name: 'Seated Calf Raise', equipment: 'Machine', group: 'Calves', muscles: ['Calves'], pattern: 'calf-raise', variationOf: 'Calf Raise' },
+        { name: 'Single-Leg Calf Raise', equipment: 'Bodyweight', group: 'Calves', muscles: ['Calves'], pattern: 'calf-raise', variationOf: 'Calf Raise' },
+        { name: 'Lateral Raise', equipment: 'Dumbbell', group: 'Shoulders', muscles: ['Side Delts'], pattern: 'lateral-raise' },
+        { name: 'Cable Lateral Raise', equipment: 'Cable', group: 'Shoulders', muscles: ['Side Delts'], pattern: 'lateral-raise', variationOf: 'Lateral Raise' },
+        { name: 'Machine Lateral Raise', equipment: 'Machine', group: 'Shoulders', muscles: ['Side Delts'], pattern: 'lateral-raise', variationOf: 'Lateral Raise' },
+        { name: 'Bicep Curl', equipment: 'Dumbbell', group: 'Arms', muscles: ['Biceps', 'Forearms'], pattern: 'curl' },
+        { name: 'Preacher Curl', equipment: 'Bar', group: 'Arms', muscles: ['Biceps'], pattern: 'curl', variationOf: 'Bicep Curl' },
+        { name: 'Reverse-Grip Curl', equipment: 'Bar', group: 'Arms', muscles: ['Forearms', 'Biceps'], pattern: 'curl', variationOf: 'Bicep Curl' },
+        { name: 'Hammer Curl', equipment: 'Dumbbell', group: 'Arms', muscles: ['Biceps', 'Forearms'], pattern: 'curl', variationOf: 'Bicep Curl' },
+        { name: 'Cable Curl', equipment: 'Cable', group: 'Arms', muscles: ['Biceps'], pattern: 'curl', variationOf: 'Bicep Curl' },
     ],
 };
 
@@ -127,22 +128,86 @@ export function equipmentFor(library: ExerciseLibrary | null, name: string): str
  *
  * - **Variations** — the same movement done another way, which is the family
  *   `variationOf` draws. Swapping within it changes the least about the
- *   workout.
+ *   workout. Library order, which keeps a family's root first.
  * - **Same movement** — different exercises doing the same job (`pattern`), so
- *   a busy squat rack offers the leg press.
- * - **Same muscle group** — the coarsest fallback, for an exercise whose
- *   movement nothing else in the library does.
+ *   a busy squat rack offers the leg press. Library order.
+ * - **Same muscles** — anything else that trains what this one trains, ranked
+ *   by how much of it: see `muscleOverlap`. Each comes with the muscles it
+ *   shares, which is what makes a chin-up readable as a curl's alternative.
  *
- * Within a tier the library's own order holds, which keeps a family's root
- * ahead of its variations and the list stable from one swap to the next.
+ * `sameGroup` is the coarse version of the last tier — gymbro's seven planning
+ * groups — and is only filled for an exercise the library gives no muscles,
+ * which is a library cached from before it did. It is not used otherwise
+ * because the groups are too coarse to call anything similar: Arms holds
+ * biceps and triceps both, so a curl's "same group" was a triceps pushdown.
  */
 export interface Alternatives {
     variations: LibraryExercise[];
     samePattern: LibraryExercise[];
+    sameMuscles: MuscleMatch[];
     sameGroup: LibraryExercise[];
 }
 
-const NO_ALTERNATIVES: Alternatives = { variations: [], samePattern: [], sameGroup: [] };
+/** An exercise that trains some of the same muscles, and which ones. */
+export interface MuscleMatch {
+    exercise: LibraryExercise;
+
+    /** The shared muscles, in the order the swapped exercise lists them. */
+    shared: string[];
+}
+
+const NO_ALTERNATIVES: Alternatives = {
+    variations: [],
+    samePattern: [],
+    sameMuscles: [],
+    sameGroup: [],
+};
+
+/**
+ * How much a muscle counts by where it is listed: the main one three times what
+ * a third does. Both exercises' positions count, so a curl (biceps first) is
+ * closer to a chin-up (biceps second) than to a pull-up (biceps third).
+ */
+const MUSCLE_WEIGHTS = [3, 2, 1];
+
+/**
+ * The least overlap that is worth suggesting. A muscle one exercise trains
+ * third and the other second is incidental; a muscle either one trains first,
+ * shared with anything, is not.
+ */
+const MIN_MUSCLE_OVERLAP = 3;
+
+/** Enough to choose from with eight people waiting; more is a second list. */
+const MAX_MUSCLE_MATCHES = 6;
+
+function muscleWeight(position: number): number {
+    return MUSCLE_WEIGHTS[position] ?? 1;
+}
+
+/**
+ * How much two exercises train the same muscles: for every muscle both list,
+ * the product of what it weighs in each. Bench press and dip share chest first
+ * and triceps second — 9 + 4 + 1 for the front delts — where bench press and an
+ * overhead press share only what each trains second and third.
+ */
+export function muscleOverlap(
+    subject: readonly string[],
+    candidate: readonly string[],
+): { score: number; shared: string[] } {
+    let score = 0;
+    const shared: string[] = [];
+
+    subject.forEach((muscle, position) => {
+        const there = candidate.indexOf(muscle);
+
+        if (there < 0) return;
+
+        score += muscleWeight(position) * muscleWeight(there);
+        shared.push(muscle);
+    });
+
+    return { score, shared };
+}
 
 /**
  * The alternatives to `name`. `standsInFor` is the exercise a swapped entry
@@ -182,9 +247,40 @@ export function alternativesFor(
     const samePattern = subject.pattern === undefined
         ? []
         : take((exercise) => exercise.pattern === subject.pattern);
-    const sameGroup = subject.group === undefined
-        ? []
-        : take((exercise) => exercise.group === subject.group);
 
-    return { variations, samePattern, sameGroup };
+    const muscles = subject.muscles;
+
+    if (muscles === undefined) {
+        const sameGroup = subject.group === undefined
+            ? []
+            : take((exercise) => exercise.group === subject.group);
+
+        return { variations, samePattern, sameMuscles: [], sameGroup };
+    }
+
+    // Ranked rather than in library order: here the order is the answer. Ties
+    // go first to an exercise whose own main muscle this one trains — after a
+    // deadlift, a leg curl (hamstrings) before a squat (quads) — and then to
+    // the library's order, so the list is stable from one swap to the next.
+    const sameMuscles = exercises
+        .map((exercise, order) => ({ exercise, order }))
+        .filter(({ exercise }) => !offered.has(exercise.name) && exercise.muscles !== undefined)
+        .map(({ exercise, order }) => {
+            const main = exercise.muscles?.[0];
+
+            return {
+                exercise,
+                order,
+                mainShared: main !== undefined && muscles.includes(main),
+                ...muscleOverlap(muscles, exercise.muscles ?? []),
+            };
+        })
+        .filter((match) => match.score >= MIN_MUSCLE_OVERLAP)
+        .sort((a, b) => b.score - a.score
+            || Number(b.mainShared) - Number(a.mainShared)
+            || a.order - b.order)
+        .slice(0, MAX_MUSCLE_MATCHES)
+        .map(({ exercise, shared }) => ({ exercise, shared }));
+
+    return { variations, samePattern, sameMuscles, sameGroup: [] };
 }

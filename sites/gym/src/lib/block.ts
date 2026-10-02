@@ -335,14 +335,16 @@ export function swappedAway(entries: readonly SessionEntry[], entryIndex: number
  *
  * Nothing logged on the exercise: it is replaced where it stands. Sets logged on
  * it: they stay exactly where they were lifted, and the substitute goes in
- * straight after. `swappedFrom` always names the original, so a second swap
- * still points at the plan; putting the original back into an untouched slot
- * clears it.
+ * straight after. `withSets` says the sets were lifted on `to` all along — the
+ * correction a finished workout makes — so it is replaced where it stands and
+ * its sets go with it. `swappedFrom` always names the original, so a second
+ * swap still points at the plan; putting the original back in place clears it.
  */
 export function swapped(
     entries: readonly SessionEntry[],
     entryIndex: number,
     to: string,
+    withSets = false,
 ): { entries: SessionEntry[]; at: number; replaced: boolean } {
     const next = [...entries];
     const current = entries[entryIndex];
@@ -351,10 +353,10 @@ export function swapped(
 
     const original = originalOf(current);
 
-    if (current.sets.length === 0) {
+    if (current.sets.length === 0 || withSets) {
         next[entryIndex] = original === to
-            ? { exerciseName: to, sets: [] }
-            : { exerciseName: to, swappedFrom: original, sets: [] };
+            ? { exerciseName: to, sets: current.sets }
+            : { exerciseName: to, swappedFrom: original, sets: current.sets };
 
         return { entries: next, at: entryIndex, replaced: true };
     }

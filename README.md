@@ -383,9 +383,14 @@ library's rules.
 
 **The ⇄ on an exercise swaps it.** The picker opens on suggestions rather than
 the alphabet: the exercise's variations, then other exercises doing the same
-job (`pattern`), then the rest of its muscle group — and the equipment chips
-filter those too, which answers "what can I do with the dumbbells that are
-free". What the swap writes depends on whether anything was lifted:
+job (`pattern`), then **whatever trains the same muscles** — ranked by overlap
+and labelled with the muscles they share, so a curl's are *Chin-up · Biceps*
+and *Close-Grip Lat Pulldown · Biceps*, and a pushdown's start with the
+close-grip bench. That tier reads each exercise's `muscles` rather than its
+`group`: the planning groups are too coarse to call anything similar, and Arms
+holding biceps and triceps both made a pushdown a curl's "same muscle group".
+The equipment chips filter every tier, which answers "what can I do with the
+dumbbells that are free". What the swap writes depends on what was lifted:
 
 - **Nothing logged** — the exercise is replaced where it stands, and the
   substitute inherits its planned set count.
@@ -394,6 +399,12 @@ free". What the swap writes depends on whether anything was lifted:
   had left**: four planned squats, two done, is two sets of leg press. The
   original reads *swapped* and owes nothing more; the logger moves to the
   substitute.
+- **Sets logged, on a finished workout** — the swap is a correction instead: the
+  sets were done on the substitute and logged under the planned name, so they
+  **move with it**, and their history and top sets land on the exercise they
+  were actually lifted on. There is nothing left to log, so leaving them behind
+  for an empty substitute would mean nothing. The picker's note says which of
+  the two a swap is about to do. (`withSets` on the API's swap route.)
 
 The substitute records `swappedFrom` on the session, always naming the
 *original*, so a second swap still knows what the plan asked for. Targets
@@ -420,8 +431,9 @@ fine on a workout from three weeks ago.
 *Edit sets in this session* on any submitted session, in any block — correcting
 what was logged does not change which block the next workout goes into, so
 unlike Start it is not limited to the block being trained. The finish bar
-becomes *Done editing*, and swapping is hidden, since there is no machine to
-wait for in the past.
+becomes *Done editing*, and ⇄ becomes the correction described above — on every
+exercise, including one swapped away from mid-workout, since its sets may have
+been done on something else too.
 
 Volume, average RPE, the block map's ticks and gymbro's top-set chart are all
 summed from the sets whenever they are read, so an edit needs no recalculation
@@ -1022,11 +1034,14 @@ phone — this site has no wordmark at the top right to make the switch.
 The API stores an exercise as a name. Grouping is a planning question — it is
 what makes "eleven sets of chest this week" answerable — and it used to live
 only here, as a map in `src/lib/groups.ts` from the shipped twenty names to
-seven groups. The library blob now carries `group` on every exercise, because
-the logger needs it too, to suggest a swap; `groupOf` reads it from there, so a
-variation such as `Preacher Curl` counts toward arms without this site having
-heard of it. The old map stays as the fallback for a library cached from before
-the field existed.
+seven groups. The library blob now carries `group` on every exercise, beside
+the finer `muscles` the logger ranks swap suggestions by; `groupOf` reads the
+group from there, so a variation such as `Preacher Curl` counts toward arms
+without this site having heard of it. The old map stays as the fallback for a
+library cached from before the field existed. The planner's tally stays on the
+seven groups rather than moving to muscles — "sets of arms" is the question a
+block is planned against, and a compound lift split across three muscles would
+count each set three times.
 
 Nothing on the wire carries a group either way. A name neither source knows
 reads as `—` and counts toward nothing, which is deliberate: a wrong group would

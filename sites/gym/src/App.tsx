@@ -641,7 +641,9 @@ export function App() {
                     onEditSet={(entryIndex, setIndex, set) => {
                         void session.editSet(entryIndex, setIndex, set);
                     }}
-                    onSwapEntry={(entryIndex, to) => { void session.swapEntry(entryIndex, to); }}
+                    onSwapEntry={(entryIndex, to, withSets) => {
+                        void session.swapEntry(entryIndex, to, withSets);
+                    }}
                     onRemoveEntry={(entryIndex) => { void session.removeEntry(entryIndex); }}
                     onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
                     onFinish={() => setFinishing(true)}

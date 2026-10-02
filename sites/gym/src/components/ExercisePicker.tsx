@@ -22,6 +22,12 @@ export interface Swapping {
     note: string;
 }
 
+/** One suggested exercise, and the muscles it shares when that is why. */
+interface Suggestion {
+    exercise: LibraryExercise;
+    shared: string[] | null;
+}
+
 interface ExercisePickerProps {
     library: ExerciseLibrary | null;
     busy: boolean;
@@ -44,11 +50,11 @@ interface ExercisePickerProps {
  * Swapping opens on **suggestions** rather than the alphabet, because the
  * person swapping is standing next to a machine somebody else is on: the
  * exercise's own variations first, then other exercises doing the same job,
- * then anything else for the same muscle group (see `alternativesFor`). The
- * equipment chips filter those too, which is the other half of the question —
- * "what can I do with the dumbbells that are free". Swapping to a variation is
- * therefore two taps from the logging screen: the swap button, then the
- * variation.
+ * then whatever else trains the same muscles, best match first and each with
+ * the muscles it shares (see `alternativesFor`). The equipment chips filter
+ * those too, which is the other half of the question — "what can I do with the
+ * dumbbells that are free". Swapping to a variation is therefore two taps from
+ * the logging screen: the swap button, then the variation.
  */
 export function ExercisePicker({ library, busy, swapping, onPick, onClose }: ExercisePickerProps) {
     const [query, setQuery] = useState('');
@@ -66,15 +72,23 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
         ? alternativesFor(library, swapping.exerciseName, swapping.swappedFrom)
         : null;
 
-    const tiers = alternatives
+    const plain = (list: LibraryExercise[]) => list
+        .filter(fitsFilter)
+        .map((exercise) => ({ exercise, shared: null }));
+
+    const tiers: { label: string; items: Suggestion[] }[] = alternatives
         ? [
-            { label: 'VARIATIONS', items: alternatives.variations.filter(fitsFilter) },
-            { label: 'SAME MOVEMENT', items: alternatives.samePattern.filter(fitsFilter) },
-            { label: 'SAME MUSCLE GROUP', items: alternatives.sameGroup.filter(fitsFilter) },
+            { label: 'VARIATIONS', items: plain(alternatives.variations) },
+            { label: 'SAME MOVEMENT', items: plain(alternatives.samePattern) },
+            {
+                label: 'SAME MUSCLES',
+                items: alternatives.sameMuscles.filter((match) => fitsFilter(match.exercise)),
+            },
+            { label: 'SAME MUSCLE GROUP', items: plain(alternatives.sameGroup) },
         ].filter((tier) => tier.items.length > 0)
         : [];
 
-    const suggested = new Set(tiers.flatMap((tier) => tier.items.map((item) => item.name)));
+    const suggested = new Set(tiers.flatMap((tier) => tier.items.map((item) => item.exercise.name)));
 
     const results = (library?.exercises ?? []).filter((exercise) => (
         fitsFilter(exercise)
@@ -90,7 +104,7 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
 
     const title = swapping ? `Swap ${swapping.exerciseName}` : 'Add exercise';
 
-    function item(exercise: LibraryExercise) {
+    function item(exercise: LibraryExercise, shared: string[] | null = null) {
         return (
             <button
                 key={`${exercise.name}-${exercise.equipment}`}
@@ -99,7 +113,14 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                 disabled={busy}
                 onClick={() => onPick(exercise.name)}
             >
-                <span className="picker__item-name">{exercise.name}</span>
+                <span className="picker__item-body">
+                    <span className="picker__item-name">{exercise.name}</span>
+                    {/* Why it was suggested, for the one tier where that is not
+                        obvious from the name: what it trains in common. */}
+                    {shared ? (
+                        <span className="picker__item-muscles">{shared.join(' · ')}</span>
+                    ) : null}
+                </span>
                 <span className="picker__item-eq">{exercise.equipment}</span>
             </button>
         );
@@ -154,7 +175,7 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                 {tiers.map((tier) => (
                     <section key={tier.label} aria-label={tier.label.toLowerCase()}>
                         <span className="picker__section">{tier.label}</span>
-                        {tier.items.map(item)}
+                        {tier.items.map((suggestion) => item(suggestion.exercise, suggestion.shared))}
                     </section>
                 ))}
 
@@ -162,7 +183,7 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                     <span className="picker__section">EVERYTHING ELSE</span>
                 ) : null}
 
-                {results.map(item)}
+                {results.map((exercise) => item(exercise))}
 
                 {results.length === 0 && tiers.length === 0 && !showCustom ? (
                     <p className="picker__empty">

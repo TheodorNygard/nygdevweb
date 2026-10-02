@@ -2041,8 +2041,23 @@ button {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* The name, and under it — for a same-muscles suggestion — what it trains in
+   common with the exercise being swapped. */
+.picker__item-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
 .picker__item-name {
     font: 500 16px/1.2 var(--sans);
+}
+
+.picker__item-muscles {
+    font: 400 11px/1 var(--mono);
+    letter-spacing: 0.06em;
+    color: var(--accent-ink);
 }
 
 .picker__item-eq {

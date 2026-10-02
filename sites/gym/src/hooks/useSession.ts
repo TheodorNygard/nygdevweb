@@ -45,10 +45,11 @@ export interface SessionActions {
 
     /**
      * Swaps an exercise for another. Replaced where it stands if nothing was
-     * logged on it; otherwise its sets stay and `to` goes in after it. See
-     * `swapped()` in `lib/block`, which is the same rule the API applies.
+     * logged on it; otherwise its sets stay and `to` goes in after it — unless
+     * `withSets`, which says they were lifted on `to` and moves them with it.
+     * See `swapped()` in `lib/block`, which is the same rule the API applies.
      */
-    swapEntry: (entryIndex: number, to: string) => Promise<void>;
+    swapEntry: (entryIndex: number, to: string, withSets?: boolean) => Promise<void>;
 
     /**
      * Takes an exercise out of the session. Offered only once its last set is
@@ -322,7 +323,11 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         );
     }, [write]);
 
-    const swapEntry = useCallback(async (entryIndex: number, to: string): Promise<void> => {
+    const swapEntry = useCallback(async (
+        entryIndex: number,
+        to: string,
+        withSets = false,
+    ): Promise<void> => {
         const entry = current.current?.entries[entryIndex];
         const expectedEntryCount = current.current?.entries.length;
 
@@ -335,13 +340,17 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         const expectedSetCount = entry.sets.length;
 
         await write(
-            (session) => withEntries(session, swapped(session.entries, entryIndex, to).entries),
+            (session) => withEntries(
+                session,
+                swapped(session.entries, entryIndex, to, withSets).entries,
+            ),
             (client, session) => client.swapEntry(session.id, {
                 entryIndex,
                 exerciseName: entry.exerciseName,
                 expectedEntryCount,
                 expectedSetCount,
                 to,
+                withSets,
             }),
             'This session had changed elsewhere. Reloaded — swap it again.',
         );

@@ -244,6 +244,13 @@ export interface LibraryExercise {
 
     /** The muscle group it is planned against, one of gymbro's seven. */
     group?: string;
+
+    /**
+     * The muscles it trains, the main one first — `Chin-up` is lats, then
+     * biceps. Finer than `group`, which puts biceps and triceps both under
+     * Arms: this is what tells a curl's alternatives from a pushdown's.
+     */
+    muscles?: string[];
 }
 
 /** The library published on the CDN, not by the API. */
