@@ -627,10 +627,15 @@ export function SessionScreen({
                         ? entry.swappedFrom
                         : null;
 
+                    // Quieter while another exercise has the logger open, so
+                    // the eye lands on the one being lifted. Only then: with
+                    // every exercise closed there is nothing to defer to.
+                    const idle = activeIndex !== null && !isActive;
+
                     const row = rowProps(entryIndex);
-                    const articleClassName = row.className
-                        ? `exercise ${row.className}`
-                        : 'exercise';
+                    const articleClassName = ['exercise', idle ? 'exercise--idle' : '', row.className]
+                        .filter(Boolean)
+                        .join(' ');
 
                     return (
                         <article

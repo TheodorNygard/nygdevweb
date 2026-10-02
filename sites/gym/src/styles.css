@@ -1334,6 +1334,20 @@ button {
     display: block;
     font: 600 17px/1.15 var(--sans);
     letter-spacing: -0.01em;
+    transition: color 0.2s ease;
+}
+
+/* An exercise other than the one with the logger open steps back: the title
+   most, its logged sets a little. Still plainly legible — it is one tap from
+   being the open one, and its sets are read for what to lift next. The sets
+   dim by opacity rather than by colour so a warm-up stays quieter than a
+   working set, and the delete beside them is left at full strength. */
+.exercise--idle .exercise__name {
+    color: var(--fg-60);
+}
+
+.exercise--idle .set__edit {
+    opacity: 0.8;
 }
 
 .exercise__eq {
@@ -1424,6 +1438,7 @@ button {
     background: transparent;
     color: var(--fg);
     text-align: left;
+    transition: opacity 0.2s ease;
 }
 
 .set__no {
