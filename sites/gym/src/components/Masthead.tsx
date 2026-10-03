@@ -9,12 +9,12 @@ interface MastheadProps {
 /**
  * The strip across the top of Today: the date, and the LOGBOOK mark.
  *
- * The mark is the theme switch. It was a wordmark with nothing behind it, on
+ * The mark is a theme switch. It was a wordmark with nothing behind it, on
  * the one screen every visit opens on, and a palette is the kind of preference
- * that wants one tap from there rather than a section at the bottom of the
- * Plan tab. Tapping it moves to the next theme in the list, and the mark is
- * drawn in the accent, so the tap answers itself: the word changes colour with
- * everything else.
+ * that wants one tap from there. Tapping it moves to the next theme in the
+ * list, and the mark is drawn in the accent, so the tap answers itself: the
+ * word changes colour with everything else. The Plan tab lists the same themes
+ * as chips, for anybody who never thinks to tap a wordmark.
  *
  * Nothing on the mark says what it does, deliberately. There are three themes,
  * the tap cycles back round, and a caption under the wordmark would be

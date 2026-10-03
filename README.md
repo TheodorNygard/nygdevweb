@@ -261,11 +261,12 @@ below the tokens knows which theme is on. Two ship:
   background, and Material's purple (`#ab47bc`) as the accent, with white text
   on it.
 
-The switch is the **LOGBOOK** mark at the top right of Today: a tap moves to
-the next theme, and the mark is drawn in the accent so the tap answers with
-the new colour. It was a wordmark with nothing behind it on the screen every
-visit opens on, and a palette is the kind of preference that wants one tap
-from there rather than a section of its own. The choice is stored under
+The quick switch is the **LOGBOOK** mark at the top right of Today: a tap
+moves to the next theme, and the mark is drawn in the accent so the tap answers
+with the new colour. It was a wordmark with nothing behind it on the screen
+every visit opens on, and a palette is the kind of preference that wants one
+tap from there. Nothing on it says it does that, so the Plan tab also lists the
+themes as a row of chips above "Signed in as", driven by the same state. The choice is stored under
 `gymlog.theme` in `localStorage`, per browser rather than per account,
 because a palette is a preference of the phone and should survive signing
 out.

@@ -5,6 +5,7 @@ import { Sheet } from '../components/Sheet';
 import { Stepper } from '../components/Stepper';
 import type { TemplatesState } from '../hooks/useTemplates';
 import { daysForWeek, draftIn, isRestWeek, repsInTank, sessionsFor } from '../lib/block';
+import { THEMES, type Theme } from '../lib/theme';
 import type {
     CurrentBlock,
     DayInput,
@@ -127,6 +128,10 @@ interface PlanScreenProps {
     onCreate: (plan: { name: string; weeks: number; days: DayInput[] }) => void;
     onSignOut: () => void;
     account: string;
+
+    /** The same state the LOGBOOK mark on Today cycles through. */
+    theme: Theme;
+    onTheme: (theme: Theme) => void;
 }
 
 /**
@@ -152,6 +157,8 @@ export function PlanScreen({
     onCreate,
     onSignOut,
     account,
+    theme,
+    onTheme,
 }: PlanScreenProps) {
     const saved = useMemo(() => draftOf(block.mesocycle), [block.mesocycle]);
     const blockId = block.mesocycle?.id ?? null;
@@ -460,6 +467,26 @@ export function PlanScreen({
                     ))}
                 </div>
             )}
+
+            {/* The theme as a choice that says what it is, beside the other
+                preferences of this phone. The wordmark on Today is still the
+                one-tap way; this is the way that does not have to be known
+                about first. */}
+            <span className="section-label">THEME</span>
+            <div className="chips" role="group" aria-label="Theme">
+                {THEMES.map((option) => (
+                    <button
+                        key={option.id}
+                        type="button"
+                        className={option.id === theme ? 'chip chip--on' : 'chip'}
+                        aria-pressed={option.id === theme}
+                        title={option.note}
+                        onClick={() => onTheme(option.id)}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </div>
 
             <div className="stack-22">
                 <p className="empty">Signed in as {account}.</p>

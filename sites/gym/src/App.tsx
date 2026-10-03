@@ -583,6 +583,8 @@ export function App() {
                                     onCreate={createPlan}
                                     onSignOut={signOut}
                                     account={auth.account.username || auth.account.name || 'this account'}
+                                    theme={theme}
+                                    onTheme={pickTheme}
                                 />
                             ) : null}
 
