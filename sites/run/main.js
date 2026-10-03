@@ -304,6 +304,9 @@ window.addEventListener('scroll', () => {
 
 // Wire a mark to the hover layer. The hit target is the mark plus its surface
 // gap, never only the painted pixels; focus shows exactly what hover shows.
+// Per-point and per-week marks pass `focusable: false`: a Tab stop on every dot
+// of a year of runs is hundreds of stops between a keyboard and the next card,
+// and the card's Table toggle is the keyboard path to the same numbers.
 function attachTooltip(node, title, rows, {focusable = true} = {}) {
     const label = `${title}. ${rows.map(row => `${row.name}: ${row.value}`).join('. ')}`;
 
@@ -827,7 +830,7 @@ function renderVolume(data) {
             {name: `${rollingWeeks}-week average`, value: fmt(week.rolling4WeekAvgKm), color: colors.s2},
             {name: 'longest run', value: fmt(week.longestRunKm), color: colors.s3},
             {name: week.runs === 1 ? 'run' : 'runs', value: String(num(week.runs) ?? 0)}
-        ]);
+        ], {focusable: false});
     });
 
     const ran = weeks.filter(week => num(week.runs) > 0).length;
@@ -943,7 +946,7 @@ function renderPace(data) {
                 {name: 'km', value: fmt(item.point.distanceKm, 2)},
                 {name: 'min', value: fmt(item.point.durationMin)},
                 {name: 'bpm avg', value: String(num(item.point.averageHeartRate) ?? '—')}
-            ]);
+            ], {focusable: false});
         }
 
         // The latest run only: a number on every dot goes unread.
@@ -1057,7 +1060,7 @@ function renderZones(data) {
             {name: 'min hard', value: fmt(week.zone3PlusMinutes), color: colors.s2},
             {name: 'easy share', value: fmtPercent(week.easyShare)},
             {name: 'min below zone 1', value: fmt(week.zone0Minutes)}
-        ]);
+        ], {focusable: false});
     });
 
     const share = num(latest.easyShare);
@@ -1133,7 +1136,7 @@ function renderEfficiency(data) {
 
         attachTooltip(dot, fmtDayYear(item.point.date), [
             {name: String(efficiency.unit || ''), value: fmt(item.value, 2), color: colors.s1}
-        ]);
+        ], {focusable: false});
     }
 
     svg('line', {class: 'axisline', x1: plot.left, x2: plot.right, y1: plot.bottom, y2: plot.bottom}, node);
