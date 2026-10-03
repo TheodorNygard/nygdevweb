@@ -82,8 +82,35 @@ function sameDraft(a: Draft, b: Draft): boolean {
         });
 }
 
+/**
+ * The Plan tab's unsaved edits, and the day sheet open over them.
+ *
+ * Held by `App` rather than by this screen, because the screen is unmounted
+ * whenever another tab is picked — and a half-planned block lost to a glance at
+ * Today is a draft nobody trusts the tab with twice.
+ *
+ * `blockId` and `base` say what the edits were made against. They apply only
+ * while the server still holds that: a create, a switch, a save or another
+ * device moving the block under them drops them, which is the same reset the
+ * screen made when it owned the draft. Compared by content rather than by
+ * identity, so a reload that brings back the same block — every back-out of
+ * the session screen does one — leaves the edits alone.
+ */
+export interface PlanDraft {
+    blockId: string | null;
+    base: Draft;
+    draft: Draft;
+
+    /** Which day's plan is being edited, by position. Null is the common case. */
+    planningDay: number | null;
+}
+
 interface PlanScreenProps {
     block: CurrentBlock;
+
+    /** The edits in progress, if any; see `PlanDraft`. */
+    held: PlanDraft | null;
+    onHold: (next: PlanDraft) => void;
 
     /** Every block this user has planned, newest first. */
     blocks: MesocycleSummary[];
@@ -113,6 +140,8 @@ interface PlanScreenProps {
  */
 export function PlanScreen({
     block,
+    held,
+    onHold,
     blocks,
     blocksLoading,
     onOpenBlock,
@@ -125,19 +154,25 @@ export function PlanScreen({
     account,
 }: PlanScreenProps) {
     const saved = useMemo(() => draftOf(block.mesocycle), [block.mesocycle]);
-    const [draft, setDraft] = useState<Draft>(saved);
+    const blockId = block.mesocycle?.id ?? null;
     const [confirmFresh, setConfirmFresh] = useState(false);
 
-    // Which day's plan is being edited, by position. Null is the common case.
-    const [planningDay, setPlanningDay] = useState<number | null>(null);
+    // The held edits, unless the saved block changed under them — a create, a
+    // switch, or another device. The alternative is showing edits against a
+    // block that no longer exists. Derived rather than reset, so there is no
+    // render in which the stale draft is on screen; the next edit replaces it.
+    const live = held !== null && held.blockId === blockId && sameDraft(held.base, saved)
+        ? held
+        : null;
+    const draft = live?.draft ?? saved;
+    const planningDay = live?.planningDay ?? null;
 
-    // The saved block changed under the draft — a create, or another device.
-    // The alternative is showing edits against a block that no longer exists.
-    const [adopted, setAdopted] = useState(saved);
+    function setDraft(next: Draft) {
+        onHold({ blockId, base: saved, draft: next, planningDay });
+    }
 
-    if (adopted !== saved) {
-        setAdopted(saved);
-        setDraft(saved);
+    function setPlanningDay(next: number | null) {
+        onHold({ blockId, base: saved, draft, planningDay: next });
     }
 
     const dirty = !sameDraft(draft, saved);

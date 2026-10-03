@@ -22,7 +22,7 @@ import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
 import { DoneScreen } from './screens/DoneScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
-import { PlanScreen } from './screens/PlanScreen';
+import { PlanScreen, type PlanDraft } from './screens/PlanScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { TodayScreen } from './screens/TodayScreen';
 import type {
@@ -176,6 +176,11 @@ export function App() {
     const [picking, setPicking] = useState(false);
     const [finishing, setFinishing] = useState(false);
     const [completed, setCompleted] = useState<Completed | null>(null);
+
+    // The Plan tab's unsaved edits. Here rather than on the screen because the
+    // screen unmounts on every tab switch; it decides for itself whether what
+    // is held still applies to the block it is showing.
+    const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
 
     const [planBusy, setPlanBusy] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -566,6 +571,8 @@ export function App() {
                             {tab === 'plan' ? (
                                 <PlanScreen
                                     block={block.block}
+                                    held={planDraft}
+                                    onHold={setPlanDraft}
                                     blocks={blocks.blocks}
                                     blocksLoading={blocks.loading}
                                     onOpenBlock={setOpenBlock}
