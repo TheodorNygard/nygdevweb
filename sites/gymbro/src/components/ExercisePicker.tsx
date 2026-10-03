@@ -93,6 +93,21 @@ export function ExercisePicker({
                         placeholder="Search or type a new exercise"
                         aria-label="Search exercises"
                         autoComplete="off"
+                        onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+
+                            event.preventDefault();
+
+                            // Whatever is at the top of the list: the custom
+                            // name when it is offered — which is only when
+                            // nothing in the catalogue is an exact match —
+                            // and the first result otherwise. Type, Enter, and
+                            // the next exercise is one more search away.
+                            const first = results[0];
+
+                            if (showCustom) onPick(trimmed);
+                            else if (first) onPick(first.name);
+                        }}
                     />
                     <div className="modal__chips">
                         {filters.map((filter) => (
