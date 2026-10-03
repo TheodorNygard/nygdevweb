@@ -17,6 +17,16 @@
 
     <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report real
          numbers; without it the header sits under the notch. -->
+    <!-- Open the connections the app is about to need while the HTML is still
+         being parsed, rather than once ~150 kB of script has downloaded and
+         run. `crossorigin` is not decoration: every call to these origins is a
+         CORS fetch with `credentials: 'omit'`, and browsers keep anonymous
+         connections in a pool of their own — a preconnect without it opens a
+         socket none of them can use. The CSP does not govern these hints, so
+         `connect-src` needs nothing new. -->
+    <link rel="preconnect" href="https://func-nygdev-api.azurewebsites.net" crossorigin>
+    <link rel="preconnect" href="https://nygdevcdn.blob.core.windows.net" crossorigin>
+
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
