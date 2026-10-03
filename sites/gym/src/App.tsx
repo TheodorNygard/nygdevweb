@@ -131,7 +131,8 @@ export function App() {
     const history = useHistory(api);
 
     // What the open session's exercises were last done with. Keyed off the
-    // session rather than fetched by the screen, so it is in hand by the time
+    // session rather than fetched by the screen, and started as early as the
+    // day sheet opening (see `prefetch` below), so it is in hand by the time
     // the first logger opens.
     const lastSets = useLastSets(
         api,
@@ -561,6 +562,16 @@ export function App() {
                                             block: null,
                                         });
                                         setDaySessionId(sessions[0]?.id ?? null);
+
+                                        // A cell of the block being trained
+                                        // is one Start away from needing last
+                                        // week's sets, and the sheet is open
+                                        // for a second or two before that tap
+                                        // — long enough for the read to land.
+                                        lastSets.prefetch(
+                                            block.block?.sessions ?? [],
+                                            dayIndex,
+                                        );
                                     }}
                                     onPlan={() => pickTab('plan')}
                                     theme={theme}
@@ -640,7 +651,7 @@ export function App() {
                     library={library}
                     plan={(sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
                     weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
-                    lastSets={lastSets}
+                    lastSets={lastSets.sets}
                     savedAt={session.savedAt}
                     waiting={session.waiting}
                     onAddExercise={() => setPicking(true)}
