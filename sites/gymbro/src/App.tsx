@@ -4,6 +4,7 @@ import { Banner } from './components/Banner';
 import { Rail, type View } from './components/Rail';
 import { SignInGate } from './components/SignInGate';
 import { useBlocks } from './hooks/useBlocks';
+import { useProfile } from './hooks/useProfile';
 import { useWorkouts } from './hooks/useWorkouts';
 import { seriesOf } from './lib/analytics';
 import {
@@ -67,6 +68,9 @@ export function App() {
     // no call of their own. Recent is written by Submit on the phone, so it is
     // as fresh as the last time this list was read.
     const favorites = useFavorites(api, blocks.favorites, blocks.recent);
+    // The lifter's profile rides along on the same read, and is edited beside
+    // the coaching export — the one thing that reads it.
+    const profile = useProfile(api, blocks.profile);
     const history = useHistory(api);
     // The user's own exercises, merged into the shipped library every view
     // reads — so the builder's tally, the picker and the Library table treat a
@@ -258,10 +262,11 @@ export function App() {
                 sessions: workouts.sessions,
                 library,
                 custom: customExercises.exercises,
+                profile: profile.profile,
                 exportedOn: localDate(),
             }
             : null),
-        [selected, workouts.loading, workouts.sessions, library, customExercises.exercises],
+        [selected, workouts.loading, workouts.sessions, library, customExercises.exercises, profile.profile],
     );
 
     function setDraft(next: Draft) {
@@ -590,6 +595,7 @@ export function App() {
                             onSelect={setLift}
                             loading={workouts.loading}
                             coaching={coaching}
+                            profile={profile}
                         />
                     )}
                 </div>

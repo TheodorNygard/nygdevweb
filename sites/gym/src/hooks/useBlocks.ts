@@ -7,7 +7,7 @@ export interface BlocksState extends Omit<Resource<BlockList>, 'data'> {
     blocks: MesocycleSummary[];
 }
 
-const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [] };
+const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [], profile: {} };
 const load = (api: GymApi) => api.mesocycles();
 
 /**
