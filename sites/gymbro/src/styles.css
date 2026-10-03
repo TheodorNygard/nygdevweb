@@ -1646,6 +1646,96 @@ a:hover {
     flex-wrap: wrap;
 }
 
+/* The panel above the table: your own exercises, and the form that adds one.
+   Spaced from the controls below it rather than flush, because the table that
+   follows is the whole library and the panel is about one part of it. */
+.library > .panel {
+    margin-bottom: 18px;
+}
+
+.exform {
+    display: grid;
+    gap: 16px;
+}
+
+.exform__row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 14px;
+}
+
+.exform__group {
+    display: grid;
+    gap: 10px;
+}
+
+.exform__chips {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+/* A muscle past the third is not refused silently: it is dimmed, so the limit
+   is visible before it is hit. */
+.exform__chips .chip:disabled {
+    opacity: 0.4;
+}
+
+.exform__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.exform__problem {
+    margin: 0;
+    font: 400 12px/1.5 var(--sans);
+    color: #ff8b82;
+}
+
+/* The name, kept to one line so the pills and actions beside it stay on the
+   row rather than wrapping under a long custom name. */
+.table__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Inline actions on a row of your own: quiet until pointed at, because the
+   table is read far more often than it is edited. */
+.table__act {
+    flex: none;
+    padding: 4px 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg-40);
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.06em;
+}
+
+.table__act:hover:not(:disabled) {
+    color: var(--accent-ink);
+    background: var(--accent-14);
+}
+
+.table__act:disabled {
+    opacity: 0.45;
+}
+
+.table__act--danger,
+.table__act--danger:hover:not(:disabled) {
+    color: #ff8b82;
+    background: rgba(255, 120, 120, 0.1);
+}
+
+/* A typed name nothing describes: marked, but quieter than one of your own. */
+.pill--muted {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--fg-45);
+}
+
 .table {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(56px, 0.8fr);

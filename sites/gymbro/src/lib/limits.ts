@@ -22,3 +22,12 @@ export const DEFAULT_DAY_LABELS = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 
 
 /** Longest a block name may be — the length its `maxLength` field stops at. */
 export const MAX_NAME = 80;
+
+/** An exercise name, typed into a picker or given to a custom exercise. */
+export const MAX_EXERCISE_NAME = 80;
+
+/** A custom exercise's equipment, and each muscle — `GymLimits.MaxTagLength`. */
+export const MAX_TAG = 40;
+
+/** What a custom exercise trains, main muscle first — `GymLimits.MaxMusclesPerExercise`. */
+export const MAX_MUSCLES = 3;

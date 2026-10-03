@@ -261,6 +261,28 @@ export interface ExerciseLibrary {
 }
 
 /**
+ * An exercise of the user's own, from `GET /gym/exercises`: the library's shape
+ * with an id, and equipment optional because the API stores it that way.
+ *
+ * A description of a name rather than a thing plans point at. Plans and
+ * sessions hold exercises by name and still do, so describing one describes
+ * every session that already used it, and deleting the description leaves
+ * them all as they were. The name cannot change for the same reason — the id
+ * is derived from it.
+ */
+export interface CustomExercise {
+    id: string;
+    name: string;
+    equipment?: string;
+    group?: string;
+    muscles?: string[];
+    variationOf?: string;
+}
+
+/** What is sent to describe one: all of it but the id, which the API derives from the name. */
+export type CustomExerciseInput = Omit<CustomExercise, 'id'>;
+
+/**
  * A saved day plan: a name, and the exercises it drops into a day.
  *
  * The same shape as a day's `plan` and deliberately not a richer one, because

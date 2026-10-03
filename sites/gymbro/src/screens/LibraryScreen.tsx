@@ -1,33 +1,56 @@
 import { useState } from 'react';
 
+import { ExerciseForm } from '../components/ExerciseForm';
 import { catalogue } from '../lib/groups';
-import { type ExerciseLibrary, type MesocycleSummary } from '../lib/gym';
+import {
+    type CustomExercise,
+    type CustomExercisesState,
+    type ExerciseLibrary,
+    type MesocycleSummary,
+} from '../lib/gym';
 
 interface LibraryScreenProps {
+    /** The shipped library with the user's own merged in — see `withCustom`. */
     library: ExerciseLibrary | null;
     block: MesocycleSummary | null;
+
+    /** Every exercise name any block plans, for the typed names worth describing. */
+    knownNames: readonly string[];
+
+    custom: CustomExercisesState;
 }
 
+/** What the form is open for, if anything. */
+type Editing =
+    | { mode: 'new' }
+    | { mode: 'edit'; exercise: CustomExercise }
+    | { mode: 'describe'; name: string };
+
 /**
- * Every exercise the planner can reach, and how much of the selected block each
- * one accounts for.
+ * Every exercise the planner can reach, how much of the selected block each one
+ * accounts for — and the exercises of your own, described here.
  *
- * Read-only, and that is the honest shape rather than a missing feature. The
- * built-in half is a static blob on the CDN — identical for every account,
- * which is what lets it cost no token and no function call — so there is
- * nothing here anyone could edit. Exercises of your own would be somebody's,
- * and the API has no store for them: no `/gym/exercises` route exists, and the
- * one place a name of your own does live is inside the session or plan that
- * uses it. Typing one into the picker is therefore the whole feature, and this
- * table shows it the moment a block plans it.
+ * Three kinds of row. The shipped library is a static blob on the CDN,
+ * identical for every account, so those are read-only. An exercise of your own
+ * is a record on your account (`/gym/exercises`): created here, with the
+ * equipment, group and muscles a typed name could never carry, and merged into
+ * the library so the builder's tally and the phone's swap sheet treat it like a
+ * shipped one. And a name some plan uses that nothing describes yet — typed into
+ * a picker, here or mid-session on the phone — is offered to describe, which
+ * gives every session already logged under it the description too, since
+ * sessions hold the name.
  *
  * The IN BLOCK column is why this is a view rather than a reference page. It
  * answers the question a plan raises — where did all these sets go — against
  * the block in the sidebar, from data already in hand.
  */
-export function LibraryScreen({ library, block }: LibraryScreenProps) {
+export function LibraryScreen({ library, block, knownNames, custom }: LibraryScreenProps) {
     const [query, setQuery] = useState('');
     const [equipment, setEquipment] = useState('All');
+    const [editing, setEditing] = useState<Editing | null>(null);
+
+    // The exercise whose delete has had its first click.
+    const [arming, setArming] = useState<string | null>(null);
 
     const inBlock = new Map<string, number>();
 
@@ -40,7 +63,8 @@ export function LibraryScreen({ library, block }: LibraryScreenProps) {
         }
     }
 
-    const rows = catalogue(library, [...inBlock.keys()]);
+    const yours = new Set(custom.exercises.map((exercise) => exercise.name));
+    const rows = catalogue(library, knownNames, yours);
     const filters = ['All', ...(library?.equipment ?? [])];
     const needle = query.trim().toLowerCase();
 
@@ -49,8 +73,87 @@ export function LibraryScreen({ library, block }: LibraryScreenProps) {
         && (!needle || exercise.name.toLowerCase().includes(needle))
     ));
 
+    /**
+     * Why a new name cannot be used. Compared ignoring case, as the API
+     * compares it: two spellings of one name would be one exercise's history
+     * split between two descriptions.
+     */
+    function refuse(name: string): string | null {
+        const lower = name.toLowerCase();
+        const own = custom.exercises.find((exercise) => exercise.name.toLowerCase() === lower);
+
+        if (own) return `You already have “${own.name}” — edit that one instead.`;
+
+        const shipped = library?.exercises.find((exercise) => exercise.name.toLowerCase() === lower);
+
+        if (shipped) {
+            return `“${shipped.name}” is in the built-in library already, and every account `
+                + 'shares that description.';
+        }
+
+        return null;
+    }
+
+    function openForm(next: Editing) {
+        setArming(null);
+        setEditing(next);
+    }
+
+    const recordOf = (name: string) => custom.exercises.find((exercise) => exercise.name === name);
+
     return (
         <div className="view library">
+            <section className="panel">
+                <div className="panel__head">
+                    <span className="panel__label">YOUR EXERCISES</span>
+                    {editing === null ? (
+                        <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => openForm({ mode: 'new' })}
+                            disabled={custom.loading && custom.exercises.length === 0}
+                        >
+                            + New exercise
+                        </button>
+                    ) : null}
+                </div>
+                <p className="panel__note panel__note--wide">
+                    {custom.exercises.length === 0
+                        ? 'Anything the built-in library does not have. Give it a muscle group and '
+                            + 'it counts toward the builder’s sets per group; give it muscles and the '
+                            + 'phone suggests it when you need to swap. A name you have only typed '
+                            + 'into a picker shows below as CUSTOM, with Describe beside it.'
+                        : `${custom.exercises.length} of your own, merged into the library on both `
+                            + 'sites. Names are fixed once made — sessions hold them.'}
+                </p>
+                {editing === null && custom.error ? (
+                    <p className="exform__problem">{custom.error}</p>
+                ) : null}
+            </section>
+
+            {editing !== null ? (
+                <ExerciseForm
+                    key={editing.mode === 'edit'
+                        ? editing.exercise.id
+                        : editing.mode === 'describe' ? `describe:${editing.name}` : 'new'}
+                    initial={editing.mode === 'edit'
+                        ? editing.exercise
+                        : { name: editing.mode === 'describe' ? editing.name : '' }}
+                    nameFixed={editing.mode !== 'new'}
+                    editing={editing.mode === 'edit'}
+                    library={library}
+                    refuse={refuse}
+                    busy={custom.busy}
+                    error={custom.error}
+                    onSubmit={(input) => (
+                        editing.mode === 'edit'
+                            ? custom.replace(editing.exercise.id, input)
+                            : custom.create(input)
+                    )}
+                    onCancel={() => setEditing(null)}
+                />
+            ) : null}
+
             <div className="library__controls">
                 <input
                     className="library__search"
@@ -85,14 +188,67 @@ export function LibraryScreen({ library, block }: LibraryScreenProps) {
             <div className="rows rows--roomy">
                 {shown.map((exercise) => {
                     const sets = inBlock.get(exercise.name) ?? 0;
+                    const record = exercise.kind === 'yours' ? recordOf(exercise.name) : undefined;
 
                     return (
                         <div key={`${exercise.name}:${exercise.equipment}`} className="table">
                             <span className="table__name">
-                                {exercise.name}
-                                {exercise.equipment === 'Custom'
-                                    ? <span className="pill">CUSTOM</span>
-                                    : null}
+                                <span className="table__label">{exercise.name}</span>
+                                {exercise.kind === 'yours' ? <span className="pill">YOURS</span> : null}
+                                {exercise.kind === 'typed' ? (
+                                    <span className="pill pill--muted">CUSTOM</span>
+                                ) : null}
+
+                                {exercise.kind === 'typed' ? (
+                                    <button
+                                        type="button"
+                                        className="table__act"
+                                        disabled={custom.busy}
+                                        onClick={() => openForm({ mode: 'describe', name: exercise.name })}
+                                    >
+                                        Describe
+                                    </button>
+                                ) : null}
+
+                                {record ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="table__act"
+                                            disabled={custom.busy}
+                                            onClick={() => openForm({ mode: 'edit', exercise: record })}
+                                        >
+                                            Edit
+                                        </button>
+                                        {/* Two clicks, the second on a button that says
+                                            what it does. Nothing cascades — plans and
+                                            sessions keep the name — but the description
+                                            is gone, and with it the group it counted
+                                            toward. */}
+                                        {arming === record.id ? (
+                                            <button
+                                                type="button"
+                                                className="table__act table__act--danger"
+                                                disabled={custom.busy}
+                                                onClick={() => {
+                                                    setArming(null);
+                                                    void custom.remove(record.id);
+                                                }}
+                                            >
+                                                Delete description?
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="table__act"
+                                                disabled={custom.busy}
+                                                onClick={() => setArming(record.id)}
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
+                                    </>
+                                ) : null}
                             </span>
                             <span className="table__mono">{exercise.equipment}</span>
                             <span className="table__mono">{exercise.group}</span>
@@ -106,19 +262,17 @@ export function LibraryScreen({ library, block }: LibraryScreenProps) {
 
             {shown.length === 0 ? (
                 <p className="empty" style={{ paddingLeft: 0, marginTop: 20 }}>
-                    Nothing matches. A name the library does not have is one you type — into the
-                    picker here, or on the phone mid-session — and it appears in this table as
-                    soon as something uses it.
+                    Nothing matches. Add it as an exercise of your own above, or type the name
+                    into a picker — here or on the phone — and describe it later.
                 </p>
             ) : null}
 
             <p className="panel__note panel__note--wide">
                 The built-in half ships with the app and is the same for every account, so it
-                stays a static file rather than a route. Exercises of your own cannot be: they
-                would need a store the API does not have, the way saved day templates already
-                have one. Muscle groups are this site&rsquo;s addition, held as a map against the
-                shipped names — nothing on the wire carries them, so a name typed anywhere reads
-                as no group rather than as a guess.
+                stays a static file rather than a route. Your own are records on your account,
+                described in the library&rsquo;s terms and merged into it on both sites. Plans
+                and sessions still hold exercises by name, so deleting a description leaves every
+                workout that used the name exactly as it was.
             </p>
         </div>
     );

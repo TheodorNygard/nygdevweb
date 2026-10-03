@@ -121,6 +121,9 @@ interface BlockScreenProps {
     /** Creates a block from a draft — the one on screen, edits included. */
     onCopy: (draft: Draft) => void;
     onDelete: () => void;
+
+    /** Every exercise name any block plans, so a typed one is offered rather than retyped. */
+    knownNames: readonly string[];
 }
 
 /**
@@ -145,6 +148,7 @@ export function BlockScreen({
     onMakeCurrent,
     onCopy,
     onDelete,
+    knownNames,
 }: BlockScreenProps) {
     const [picking, setPicking] = useState<number | null>(null);
     const [templating, setTemplating] = useState<number | null>(null);
@@ -205,8 +209,10 @@ export function BlockScreen({
         0,
     );
 
+    // The draft's own names as well as every saved block's: one typed into
+    // this draft a minute ago is not in any saved block yet.
     const plannedNames = draft.days.flatMap((day) => day.plan.map((one) => one.exerciseName));
-    const options = catalogue(library, plannedNames);
+    const options = catalogue(library, [...plannedNames, ...knownNames]);
     const pickingDay = picking === null ? null : draft.days[picking];
     const templatingDay = templating === null ? null : draft.days[templating];
 

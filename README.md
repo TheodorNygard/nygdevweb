@@ -586,6 +586,16 @@ moment the signal is worst. Editing `gym/exercises.json` means editing that copy
 too. Custom names are typed inline and post with the entry, so
 nothing about a session depends on the library being reachable.
 
+Exercises of your own that have been *described* in gymbro — see "Your own
+exercises" under the planner — are merged into the library by `withCustom`
+(`src/lib/library.ts`), so they get their equipment chip and their place in the
+swap sheet like a shipped one. The logger reads them the first time a day sheet,
+the session screen or the Plan tab opens, the same read-when-first-looked-at
+rule as the other tabs; a day sheet is the step before Start, so they are
+normally in hand by the time a session needs them. A failed read leaves the
+shipped library as it was. Typing a name mid-session is unchanged and still a
+complete answer.
+
 ### Day templates come from both places at once
 
 A **template** is a named plan — Push, Lower · Squat — that the Plan tab drops into a
@@ -992,10 +1002,8 @@ every day empty, so refusing would make an incremental plan unsavable until the
 last day was filled — and, on the phone, the very first block uncreatable. Both
 say which days are empty instead, in the same words.
 
-Exercises are still typed names, not records. Neither app can *create* one in any
-lasting sense — the API has no `/gym/exercises` route, so a custom name lives only
-inside the plans and sessions that use it. A real exercise library of your own
-needs that route first.
+Exercises are still stored by name in every plan and session. What gymbro adds
+is a place to *describe* one of your own — see "Your own exercises" below.
 
 ### One read, and one more for the chart
 
@@ -1037,8 +1045,8 @@ hooks through a `@gym` alias declared in both `vite.config.ts` and
 `setsForWeek`, `isRestWeek`, `progressOf`), the formatting, the `GymApi` client,
 the AADSTS error map, `useAuth`, `useResource`, `useHistory` (a block's
 sessions, read once and held), `useLibrary`, `useTemplates`, `useDragReorder`,
-`useDialog` (Escape for the top modal only, focus in and back, Tab kept inside)
-and `useTheme` all live once, in `sites/gym/src`.
+`useDialog` (Escape for the top modal only, focus in and back, Tab kept inside),
+`useCustomExercises` and `useTheme` all live once, in `sites/gym/src`.
 
 That is the point of `lib/types.ts` being written as a transcription of the API
 rather than as what the screens want: a route that changes shape becomes a type
@@ -1082,13 +1090,38 @@ silently skew the one panel that exists to be trusted.
 A variation is charted as its own lift in Analytics, by the same reasoning the
 logger tracks it separately: its loads are not the bar's loads.
 
-**There are no custom exercises of your own here, and there is no route for
-them.** No `/gym/exercises` endpoint exists — the built-in library is a static
-blob because it is identical for every account, and an exercise of yours would
-need a per-account store the way saved day templates already have one. What does
-work, and is the whole feature, is typing a name into the picker: the plan
-stores names, so a name that is not in the library is a complete answer. It
-appears in the Library table as `CUSTOM` the moment a block plans it.
+### Your own exercises
+
+The built-in library is a static blob because it is identical for every
+account. An exercise of your own is not, so it is a record on your account —
+`/gym/exercises`, stored beside the saved day templates — described in the
+library's own terms: equipment, the muscle group it is planned against, up to
+three muscles it trains, and the family it belongs to. `withCustom` merges the
+records into the library both sites read, so the tally above, the picker and
+the phone's swap sheet treat a described exercise exactly like a shipped one.
+
+They are made in the **Library** view, under *Your exercises*. Group and muscles
+are chips rather than text, because the tally and the swap sheet match them by
+spelling; equipment and the family are typed with suggestions, since a
+kettlebell is a reasonable thing to own that the library has never listed.
+
+**A record describes a name; nothing points at it.** Plans and sessions store
+exercises by name and still do. So describing a name that is already in fifty
+sessions describes all fifty, and deleting the description leaves every one of
+them as it was — the name simply reads as undescribed again. That is also why
+**the name cannot change**: the API derives the record's id from it, refuses a
+second record with the same name ignoring case and spacing, and refuses a PUT
+that tries to rename. A different name is a different exercise.
+
+Typing a name into a picker still works and still needs nothing else. A name
+some plan uses that nothing describes shows in the Library table as `CUSTOM`
+with **Describe** beside it; the picker in the builder offers names from every
+block's plans, not only the selected one, so last block's typed name is picked
+rather than retyped and misspelled into a second history.
+
+One limit: the groups are the seven the tally counts, and the library has no
+core group. An exercise for something none of them covers — abs, say — can still
+be described, with its equipment and family, but it counts toward no group.
 
 ### Build
 

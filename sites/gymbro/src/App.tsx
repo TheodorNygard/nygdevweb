@@ -12,10 +12,12 @@ import {
     messageOf,
     sessionDateLabel,
     useAuth,
+    useCustomExercises,
     useHistory,
     useLibrary,
     useTemplates,
     useTheme,
+    withCustom,
     type MesocycleSummary,
     type SessionSummary,
 } from './lib/gym';
@@ -59,7 +61,29 @@ export function App() {
 
     const blocks = useBlocks(api);
     const history = useHistory(api);
-    const library = useLibrary();
+    // The user's own exercises, merged into the shipped library every view
+    // reads — so the builder's tally, the picker and the Library table treat a
+    // described exercise exactly like a shipped one. Read at sign-in rather
+    // than when the Library view opens: the builder's groups panel needs them
+    // too, and the dashboard opens on it.
+    const customExercises = useCustomExercises(api);
+    const shippedLibrary = useLibrary();
+
+    const library = useMemo(
+        () => withCustom(shippedLibrary, customExercises.exercises),
+        [shippedLibrary, customExercises.exercises],
+    );
+
+    // Every exercise name any block plans. A name typed for last block is
+    // offered in this block's picker rather than retyped — and misspelled,
+    // which splits its history in two — and the Library view lists the ones
+    // nothing describes yet, to describe.
+    const knownNames = useMemo(
+        () => [...new Set(blocks.blocks.flatMap((block) => (
+            block.days.flatMap((day) => day.plan.map((planned) => planned.exerciseName))
+        )))],
+        [blocks.blocks],
+    );
 
     const [view, setView] = useState<View>('dashboard');
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -525,9 +549,15 @@ export function App() {
                             onMakeCurrent={makeCurrent}
                             onCopy={copyBlock}
                             onDelete={removeBlock}
+                            knownNames={knownNames}
                         />
                     ) : view === 'library' ? (
-                        <LibraryScreen library={library} block={selected} />
+                        <LibraryScreen
+                            library={library}
+                            block={selected}
+                            knownNames={knownNames}
+                            custom={customExercises}
+                        />
                     ) : (
                         <AnalyticsScreen
                             series={series}

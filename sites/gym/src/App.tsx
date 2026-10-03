@@ -10,6 +10,7 @@ import { TabBar, type Tab } from './components/TabBar';
 import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
 import { useBlocks } from './hooks/useBlocks';
+import { useCustomExercises } from './hooks/useCustomExercises';
 import { useHistory } from './hooks/useHistory';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
@@ -20,6 +21,7 @@ import { useUpdateCheck } from './hooks/useUpdateCheck';
 import { GymApi, messageOf } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
+import { withCustom } from './lib/library';
 import { DoneScreen } from './screens/DoneScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen, type PlanDraft } from './screens/PlanScreen';
@@ -106,7 +108,7 @@ export function App() {
 
     const block = useBlock(api, accountId);
     const session = useSession(api);
-    const library = useLibrary();
+    const shippedLibrary = useLibrary();
 
     // The block the open session belongs to when it is not the one being
     // trained — a submitted workout opened from History to be corrected. Null
@@ -163,6 +165,25 @@ export function App() {
     }, []);
 
     const [openDay, setOpenDay] = useState<OpenDay | null>(null);
+
+    // The exercises this user has described in gymbro, merged into the
+    // library every screen reads — so a custom exercise gets its equipment
+    // chip and its place in the swap sheet like a shipped one. Read the first
+    // time something that shows exercises opens, as the Plan and History tabs
+    // are, rather than on every sign-in: a day sheet is the step before Start,
+    // so the list is normally in hand by the time the logger needs it.
+    const [wantCustom, setWantCustom] = useState(false);
+
+    if (!wantCustom && (openDay !== null || screen !== 'tabs' || opened.plan)) {
+        setWantCustom(true);
+    }
+
+    const customExercises = useCustomExercises(wantCustom ? api : null);
+
+    const library = useMemo(
+        () => withCustom(shippedLibrary, customExercises.exercises),
+        [shippedLibrary, customExercises.exercises],
+    );
     const [daySessionId, setDaySessionId] = useState<string | null>(null);
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
     const [dayLoading, setDayLoading] = useState(false);

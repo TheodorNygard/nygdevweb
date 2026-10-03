@@ -1,5 +1,5 @@
 import { EXERCISE_LIBRARY_URL } from './config';
-import type { ExerciseLibrary, LibraryExercise } from './types';
+import type { CustomExercise, ExerciseLibrary, LibraryExercise } from './types';
 
 /**
  * The built-in exercise library, fetched anonymously from the CDN rather than
@@ -107,6 +107,50 @@ export function loadLibrary(): Promise<ExerciseLibrary> {
     })();
 
     return pending;
+}
+
+/**
+ * The library with the user's own exercises in it.
+ *
+ * Merged here, once, rather than consulted beside the library everywhere it is
+ * read: the equipment chip, the swap sheet's tiers, gymbro's muscle-group
+ * tally and its picker all read `exercises`, and a custom exercise described
+ * in the library's own shape is then treated exactly like a shipped one by
+ * every one of them with no second code path.
+ *
+ * The shipped entry wins a name both lists hold. The planner refuses to
+ * describe a library name, so that only happens when the library later ships
+ * an exercise somebody had already added — and then it is the library's
+ * description that the next person reading it would expect.
+ *
+ * Equipment the library has never heard of — a kettlebell, a landmine — is
+ * added to the filter list after the shipped ones, so a custom exercise can be
+ * found by its chip.
+ */
+export function withCustom(
+    library: ExerciseLibrary | null,
+    custom: readonly CustomExercise[],
+): ExerciseLibrary | null {
+    if (!library || custom.length === 0) return library;
+
+    const shipped = new Set(library.exercises.map((exercise) => exercise.name));
+    const added: LibraryExercise[] = [];
+
+    for (const { id: _id, ...exercise } of custom) {
+        if (shipped.has(exercise.name)) continue;
+
+        added.push({ ...exercise, equipment: exercise.equipment ?? 'Custom' });
+    }
+
+    const equipment = [...library.equipment];
+
+    for (const exercise of added) {
+        if (exercise.equipment !== 'Custom' && !equipment.includes(exercise.equipment)) {
+            equipment.push(exercise.equipment);
+        }
+    }
+
+    return { ...library, equipment, exercises: [...library.exercises, ...added] };
 }
 
 /**

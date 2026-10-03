@@ -2,6 +2,8 @@ import { API_BASE } from './config';
 import type {
     CurrentBlock,
     DayInput,
+    CustomExercise,
+    CustomExerciseInput,
     DayTemplate,
     EditSetResult,
     EntryMoveResult,
@@ -311,6 +313,56 @@ export class GymApi {
         return this.send({
             method: 'DELETE',
             path: `/gym/templates/${encodeURIComponent(templateId)}`,
+        });
+    }
+
+    /**
+     * The exercises this user has described, by name. Merged into the CDN's
+     * library on the client — see `withCustom` in `lib/library`.
+     */
+    async customExercises(): Promise<CustomExercise[]> {
+        const body = await this.send<{ exercises: CustomExercise[] }>({
+            method: 'GET',
+            path: '/gym/exercises',
+        });
+
+        return body.exercises;
+    }
+
+    /**
+     * Describes an exercise under a new name. A name already described — case
+     * and spacing aside — is a 409 `exercise_exists`, which is also what a
+     * create retried after a lost response gets.
+     */
+    async createExercise(input: CustomExerciseInput): Promise<CustomExercise> {
+        const body = await this.send<{ exercise: CustomExercise }>({
+            method: 'POST',
+            path: '/gym/exercises',
+            body: input,
+        });
+
+        return body.exercise;
+    }
+
+    /**
+     * Re-describes one. The whole record is sent, name included, and the name
+     * must be the one it was created with: sessions hold it, so it cannot move.
+     */
+    async replaceExercise(exerciseId: string, input: CustomExerciseInput): Promise<CustomExercise> {
+        const body = await this.send<{ exercise: CustomExercise }>({
+            method: 'PUT',
+            path: `/gym/exercises/${encodeURIComponent(exerciseId)}`,
+            body: input,
+        });
+
+        return body.exercise;
+    }
+
+    /** Removes a description. Every plan and session keeps the name. */
+    deleteExercise(exerciseId: string): Promise<{ id: string; deleted: boolean }> {
+        return this.send({
+            method: 'DELETE',
+            path: `/gym/exercises/${encodeURIComponent(exerciseId)}`,
         });
     }
 

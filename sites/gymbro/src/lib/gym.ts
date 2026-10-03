@@ -27,13 +27,18 @@ export { GymApi, messageOf } from '@gym/lib/api';
 
 export { type AuthErrorDetail } from '@gym/lib/errors';
 
-export { equipmentFor } from '@gym/lib/library';
+export { equipmentFor, withCustom } from '@gym/lib/library';
 
 export { useAuth } from '@gym/hooks/useAuth';
 
 export { useHistory } from '@gym/hooks/useHistory';
 
 export { useLibrary } from '@gym/hooks/useLibrary';
+
+export {
+    useCustomExercises,
+    type CustomExercisesState,
+} from '@gym/hooks/useCustomExercises';
 
 export { useTemplates, type TemplatesState } from '@gym/hooks/useTemplates';
 
@@ -61,6 +66,8 @@ export {
 export { kg, num, rpeLabel, sessionDateLabel } from '@gym/lib/format';
 
 export type {
+    CustomExercise,
+    CustomExerciseInput,
     DayInput,
     DayTemplate,
     ExerciseLibrary,

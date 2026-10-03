@@ -11,12 +11,38 @@ import { type ExerciseLibrary } from './gym';
  * it.
  *
  * The map below is what the blob said before it carried groups, and it is kept
- * as the fallback for a library cached from then. A name neither knows — one
- * typed on the phone — has no group, which is what {@link groupOf} answers with
- * a dash rather than a guess: a wrong group silently skews the panel that
- * exists to be trusted.
+ * as the fallback for a library cached from then. An exercise of the user's own
+ * that has been described in the Library view carries its group the same way,
+ * because the described ones are merged into the library before anything here
+ * reads it. A name nothing describes — one typed into a picker and left at
+ * that — has no group, which is what {@link groupOf} answers with a dash rather
+ * than a guess: a wrong group silently skews the panel that exists to be
+ * trusted.
  */
 export const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Posterior', 'Calves'];
+
+/**
+ * What an exercise can say it trains — the shipped library's closed vocabulary,
+ * from `gym/README.md` in NygDevAzure. Offered as choices rather than typed,
+ * because the swap sheet matches these by spelling and a muscle written any
+ * other way matches nothing.
+ */
+export const MUSCLES = [
+    'Chest',
+    'Front Delts',
+    'Side Delts',
+    'Rear Delts',
+    'Triceps',
+    'Biceps',
+    'Forearms',
+    'Lats',
+    'Upper Back',
+    'Lower Back',
+    'Quads',
+    'Glutes',
+    'Hamstrings',
+    'Calves',
+];
 
 /** No group known. Shown as-is, and counted toward nothing. */
 export const NO_GROUP = '—';
@@ -62,40 +88,58 @@ export function groupOf(name: string, library: ExerciseLibrary | null): string {
 }
 
 /**
- * Every exercise the picker and the library table show: the shipped blob, plus
- * anything a block already plans that the blob does not list.
+ * Every exercise the picker and the library table show, and where each came
+ * from:
  *
- * The second half is what keeps a name typed on the phone from vanishing off
- * this screen. It reads `Custom` for equipment — the same word the logger's
- * `equipmentFor` falls back to — and a dash for its group.
+ * - `library` — shipped on the CDN, the same for everybody.
+ * - `yours` — described in the Library view, merged into the library with its
+ *   equipment and group (see `withCustom`).
+ * - `typed` — a name some plan uses that nothing describes: typed into a
+ *   picker, here or on the phone. It reads `Custom` for equipment — the word
+ *   the logger's `equipmentFor` falls back to — and a dash for its group, and
+ *   it is what the Library view offers to describe.
  */
 export interface Exercise {
     name: string;
     equipment: string;
     group: string;
+    kind: 'library' | 'yours' | 'typed';
 }
 
+/**
+ * `library` is the merged one. `knownNames` is every name the plans use —
+ * all blocks', not only the selected one, so a name typed for last block is
+ * still offered for this one rather than retyped and misspelled. `yours` is
+ * which of the library's names are the user's own.
+ */
 export function catalogue(
     library: ExerciseLibrary | null,
-    plannedNames: readonly string[],
+    knownNames: readonly string[],
+    yours: ReadonlySet<string> = new Set(),
 ): Exercise[] {
-    const shipped = (library?.exercises ?? []).map((exercise) => ({
+    const listed: Exercise[] = (library?.exercises ?? []).map((exercise) => ({
         name: exercise.name,
         equipment: exercise.equipment,
         group: groupOf(exercise.name, library),
+        kind: yours.has(exercise.name) ? 'yours' : 'library',
     }));
 
-    const known = new Set(shipped.map((exercise) => exercise.name));
-    const custom: Exercise[] = [];
+    const known = new Set(listed.map((exercise) => exercise.name));
+    const typed: Exercise[] = [];
 
-    for (const name of plannedNames) {
+    for (const name of knownNames) {
         if (known.has(name)) continue;
 
         known.add(name);
-        custom.push({ name, equipment: 'Custom', group: groupOf(name, library) });
+        typed.push({ name, equipment: 'Custom', group: groupOf(name, library), kind: 'typed' });
     }
 
-    // Custom first: it is the short list, and the one somebody is looking for
-    // when they came to this table wondering where a name went.
-    return [...custom, ...shipped];
+    // The user's own first, described then typed: they are the short list,
+    // and the one somebody is looking for when they came to this table
+    // wondering where a name went.
+    return [
+        ...listed.filter((exercise) => exercise.kind === 'yours'),
+        ...typed,
+        ...listed.filter((exercise) => exercise.kind === 'library'),
+    ];
 }
