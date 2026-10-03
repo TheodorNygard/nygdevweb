@@ -6,6 +6,7 @@ import { SetSheet } from '../components/SetSheet';
 import { Stepper } from '../components/Stepper';
 import { useDragReorder } from '../hooks/useDragReorder';
 import type { LastSets } from '../hooks/useLastSets';
+import type { Waiting } from '../hooks/useSession';
 import {
     completesTarget,
     isRestWeek,
@@ -145,6 +146,14 @@ interface SessionScreenProps {
     lastSets: LastSets;
 
     savedAt: number | null;
+
+    /**
+     * Writes that did not get through and are being retried. While there are
+     * any, the header says how many instead of when the last one landed —
+     * "Saved 19:42" above a set that is not saved would be the one lie the
+     * header exists not to tell.
+     */
+    waiting: Waiting | null;
     onAddExercise: () => void;
     onLogSet: (entryIndex: number, set: WorkSet) => void;
 
@@ -235,6 +244,7 @@ export function SessionScreen({
     weeks,
     lastSets,
     savedAt,
+    waiting,
     onAddExercise,
     onLogSet,
     onRemoveSet,
@@ -564,16 +574,19 @@ export function SessionScreen({
                 <div className="session__title">
                     <div className="session__label">{label}</div>
                     <div className="session__state">
-                        <span className={savedAt ? 'dot' : 'dot dot--muted'} />
+                        <span className={savedAt && !waiting ? 'dot' : 'dot dot--muted'} />
                         <span className="session__saved">
-                            {savedAt
-                                ? `Saved ${new Date(savedAt).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })}`
-                                : submitted
-                                    ? 'Submitted · edits save as you make them'
-                                    : 'Every set saves as you log it'}
+                            {waiting
+                                ? `${waiting.count} ${waiting.setsOnly ? 'set' : 'change'}`
+                                    + `${waiting.count === 1 ? '' : 's'} waiting to save`
+                                : savedAt
+                                    ? `Saved ${new Date(savedAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}`
+                                    : submitted
+                                        ? 'Submitted · edits save as you make them'
+                                        : 'Every set saves as you log it'}
                         </span>
                     </div>
                 </div>

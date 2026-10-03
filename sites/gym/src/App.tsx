@@ -640,6 +640,7 @@ export function App() {
                     weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
                     lastSets={lastSets}
                     savedAt={session.savedAt}
+                    waiting={session.waiting}
                     onAddExercise={() => setPicking(true)}
                     onLogSet={(entryIndex, set) => { void session.logSet(entryIndex, set); }}
                     onRemoveSet={(entryIndex, setIndex) => {

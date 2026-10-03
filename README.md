@@ -532,6 +532,16 @@ That guard is also what lets every write apply **locally first**. The row
 appears on the tap rather than 300 ms later, and the only thing that makes that
 safe rather than optimistic is the count the server checks.
 
+It is also what makes a failed write worth **retrying rather than rolling
+back**. A set that did not get through — no signal by the rack, a 503 — stays
+on screen and is retried with backoff for about a minute while the session is
+open, and the header reads "2 sets waiting to save" where "Saved 19:42" was.
+Writes go out one at a time, in the order they were tapped, so the next set
+waits behind the one being retried rather than overtaking it and meeting a
+count one short. The banner, and the rollback, come only once the retries run
+out or the session is closed with sets still waiting; Submit waits for writes in
+flight and refuses while any are being retried.
+
 **A cell can hold more than one session.** Sessions are keyed on the calendar
 date, not on `(meso, week, dayIndex)`, so tapping Start on a day already logged
 files a *second* session rather than overwriting the first — the API relaxed
