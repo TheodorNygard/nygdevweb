@@ -720,7 +720,7 @@ npm run preview   # serve the built dist/ over HTTP
 | `index.html` | The shell. One `<div id="root">`, the module script Vite rewrites at build time, and the `viewport-fit=cover` that makes `env(safe-area-inset-*)` report real numbers |
 | `auth.html` | MSAL's redirect URI. Loads `src/auth.ts` and nothing else — every sign-in and renewal comes back from Entra through it before the app loads, so the app stays off it |
 | `src/lib/` | No React: the typed API client and its wire types, the block/session maths (targets, swaps) and the local session totals, formatting, the steps and bounds a set is composed from, the exercise library and its swap suggestions, the built-in day templates, the identity config and MSAL instance, the renewal-redirect guard, the AADSTS error map, the held copy of the current block, the themes |
-| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useHistory` (another block's sessions, read when it is opened), `useLastSets`, `useTemplates` (the two template lists and their writes), `useDragReorder`, `useLibrary`, `useTheme` |
+| `src/hooks/` | `useAuth` (all MSAL interaction), `useResource` (one API read with its loading/error state, shared by `useBlock` and `useBlocks`), `useSession` (the guarded writes), `useHistory` (another block's sessions, read when it is opened), `useLastSets`, `useTemplates` (the two template lists and their writes), `useCustomExercises` (your own exercises, merged into the library), `useFavorites` (the starred and recently used exercises, and the context the pickers read them from), `useDialog` (Escape, focus and the Tab trap for every sheet), `useDragReorder`, `useLibrary`, `useTheme` |
 | `src/screens/` | Intro, Today, Plan, History, Session, Done |
 | `src/components/` | The tab bar, the masthead (and its theme switch), the bottom sheets — day, block, day plan, templates, exercise picker (add and swap), set editor, finish — the stepper, the drag handle, the intro's effort graph, the banner, the sign-in gate |
 | `public/` | Copied to the deployed root untouched: favicons, the web manifest, `404.html` and its stylesheet, and `staticwebapp.config.json` |
@@ -1072,7 +1072,8 @@ hooks through a `@gym` alias declared in both `vite.config.ts` and
 the AADSTS error map, `useAuth`, `useResource`, `useHistory` (a block's
 sessions, read once and held), `useLibrary`, `useTemplates`, `useDragReorder`,
 `useDialog` (Escape for the top modal only, focus in and back, Tab kept inside),
-`useCustomExercises` and `useTheme` all live once, in `sites/gym/src`.
+`useCustomExercises`, `useFavorites` and `useTheme` all live once, in
+`sites/gym/src`.
 
 That is the point of `lib/types.ts` being written as a transcription of the API
 rather than as what the screens want: a route that changes shape becomes a type
@@ -1148,6 +1149,41 @@ rather than retyped and misspelled into a second history.
 One limit: the groups are the seven the tally counts, and the library has no
 core group. An exercise for something none of them covers — abs, say — can still
 be described, with its equipment and family, but it counts toward no group.
+
+### Favourites and recently used
+
+Both pickers — the phone's and the builder's — open on **your own picks**
+before the alphabet: the exercises you starred, then the ones your last few
+finished workouts lifted, then everything else. A search has no sections, so
+the starred matches go first instead. A swap on the phone keeps its
+suggestions first, because they answer the question being asked, and the
+favourites that fit come after them.
+
+Every row in both pickers and in the Library table has a star, so curating is
+one tap from wherever an exercise turns up. The Library view is where the list
+is tidied: a *Favorites* filter, and **Star the N this block plans**, which is
+most of a useful list in one click since the plan is what gets trained. A
+favourite is a name, built-in or your own, typed or described — the same as
+every other reference to an exercise — so it covers the whole history.
+
+Neither list costs a call. They live on a document of their own on the API
+(`preferences_{objectId}`) and ride along on the block read each app already
+makes: `/gym/mesocycles/current` for the phone, `/gym/mesocycles` here.
+Starring is `PUT /gym/favorites` with the whole list; `useFavorites` changes
+the star on the tap, sends one list at a time with the newest last so a slow
+request cannot undo a later star, and goes back to the last list the server
+confirmed if one fails. On the phone the pickers reach it through
+`FavoritesContext`, because they open from four places under screens that have
+no use for the list themselves.
+
+**Recent is written by Submit, not by the set-tap.** The set-tap is the one hot
+path and stays a single patch; "recent" only needs to be as fresh as the last
+finished workout. It is the exercises that workout actually lifted, most recent
+first, twenty at most, across every block — so a new block opens with the last
+one's exercises at hand. It starts filling from the first workout submitted
+after it shipped. On the phone, finishing a workout reloads the block, which is
+what brings the new list in; here it is as fresh as the last time the block
+list was read.
 
 ### Build
 

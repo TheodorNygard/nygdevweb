@@ -11,6 +11,7 @@ import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
 import { useBlocks } from './hooks/useBlocks';
 import { useCustomExercises } from './hooks/useCustomExercises';
+import { FavoritesContext, useFavorites } from './hooks/useFavorites';
 import { useHistory } from './hooks/useHistory';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
@@ -107,6 +108,12 @@ export function App() {
     const accountId = auth.account?.homeAccountId ?? null;
 
     const block = useBlock(api, accountId);
+
+    // The starred and recently used exercises, off the block read Today already
+    // makes — no call of their own. Handed to every exercise picker through
+    // context; see `FavoritesContext`. Submitting a workout reloads the block,
+    // which is what brings the new recent list in.
+    const favorites = useFavorites(api, block.block?.favorites, block.block?.recent);
     const session = useSession(api);
     const shippedLibrary = useLibrary();
 
@@ -517,269 +524,271 @@ export function App() {
         : null;
 
     return (
-        <div className="app">
-            {banner ? (
-                <Banner
-                    kind="error"
-                    label="Something went wrong"
-                    message={banner}
-                    action={auth.error ? {
-                        label: auth.signingIn ? 'Opening Entra ID…' : 'Sign in again',
-                        busy: auth.signingIn,
-                        onClick: auth.reauthenticate,
-                    } : null}
-                    onDismiss={() => {
-                        setActionError(null);
-                        session.dismiss();
-                        auth.dismissError();
-                    }}
-                />
-            ) : null}
+        <FavoritesContext.Provider value={favorites}>
+            <div className="app">
+                {banner ? (
+                    <Banner
+                        kind="error"
+                        label="Something went wrong"
+                        message={banner}
+                        action={auth.error ? {
+                            label: auth.signingIn ? 'Opening Entra ID…' : 'Sign in again',
+                            busy: auth.signingIn,
+                            onClick: auth.reauthenticate,
+                        } : null}
+                        onDismiss={() => {
+                            setActionError(null);
+                            session.dismiss();
+                            auth.dismissError();
+                        }}
+                    />
+                ) : null}
 
-            {bannerIsNotice && session.notice ? (
-                <Banner
-                    kind="notice"
-                    label="Heads up"
-                    message={session.notice}
-                    onDismiss={session.dismiss}
-                />
-            ) : null}
+                {bannerIsNotice && session.notice ? (
+                    <Banner
+                        kind="notice"
+                        label="Heads up"
+                        message={session.notice}
+                        onDismiss={session.dismiss}
+                    />
+                ) : null}
 
-            {updateAvailable && !updateDismissed && !banner && !bannerIsNotice ? (
-                <Banner
-                    kind="notice"
-                    label="Update available"
-                    message="A newer version of GymLog is ready. Reload to get it."
-                    action={{
-                        label: 'Reload',
-                        busy: false,
-                        onClick: () => window.location.reload(),
-                    }}
-                    onDismiss={() => setUpdateDismissed(true)}
-                />
-            ) : null}
+                {updateAvailable && !updateDismissed && !banner && !bannerIsNotice ? (
+                    <Banner
+                        kind="notice"
+                        label="Update available"
+                        message="A newer version of GymLog is ready. Reload to get it."
+                        action={{
+                            label: 'Reload',
+                            busy: false,
+                            onClick: () => window.location.reload(),
+                        }}
+                        onDismiss={() => setUpdateDismissed(true)}
+                    />
+                ) : null}
 
-            {screen === 'tabs' ? (
-                <>
-                    {block.loading && !block.block ? (
-                        <div className="spinner">LOADING</div>
-                    ) : block.block ? (
-                        <>
-                            {tab === 'today' ? (
-                                <TodayScreen
-                                    block={block.block}
-                                    week={activeWeek}
-                                    onWeek={chooseWeek}
-                                    onOpenDay={(dayIndex) => {
-                                        const sessions = sessionsFor(
-                                            block.block?.sessions ?? [],
-                                            activeWeek,
-                                            dayIndex,
-                                        );
+                {screen === 'tabs' ? (
+                    <>
+                        {block.loading && !block.block ? (
+                            <div className="spinner">LOADING</div>
+                        ) : block.block ? (
+                            <>
+                                {tab === 'today' ? (
+                                    <TodayScreen
+                                        block={block.block}
+                                        week={activeWeek}
+                                        onWeek={chooseWeek}
+                                        onOpenDay={(dayIndex) => {
+                                            const sessions = sessionsFor(
+                                                block.block?.sessions ?? [],
+                                                activeWeek,
+                                                dayIndex,
+                                            );
 
-                                        setOpenDay({
-                                            week: activeWeek,
-                                            dayIndex,
-                                            block: null,
-                                        });
-                                        setDaySessionId(sessions[0]?.id ?? null);
+                                            setOpenDay({
+                                                week: activeWeek,
+                                                dayIndex,
+                                                block: null,
+                                            });
+                                            setDaySessionId(sessions[0]?.id ?? null);
 
-                                        // A cell of the block being trained
-                                        // is one Start away from needing last
-                                        // week's sets, and the sheet is open
-                                        // for a second or two before that tap
-                                        // — long enough for the read to land.
-                                        lastSets.prefetch(
-                                            block.block?.sessions ?? [],
-                                            dayIndex,
-                                        );
-                                    }}
-                                    onPlan={() => pickTab('plan')}
-                                    theme={theme}
-                                    onTheme={pickTheme}
-                                />
-                            ) : null}
+                                            // A cell of the block being trained
+                                            // is one Start away from needing last
+                                            // week's sets, and the sheet is open
+                                            // for a second or two before that tap
+                                            // — long enough for the read to land.
+                                            lastSets.prefetch(
+                                                block.block?.sessions ?? [],
+                                                dayIndex,
+                                            );
+                                        }}
+                                        onPlan={() => pickTab('plan')}
+                                        theme={theme}
+                                        onTheme={pickTheme}
+                                    />
+                                ) : null}
 
-                            {tab === 'plan' ? (
-                                <PlanScreen
-                                    block={block.block}
-                                    held={planDraft}
-                                    onHold={setPlanDraft}
-                                    blocks={blocks.blocks}
-                                    blocksLoading={blocks.loading}
-                                    onOpenBlock={setOpenBlock}
-                                    library={library}
-                                    templates={templates}
-                                    busy={planBusy}
-                                    onSave={savePlan}
-                                    onCreate={createPlan}
-                                    onSignOut={signOut}
-                                    account={auth.account.username || auth.account.name || 'this account'}
-                                    theme={theme}
-                                    onTheme={pickTheme}
-                                />
-                            ) : null}
+                                {tab === 'plan' ? (
+                                    <PlanScreen
+                                        block={block.block}
+                                        held={planDraft}
+                                        onHold={setPlanDraft}
+                                        blocks={blocks.blocks}
+                                        blocksLoading={blocks.loading}
+                                        onOpenBlock={setOpenBlock}
+                                        library={library}
+                                        templates={templates}
+                                        busy={planBusy}
+                                        onSave={savePlan}
+                                        onCreate={createPlan}
+                                        onSignOut={signOut}
+                                        account={auth.account.username || auth.account.name || 'this account'}
+                                        theme={theme}
+                                        onTheme={pickTheme}
+                                    />
+                                ) : null}
 
-                            {tab === 'history' ? (
-                                <HistoryScreen
-                                    block={block.block}
-                                    blocks={blocks.blocks}
-                                    blocksLoading={blocks.loading}
-                                    sessions={history.sessions}
-                                    loadingMesoId={history.loading}
-                                    onLoadBlock={history.load}
-                                    onOpen={(summary, mesocycle) => {
-                                        const isCurrent = mesocycle.id === meso?.id;
+                                {tab === 'history' ? (
+                                    <HistoryScreen
+                                        block={block.block}
+                                        blocks={blocks.blocks}
+                                        blocksLoading={blocks.loading}
+                                        sessions={history.sessions}
+                                        loadingMesoId={history.loading}
+                                        onLoadBlock={history.load}
+                                        onOpen={(summary, mesocycle) => {
+                                            const isCurrent = mesocycle.id === meso?.id;
 
-                                        // Only a cell of the block being
-                                        // trained moves Today's week with it —
-                                        // week 4 of another block is not week 4
-                                        // of this one.
-                                        if (isCurrent) chooseWeek(summary.week);
+                                            // Only a cell of the block being
+                                            // trained moves Today's week with it —
+                                            // week 4 of another block is not week 4
+                                            // of this one.
+                                            if (isCurrent) chooseWeek(summary.week);
 
-                                        setOpenDay({
-                                            week: summary.week,
-                                            dayIndex: summary.dayIndex,
-                                            block: isCurrent ? null : mesocycle,
-                                        });
-                                        setDaySessionId(summary.id);
-                                    }}
-                                />
-                            ) : null}
-                        </>
-                    ) : (
-                        <div className={banner ? 'screen screen--cleared' : 'screen'}>
-                            <h1 className="title">Nothing loaded.</h1>
-                            <p className="lede">
-                                The block could not be read. The banner above says why.
-                            </p>
-                            <div className="stack-22">
-                                <button type="button" className="primary" onClick={block.reload}>
-                                    Try again
-                                </button>
+                                            setOpenDay({
+                                                week: summary.week,
+                                                dayIndex: summary.dayIndex,
+                                                block: isCurrent ? null : mesocycle,
+                                            });
+                                            setDaySessionId(summary.id);
+                                        }}
+                                    />
+                                ) : null}
+                            </>
+                        ) : (
+                            <div className={banner ? 'screen screen--cleared' : 'screen'}>
+                                <h1 className="title">Nothing loaded.</h1>
+                                <p className="lede">
+                                    The block could not be read. The banner above says why.
+                                </p>
+                                <div className="stack-22">
+                                    <button type="button" className="primary" onClick={block.reload}>
+                                        Try again
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    <TabBar active={tab} onPick={pickTab} />
-                </>
-            ) : null}
+                        <TabBar active={tab} onPick={pickTab} />
+                    </>
+                ) : null}
 
-            {screen === 'session' && session.workout ? (
-                <SessionScreen
-                    workout={session.workout}
-                    label={`W${session.workout.week} · ${dayLabel(sessionBlock ?? meso, session.workout.dayIndex)}`}
-                    library={library}
-                    plan={(sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
-                    weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
-                    lastSets={lastSets.sets}
-                    savedAt={session.savedAt}
-                    waiting={session.waiting}
-                    onAddExercise={() => setPicking(true)}
-                    onLogSet={(entryIndex, set) => { void session.logSet(entryIndex, set); }}
-                    onRemoveSet={(entryIndex, setIndex) => {
-                        void session.removeSet(entryIndex, setIndex);
-                    }}
-                    onEditSet={(entryIndex, setIndex, set) => {
-                        void session.editSet(entryIndex, setIndex, set);
-                    }}
-                    onSwapEntry={(entryIndex, to, withSets) => {
-                        void session.swapEntry(entryIndex, to, withSets);
-                    }}
-                    onRemoveEntry={(entryIndex) => { void session.removeEntry(entryIndex); }}
-                    onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
-                    onFinish={() => setFinishing(true)}
-                    onBack={() => {
-                        session.close();
-                        setScreen('tabs');
+                {screen === 'session' && session.workout ? (
+                    <SessionScreen
+                        workout={session.workout}
+                        label={`W${session.workout.week} · ${dayLabel(sessionBlock ?? meso, session.workout.dayIndex)}`}
+                        library={library}
+                        plan={(sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
+                        weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
+                        lastSets={lastSets.sets}
+                        savedAt={session.savedAt}
+                        waiting={session.waiting}
+                        onAddExercise={() => setPicking(true)}
+                        onLogSet={(entryIndex, set) => { void session.logSet(entryIndex, set); }}
+                        onRemoveSet={(entryIndex, setIndex) => {
+                            void session.removeSet(entryIndex, setIndex);
+                        }}
+                        onEditSet={(entryIndex, setIndex, set) => {
+                            void session.editSet(entryIndex, setIndex, set);
+                        }}
+                        onSwapEntry={(entryIndex, to, withSets) => {
+                            void session.swapEntry(entryIndex, to, withSets);
+                        }}
+                        onRemoveEntry={(entryIndex) => { void session.removeEntry(entryIndex); }}
+                        onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
+                        onFinish={() => setFinishing(true)}
+                        onBack={() => {
+                            session.close();
+                            setScreen('tabs');
 
-                        // The totals on the block map and in History are the
-                        // server's, summed from the sets on every read — so a
-                        // reload of whichever list holds this session is all an
-                        // edit needs to show everywhere.
-                        if (sessionBlock) {
-                            history.reload(sessionBlock.id);
-                        } else {
-                            block.reload();
-                        }
+                            // The totals on the block map and in History are the
+                            // server's, summed from the sets on every read — so a
+                            // reload of whichever list holds this session is all an
+                            // edit needs to show everywhere.
+                            if (sessionBlock) {
+                                history.reload(sessionBlock.id);
+                            } else {
+                                block.reload();
+                            }
 
-                        setSessionBlock(null);
-                    }}
-                />
-            ) : null}
+                            setSessionBlock(null);
+                        }}
+                    />
+                ) : null}
 
-            {screen === 'done' && completed && block.block ? (
-                <DoneScreen
-                    dayLabel={completed.dayLabel}
-                    week={completed.week}
-                    weeks={meso?.weeks ?? completed.week}
-                    doneCount={progress?.doneCount ?? 0}
-                    totalCount={progress?.totalCount ?? 0}
-                    totals={completed.totals}
-                    onHome={() => {
-                        session.close();
-                        setCompleted(null);
-                        pickTab('today');
-                        setScreen('tabs');
-                    }}
-                />
-            ) : null}
+                {screen === 'done' && completed && block.block ? (
+                    <DoneScreen
+                        dayLabel={completed.dayLabel}
+                        week={completed.week}
+                        weeks={meso?.weeks ?? completed.week}
+                        doneCount={progress?.doneCount ?? 0}
+                        totalCount={progress?.totalCount ?? 0}
+                        totals={completed.totals}
+                        onHome={() => {
+                            session.close();
+                            setCompleted(null);
+                            pickTab('today');
+                            setScreen('tabs');
+                        }}
+                    />
+                ) : null}
 
-            {openDay !== null && screen === 'tabs' ? (
-                <DaySheet
-                    week={openDay.week}
-                    dayIndex={openDay.dayIndex}
-                    label={dayLabel(openDay.block ?? meso, openDay.dayIndex)}
-                    plan={(openDay.block ?? meso)?.days[openDay.dayIndex]?.plan ?? []}
-                    weeks={(openDay.block ?? meso)?.weeks ?? openDay.week}
-                    sessions={cell}
-                    selectedId={daySessionId}
-                    detail={dayDetail}
-                    loading={dayLoading}
-                    canLog={openDay.block === null}
-                    busy={session.busy}
-                    onSelect={setDaySessionId}
-                    onStart={() => { void startOn(openDay.dayIndex); }}
-                    onResume={(sessionId) => { void resume(sessionId); }}
-                    onEdit={(sessionId) => { void editSession(sessionId); }}
-                    onDelete={(sessionId) => { void removeSession(sessionId); }}
-                    onClose={closeDay}
-                />
-            ) : null}
+                {openDay !== null && screen === 'tabs' ? (
+                    <DaySheet
+                        week={openDay.week}
+                        dayIndex={openDay.dayIndex}
+                        label={dayLabel(openDay.block ?? meso, openDay.dayIndex)}
+                        plan={(openDay.block ?? meso)?.days[openDay.dayIndex]?.plan ?? []}
+                        weeks={(openDay.block ?? meso)?.weeks ?? openDay.week}
+                        sessions={cell}
+                        selectedId={daySessionId}
+                        detail={dayDetail}
+                        loading={dayLoading}
+                        canLog={openDay.block === null}
+                        busy={session.busy}
+                        onSelect={setDaySessionId}
+                        onStart={() => { void startOn(openDay.dayIndex); }}
+                        onResume={(sessionId) => { void resume(sessionId); }}
+                        onEdit={(sessionId) => { void editSession(sessionId); }}
+                        onDelete={(sessionId) => { void removeSession(sessionId); }}
+                        onClose={closeDay}
+                    />
+                ) : null}
 
-            {openBlock && screen === 'tabs' ? (
-                <BlockSheet
-                    block={openBlock}
-                    volumeKg={blockVolume}
-                    busy={planBusy}
-                    onSwitch={switchBlock}
-                    onCopy={copyBlock}
-                    onDelete={removeBlock}
-                    onClose={() => setOpenBlock(null)}
-                />
-            ) : null}
+                {openBlock && screen === 'tabs' ? (
+                    <BlockSheet
+                        block={openBlock}
+                        volumeKg={blockVolume}
+                        busy={planBusy}
+                        onSwitch={switchBlock}
+                        onCopy={copyBlock}
+                        onDelete={removeBlock}
+                        onClose={() => setOpenBlock(null)}
+                    />
+                ) : null}
 
-            {picking && screen === 'session' ? (
-                <ExercisePicker
-                    library={library}
-                    busy={session.busy}
-                    onPick={(name) => {
-                        setPicking(false);
-                        void session.addEntry(name);
-                    }}
-                    onClose={() => setPicking(false)}
-                />
-            ) : null}
+                {picking && screen === 'session' ? (
+                    <ExercisePicker
+                        library={library}
+                        busy={session.busy}
+                        onPick={(name) => {
+                            setPicking(false);
+                            void session.addEntry(name);
+                        }}
+                        onClose={() => setPicking(false)}
+                    />
+                ) : null}
 
-            {finishing && session.workout ? (
-                <FinishSheet
-                    label={dayLabel(meso, session.workout.dayIndex)}
-                    totals={session.workout.totals}
-                    busy={session.busy}
-                    onSubmit={() => { void submitWorkout(); }}
-                    onClose={() => setFinishing(false)}
-                />
-            ) : null}
-        </div>
+                {finishing && session.workout ? (
+                    <FinishSheet
+                        label={dayLabel(meso, session.workout.dayIndex)}
+                        totals={session.workout.totals}
+                        busy={session.busy}
+                        onSubmit={() => { void submitWorkout(); }}
+                        onClose={() => setFinishing(false)}
+                    />
+                ) : null}
+            </div>
+        </FavoritesContext.Provider>
     );
 }

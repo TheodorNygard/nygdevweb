@@ -6,6 +6,7 @@ import {
     type CustomExercise,
     type CustomExercisesState,
     type ExerciseLibrary,
+    type FavoritesState,
     type MesocycleSummary,
 } from '../lib/gym';
 
@@ -18,6 +19,9 @@ interface LibraryScreenProps {
     knownNames: readonly string[];
 
     custom: CustomExercisesState;
+
+    /** The starred exercises — curated here, shown first in both pickers. */
+    favorites: FavoritesState;
 }
 
 /** What the form is open for, if anything. */
@@ -40,13 +44,19 @@ type Editing =
  * gives every session already logged under it the description too, since
  * sessions hold the name.
  *
+ * It is also where the favourites are curated. Both pickers open on them, and
+ * this is the one screen with every exercise in a table, a filter for the
+ * starred ones, and a way to star a whole block's plan at once — which is most
+ * of a useful list in one click, since the plan is what is trained.
+ *
  * The IN BLOCK column is why this is a view rather than a reference page. It
  * answers the question a plan raises — where did all these sets go — against
  * the block in the sidebar, from data already in hand.
  */
-export function LibraryScreen({ library, block, knownNames, custom }: LibraryScreenProps) {
+export function LibraryScreen({ library, block, knownNames, custom, favorites }: LibraryScreenProps) {
     const [query, setQuery] = useState('');
     const [equipment, setEquipment] = useState('All');
+    const [starredOnly, setStarredOnly] = useState(false);
     const [editing, setEditing] = useState<Editing | null>(null);
 
     // The exercise whose delete has had its first click.
@@ -70,8 +80,13 @@ export function LibraryScreen({ library, block, knownNames, custom }: LibraryScr
 
     const shown = rows.filter((exercise) => (
         (equipment === 'All' || exercise.equipment === equipment)
+        && (!starredOnly || favorites.isFavorite(exercise.name))
         && (!needle || exercise.name.toLowerCase().includes(needle))
     ));
+
+    // What the selected block plans that is not starred yet, for the button
+    // that stars it in one go.
+    const unstarredInBlock = [...inBlock.keys()].filter((name) => !favorites.isFavorite(name));
 
     /**
      * Why a new name cannot be used. Compared ignoring case, as the API
@@ -164,6 +179,14 @@ export function LibraryScreen({ library, block, knownNames, custom }: LibraryScr
                     autoComplete="off"
                 />
                 <div className="library__chips">
+                    <button
+                        type="button"
+                        className={starredOnly ? 'chip chip--on' : 'chip'}
+                        aria-pressed={starredOnly}
+                        onClick={() => setStarredOnly(!starredOnly)}
+                    >
+                        {`★ Favorites · ${favorites.favorites.length}`}
+                    </button>
                     {filters.map((filter) => (
                         <button
                             key={filter}
@@ -178,6 +201,22 @@ export function LibraryScreen({ library, block, knownNames, custom }: LibraryScr
                 </div>
             </div>
 
+            <div className="library__starbar">
+                <button
+                    type="button"
+                    className="ghost"
+                    disabled={unstarredInBlock.length === 0}
+                    onClick={() => favorites.addAll(unstarredInBlock)}
+                >
+                    {unstarredInBlock.length === 0
+                        ? 'Everything this block plans is starred'
+                        : `Star the ${unstarredInBlock.length} this block plans`}
+                </button>
+                {favorites.error ? (
+                    <span className="exform__problem">{`The star did not save: ${favorites.error}`}</span>
+                ) : null}
+            </div>
+
             <div className="table table--head" role="presentation">
                 <span>EXERCISE</span>
                 <span>EQUIPMENT</span>
@@ -189,10 +228,20 @@ export function LibraryScreen({ library, block, knownNames, custom }: LibraryScr
                 {shown.map((exercise) => {
                     const sets = inBlock.get(exercise.name) ?? 0;
                     const record = exercise.kind === 'yours' ? recordOf(exercise.name) : undefined;
+                    const starred = favorites.isFavorite(exercise.name);
 
                     return (
                         <div key={`${exercise.name}:${exercise.equipment}`} className="table">
                             <span className="table__name">
+                                <button
+                                    type="button"
+                                    className={starred ? 'pick__star pick__star--on' : 'pick__star'}
+                                    aria-pressed={starred}
+                                    aria-label={`Favourite ${exercise.name}`}
+                                    onClick={() => favorites.toggle(exercise.name)}
+                                >
+                                    {starred ? '★' : '☆'}
+                                </button>
                                 <span className="table__label">{exercise.name}</span>
                                 {exercise.kind === 'yours' ? <span className="pill">YOURS</span> : null}
                                 {exercise.kind === 'typed' ? (

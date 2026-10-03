@@ -1,10 +1,20 @@
-import { useResource, type GymApi, type MesocycleSummary, type Resource } from '../lib/gym';
+import {
+    useResource,
+    type BlockList,
+    type GymApi,
+    type MesocycleSummary,
+    type Resource,
+} from '../lib/gym';
 
-export interface BlocksState extends Omit<Resource<MesocycleSummary[]>, 'data'> {
+export interface BlocksState extends Omit<Resource<BlockList>, 'data'> {
     blocks: MesocycleSummary[];
+
+    /** The starred and recently used exercises, which ride along on this read. */
+    favorites: string[];
+    recent: string[];
 }
 
-const EMPTY: MesocycleSummary[] = [];
+const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [] };
 const load = (api: GymApi) => api.mesocycles();
 
 /**
@@ -18,9 +28,12 @@ const load = (api: GymApi) => api.mesocycles();
  * it wants the list, it wants to edit any block in it rather than only the
  * current one, and `isCurrent` on a summary already says which one the phone
  * would open. Reading both would be the current block twice.
+ *
+ * The favourites and recently used exercises come back on the same answer,
+ * which is how the picker gets them without a call of its own.
  */
 export function useBlocks(api: GymApi | null): BlocksState {
     const { data, ...rest } = useResource(api, load, EMPTY);
 
-    return { blocks: data, ...rest };
+    return { blocks: data.mesocycles, favorites: data.favorites, recent: data.recent, ...rest };
 }

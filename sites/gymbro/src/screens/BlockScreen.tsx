@@ -13,6 +13,7 @@ import {
     setsForWeek,
     type DayInput,
     type ExerciseLibrary,
+    type FavoritesState,
     type MesocycleSummary,
     type TemplatesState,
 } from '../lib/gym';
@@ -124,6 +125,9 @@ interface BlockScreenProps {
 
     /** Every exercise name any block plans, so a typed one is offered rather than retyped. */
     knownNames: readonly string[];
+
+    /** The starred and recently used exercises, for the top of the picker. */
+    favorites: FavoritesState;
 }
 
 /**
@@ -149,6 +153,7 @@ export function BlockScreen({
     onCopy,
     onDelete,
     knownNames,
+    favorites,
 }: BlockScreenProps) {
     const [picking, setPicking] = useState<number | null>(null);
     const [templating, setTemplating] = useState<number | null>(null);
@@ -459,6 +464,7 @@ export function BlockScreen({
                     dayLabel={pickingDay.label}
                     library={library}
                     catalogue={options}
+                    favorites={favorites}
                     onPick={(exerciseName) => {
                         editDay(picking, (current) => (
                             current.plan.length >= MAX_PLANNED_PER_DAY

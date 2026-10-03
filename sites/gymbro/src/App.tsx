@@ -14,6 +14,7 @@ import {
     sessionDateLabel,
     useAuth,
     useCustomExercises,
+    useFavorites,
     useHistory,
     useLibrary,
     useTemplates,
@@ -61,6 +62,11 @@ export function App() {
     );
 
     const blocks = useBlocks(api);
+
+    // The starred and recently used exercises ride along on the block list —
+    // no call of their own. Recent is written by Submit on the phone, so it is
+    // as fresh as the last time this list was read.
+    const favorites = useFavorites(api, blocks.favorites, blocks.recent);
     const history = useHistory(api);
     // The user's own exercises, merged into the shipped library every view
     // reads — so the builder's tally, the picker and the Library table treat a
@@ -567,6 +573,7 @@ export function App() {
                             onCopy={copyBlock}
                             onDelete={removeBlock}
                             knownNames={knownNames}
+                            favorites={favorites}
                         />
                     ) : view === 'library' ? (
                         <LibraryScreen
@@ -574,6 +581,7 @@ export function App() {
                             block={selected}
                             knownNames={knownNames}
                             custom={customExercises}
+                            favorites={favorites}
                         />
                     ) : (
                         <AnalyticsScreen

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { Sheet } from './Sheet';
+import { useFavoritesContext } from '../hooks/useFavorites';
 import { alternativesFor } from '../lib/library';
 import type { ExerciseLibrary, LibraryExercise } from '../lib/types';
 
@@ -33,6 +34,13 @@ export interface Swapping {
         onChange: (withSets: boolean) => void;
     };
 }
+
+/**
+ * How many recently used exercises are shown above the list. A few workouts'
+ * worth is stored; the picker shows what fits without pushing the library off
+ * the first screen of a phone.
+ */
+const RECENT_SHOWN = 8;
 
 /** One suggested exercise, and the muscles it shares when that is why. */
 interface Suggestion {
@@ -69,10 +77,17 @@ interface ExercisePickerProps {
  * the logging screen: the swap button, then the variation. Moving the sets
  * already logged along with it — they were done on the variation all along —
  * is one more, on the choice above the note.
+ *
+ * Adding opens on **your own picks** for the same reason: the starred
+ * exercises, then the ones the last few workouts lifted, before the alphabet.
+ * A swap keeps its suggestions first — they answer the question being asked —
+ * and the favourites that fit come after them. Every row carries a star, so
+ * curating the list is one tap from wherever an exercise is found.
  */
 export function ExercisePicker({ library, busy, swapping, onPick, onClose }: ExercisePickerProps) {
     const [query, setQuery] = useState('');
     const [equipment, setEquipment] = useState('All');
+    const picks = useFavoritesContext();
 
     const filters = ['All', ...(library?.equipment ?? [])];
     const needle = query.trim().toLowerCase();
@@ -102,7 +117,32 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
         ].filter((tier) => tier.items.length > 0)
         : [];
 
-    const suggested = new Set(tiers.flatMap((tier) => tier.items.map((item) => item.exercise.name)));
+    // A name the library does not list is still a favourite — one typed on a
+    // workout and starred — and it is shown the way a custom name is.
+    const entryFor = (name: string): LibraryExercise => (
+        library?.exercises.find((exercise) => exercise.name === name) ?? { name, equipment: 'Custom' }
+    );
+
+    if (picks && !needle) {
+        const offered = new Set(tiers.flatMap((tier) => tier.items.map((one) => one.exercise.name)));
+        const fresh = (names: readonly string[]) => plain(
+            names
+                .filter((name) => name !== swapping?.exerciseName && !offered.has(name))
+                .map(entryFor),
+        );
+
+        tiers.push({ label: 'FAVORITES', items: fresh(picks.favorites) });
+
+        if (!swapping) {
+            tiers.push({
+                label: 'RECENT',
+                items: fresh(picks.recent.filter((name) => !picks.isFavorite(name))).slice(0, RECENT_SHOWN),
+            });
+        }
+    }
+
+    const shownTiers = tiers.filter((tier) => tier.items.length > 0);
+    const suggested = new Set(shownTiers.flatMap((tier) => tier.items.map((item) => item.exercise.name)));
 
     const results = (library?.exercises ?? []).filter((exercise) => (
         fitsFilter(exercise)
@@ -110,6 +150,12 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
         && !suggested.has(exercise.name)
         && (!needle || exercise.name.toLowerCase().includes(needle))
     ));
+
+    // A search has no sections, so the starred matches go first instead.
+    // Stable, so the library's own order holds within each half.
+    if (picks && needle) {
+        results.sort((a, b) => Number(picks.isFavorite(b.name)) - Number(picks.isFavorite(a.name)));
+    }
 
     // Offered once the query is long enough to be a name rather than a
     // half-typed search, and only when it is not already in the library.
@@ -120,24 +166,40 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
     const carry = swapping?.carry;
 
     function item(exercise: LibraryExercise, shared: string[] | null = null) {
+        const starred = picks?.isFavorite(exercise.name) ?? false;
+
         return (
-            <button
-                key={`${exercise.name}-${exercise.equipment}`}
-                type="button"
-                className="picker__item"
-                disabled={busy}
-                onClick={() => onPick(exercise.name)}
-            >
-                <span className="picker__item-body">
-                    <span className="picker__item-name">{exercise.name}</span>
-                    {/* Why it was suggested, for the one tier where that is not
-                        obvious from the name: what it trains in common. */}
-                    {shared ? (
-                        <span className="picker__item-muscles">{shared.join(' · ')}</span>
-                    ) : null}
-                </span>
-                <span className="picker__item-eq">{exercise.equipment}</span>
-            </button>
+            <div className="picker__row" key={`${exercise.name}-${exercise.equipment}`}>
+                <button
+                    type="button"
+                    className="picker__item"
+                    disabled={busy}
+                    onClick={() => onPick(exercise.name)}
+                >
+                    <span className="picker__item-body">
+                        <span className="picker__item-name">{exercise.name}</span>
+                        {/* Why it was suggested, for the one tier where that is
+                            not obvious from the name: what it trains in common. */}
+                        {shared ? (
+                            <span className="picker__item-muscles">{shared.join(' · ')}</span>
+                        ) : null}
+                    </span>
+                    <span className="picker__item-eq">{exercise.equipment}</span>
+                </button>
+                {/* Beside the row rather than in it: two nested buttons is not
+                    valid HTML, and a star is not a pick. */}
+                {picks ? (
+                    <button
+                        type="button"
+                        className={starred ? 'picker__star picker__star--on' : 'picker__star'}
+                        aria-pressed={starred}
+                        aria-label={`Favourite ${exercise.name}`}
+                        onClick={() => picks.toggle(exercise.name)}
+                    >
+                        {starred ? '★' : '☆'}
+                    </button>
+                ) : null}
+            </div>
         );
     }
 
@@ -171,6 +233,11 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                     </div>
                 ) : null}
                 {swapping ? <p className="picker__note">{swapping.note}</p> : null}
+                {picks?.error ? (
+                    <p className="picker__note picker__note--error">
+                        {`The star did not save: ${picks.error}`}
+                    </p>
+                ) : null}
                 <input
                     className="picker__search"
                     value={query}
@@ -207,20 +274,20 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
                     </button>
                 ) : null}
 
-                {tiers.map((tier) => (
+                {shownTiers.map((tier) => (
                     <section key={tier.label} aria-label={tier.label.toLowerCase()}>
                         <span className="picker__section">{tier.label}</span>
                         {tier.items.map((suggestion) => item(suggestion.exercise, suggestion.shared))}
                     </section>
                 ))}
 
-                {tiers.length > 0 && results.length > 0 ? (
+                {shownTiers.length > 0 && results.length > 0 ? (
                     <span className="picker__section">EVERYTHING ELSE</span>
                 ) : null}
 
                 {results.map((exercise) => item(exercise))}
 
-                {results.length === 0 && tiers.length === 0 && !showCustom ? (
+                {results.length === 0 && shownTiers.length === 0 && !showCustom ? (
                     <p className="picker__empty">
                         Nothing in the library matches. Type a name to add it as a custom exercise.
                     </p>

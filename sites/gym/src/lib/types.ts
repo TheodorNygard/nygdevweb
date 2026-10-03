@@ -135,10 +135,31 @@ export interface MesocycleSummary extends Mesocycle {
     submittedCount: number;
 }
 
-/** `GET /gym/mesocycles/current`. A null mesocycle is a first run, not a fault. */
-export interface CurrentBlock {
+/**
+ * The exercises a user reaches for: the ones they starred, in the order they
+ * starred them, and the ones their last few finished workouts lifted, most
+ * recent first. Names, as every reference to an exercise is. They ride along
+ * on both block reads rather than having a route of their own.
+ */
+export interface ExercisePicks {
+    favorites: string[];
+    recent: string[];
+}
+
+/**
+ * `GET /gym/mesocycles/current`. A null mesocycle is a first run, not a fault.
+ *
+ * The picks are optional here because a copy of this held in storage from
+ * before they existed has neither, and absent means empty.
+ */
+export interface CurrentBlock extends Partial<ExercisePicks> {
     mesocycle: Mesocycle | null;
     sessions: SessionSummary[];
+}
+
+/** `GET /gym/mesocycles`: every block, and the same picks `/current` carries. */
+export interface BlockList extends ExercisePicks {
+    mesocycles: MesocycleSummary[];
 }
 
 /** `POST /gym/workouts` — `resumed` says whether this Start found a draft. */

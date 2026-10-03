@@ -1,15 +1,15 @@
 import { API_BASE } from './config';
 import type {
+    BlockList,
     CurrentBlock,
-    DayInput,
     CustomExercise,
     CustomExerciseInput,
+    DayInput,
     DayTemplate,
     EditSetResult,
     EntryMoveResult,
     EntryResult,
     Mesocycle,
-    MesocycleSummary,
     PlannedExercise,
     RemoveEntryResult,
     RemoveSetResult,
@@ -179,13 +179,34 @@ export class GymApi {
      * tab reads this, and Today reloads after every submitted session. One call
      * out of the two would put the list's cost on the hot path.
      */
-    async mesocycles(): Promise<MesocycleSummary[]> {
-        const body = await this.send<{ mesocycles: MesocycleSummary[] }>({
+    async mesocycles(): Promise<BlockList> {
+        const body = await this.send<Partial<BlockList>>({
             method: 'GET',
             path: '/gym/mesocycles',
         });
 
-        return body.mesocycles;
+        return {
+            mesocycles: body.mesocycles ?? [],
+
+            // Absent from an API deployed before favourites; empty is right.
+            favorites: body.favorites ?? [],
+            recent: body.recent ?? [],
+        };
+    }
+
+    /**
+     * Replaces the starred list with this one, whole. Whole rather than a
+     * star at a time, so the request is its own retry: sending it twice
+     * stores the same list.
+     */
+    async setFavorites(favorites: string[]): Promise<string[]> {
+        const body = await this.send<{ favorites: string[] }>({
+            method: 'PUT',
+            path: '/gym/favorites',
+            body: { favorites },
+        });
+
+        return body.favorites;
     }
 
     /**

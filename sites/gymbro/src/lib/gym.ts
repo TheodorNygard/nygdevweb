@@ -40,6 +40,8 @@ export {
     type CustomExercisesState,
 } from '@gym/hooks/useCustomExercises';
 
+export { useFavorites, type FavoritesState } from '@gym/hooks/useFavorites';
+
 export { useTemplates, type TemplatesState } from '@gym/hooks/useTemplates';
 
 export { reordered, useDragReorder } from '@gym/hooks/useDragReorder';
@@ -78,6 +80,7 @@ export {
 } from '@gym/lib/format';
 
 export type {
+    BlockList,
     CustomExercise,
     CustomExerciseInput,
     DayInput,

@@ -2097,6 +2097,35 @@ button {
     margin-bottom: 8px;
 }
 
+/* A row of the list: the pick, and the star beside it. Two buttons side by
+   side, because a star inside the pick would be a button inside a button. */
+.picker__row {
+    display: flex;
+    align-items: center;
+}
+
+.picker__row .picker__item {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Quiet until it is on: a list of forty hollow stars should read as a list
+   of exercises, and the filled ones as the few that were chosen. */
+.picker__star {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--fg-28);
+    font: 400 20px/1 var(--sans);
+}
+
+.picker__star--on {
+    color: var(--accent-ink);
+}
+
 .picker__item {
     width: 100%;
     display: flex;
@@ -2153,6 +2182,10 @@ button {
     margin: 8px 0 0;
     font: 400 13px/1.4 var(--sans);
     color: var(--fg-50);
+}
+
+.picker__note--error {
+    color: #ff8b82;
 }
 
 /* Mid-workout, on an exercise with sets: whether they stay or go with the

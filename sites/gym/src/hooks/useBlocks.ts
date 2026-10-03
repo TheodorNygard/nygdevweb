@@ -1,13 +1,13 @@
 import { useResource, type Resource } from './useResource';
 
 import type { GymApi } from '../lib/api';
-import type { MesocycleSummary } from '../lib/types';
+import type { BlockList, MesocycleSummary } from '../lib/types';
 
-export interface BlocksState extends Omit<Resource<MesocycleSummary[]>, 'data'> {
+export interface BlocksState extends Omit<Resource<BlockList>, 'data'> {
     blocks: MesocycleSummary[];
 }
 
-const EMPTY: MesocycleSummary[] = [];
+const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [] };
 const load = (api: GymApi) => api.mesocycles();
 
 /**
@@ -20,5 +20,7 @@ const load = (api: GymApi) => api.mesocycles();
 export function useBlocks(api: GymApi | null): BlocksState {
     const { data, ...rest } = useResource(api, load, EMPTY);
 
-    return { blocks: data, ...rest };
+    // The picks on this answer are the planner's; the logger reads its own
+    // off `/current`, which it is already holding.
+    return { blocks: data.mesocycles, ...rest };
 }

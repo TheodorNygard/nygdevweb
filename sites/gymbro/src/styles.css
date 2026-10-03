@@ -1646,6 +1646,24 @@ a:hover {
     flex-wrap: wrap;
 }
 
+.library__starbar {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+/* The star leads the name in the table, so a column of them reads as one.
+   Pulled in on the left so the names still line up with the header above
+   them, and out of the row's height so the rows stay as tall as they were. */
+.table__name .pick__star {
+    align-self: center;
+    width: 32px;
+    height: 32px;
+    margin: -6px 0 -6px -10px;
+}
+
 /* The panel above the table: your own exercises, and the form that adds one.
    Spaced from the controls below it rather than flush, because the table that
    follows is the whole library and the panel is about one part of it. */
@@ -2171,6 +2189,53 @@ a:hover {
 
 .pick:hover {
     background: var(--row-hover);
+}
+
+/* A row of the picker: the pick and its star side by side. The banding and the
+   hover are the row's, so the star sits on the same stripe as its name. */
+.pick-row {
+    display: flex;
+    align-items: center;
+    border-radius: 12px;
+}
+
+.pick-row--alt {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.pick-row:hover {
+    background: var(--row-hover);
+}
+
+.pick-row .pick {
+    flex: 1;
+    min-width: 0;
+}
+
+.pick-row .pick:hover {
+    background: transparent;
+}
+
+/* Quiet until it is on, so a list of hollow stars still reads as a list of
+   exercises and the filled ones as the few that were chosen. */
+.pick__star {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    margin-right: 4px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--fg-28);
+    font: 400 18px/1 var(--sans);
+}
+
+.pick__star:hover {
+    color: var(--accent-ink);
+}
+
+.pick__star--on {
+    color: var(--accent-ink);
 }
 
 .pick__name {
