@@ -252,10 +252,13 @@ unused. A light variant would be a different design, not a preference.
 
 Within dark, the palette is a choice. Every colour in `styles.css` is a token
 on `:root`, and a theme is a `[data-theme]` block that redefines them — nothing
-below the tokens knows which theme is on. Two ship:
+below the tokens knows which theme is on. Three ship:
 
-- **Graphite**, the `:root` default: near-black surfaces, lime accent,
-  near-black text on the accent.
+- **Cobalt**, the `:root` default and what an unset attribute means: deep navy
+  surfaces, a sky-blue accent (`#5aa9ff`), and the navy background as the text
+  on it.
+- **Graphite**, the original: near-black surfaces, lime accent, near-black text
+  on the accent.
 - **Orchis**, after the GTK theme of that name: neutral greys a step lighter
   than Graphite, surfaces with edges rather than ones that dissolve into the
   background, and Material's purple (`#ab47bc`) as the accent, with white text
@@ -506,9 +509,10 @@ backend that was modelled after it cannot support them honestly:
 
 - **Duration.** The prototype shows a per-session duration everywhere. The API
   stores no timestamp finer than the day, so there is nothing to show on a
-  session opened tomorrow. The stopwatch survives on the live session and on
-  the "Workout logged" screen — where it is genuinely known — and History shows
-  the session's **date** in its place.
+  session opened tomorrow. History shows the session's **date** in its place,
+  and neither the live session nor the "Workout logged" screen has a clock: a
+  logbook is a record of what was lifted, and a stopwatch counting up beside it
+  turns the rest between sets into something being measured.
 - **Equipment on a logged exercise.** The API stores an entry's name — and, for
   a swap, the name it replaced — and no equipment, on purpose. The chip under an exercise name is a lookup into
   the shipped library, and reads `CUSTOM` for a name the user typed.
@@ -1042,12 +1046,12 @@ component from the logger would be a phone layout inside a desktop one.
 what matters about it is that nothing else ends up on that page.
 
 Themes sit on the shared side of that line. `lib/theme.ts` and `useTheme` are
-the logger's and are read through the alias, so both sites offer the same two
-— Graphite and Orchis — under the same storage key and the same
+the logger's and are read through the alias, so both sites offer the same three
+— Cobalt, Graphite and Orchis — under the same storage key and the same
 `data-theme` attribute. What each theme *looks like* is not shared: the token
 blocks are transcribed into each stylesheet separately, because the two token
 sets differ (the planner has a rail and a hairline the phone has no use for).
-The picker here is two chips in the rail's foot, above the note about the
+The picker here is three chips in the rail's foot, above the note about the
 phone — this site has no wordmark at the top right to make the switch.
 
 ### Muscle groups come from the library
