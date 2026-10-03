@@ -210,7 +210,9 @@ The session screen has one rule, and it is the whole design: **after the first
 set the primary button becomes “Log same again”**, so a working set is one tap
 and an adjustment is a delta from what you just did. Weight moves in 2.5 kg
 steps, reps in 1, RPE on a 5–10 slider in halves with a plain-language note
-(“2 reps left”). Every control is at least 44px and the ones you use mid-set
+(“2 reps left”). Once a stepper has moved, the button says “Log set” instead —
+it is no longer the same set, and the label is read at exactly that moment.
+Every control is at least 44px and the ones you use mid-set
 are in the lower half of the screen, because the premise is a phone held in one
 hand with a bar in the other.
 

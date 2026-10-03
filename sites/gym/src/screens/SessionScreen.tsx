@@ -78,6 +78,22 @@ function setLabelsOf(sets: readonly WorkSet[]): string[] {
 }
 
 /**
+ * Whether the set about to be logged is the last one again — what "Log same
+ * again" promises. Once a stepper has moved it is a different set, and the
+ * button saying "same" over a heavier one is the label being wrong at the one
+ * moment it is read. A last set with no RPE is matched against the rating the
+ * steppers opened on for it, since that is what an untouched logger holds.
+ */
+function repeatsLast(sets: readonly WorkSet[], values: Pending): boolean {
+    const last = sets[sets.length - 1];
+
+    return last !== undefined
+        && last.weightKg === values.weightKg
+        && last.reps === values.reps
+        && (last.rpe ?? OPENING.rpe) === values.rpe;
+}
+
+/**
  * What a swap is about to do, said under the picker's title — because the same
  * button does three different things depending on what is logged and whether
  * the sets go with it.
@@ -904,9 +920,11 @@ export function SessionScreen({
                                             the count did not move afterwards. */}
                                         {isWarmUpRpe(values.rpe)
                                             ? `Log warm-up (${num(values.weightKg)}×${num(values.reps)})`
-                                            : entry.sets.length > 0
-                                                ? `Log same again (${num(values.weightKg)}×${num(values.reps)})`
-                                                : 'Log first set'}
+                                            : entry.sets.length === 0
+                                                ? 'Log first set'
+                                                : repeatsLast(entry.sets, values)
+                                                    ? `Log same again (${num(values.weightKg)}×${num(values.reps)})`
+                                                    : `Log set (${num(values.weightKg)}×${num(values.reps)})`}
                                     </button>
                                 </div>
                             ) : null}
