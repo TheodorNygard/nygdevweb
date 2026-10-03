@@ -105,6 +105,9 @@ export function Stepper({
                             if (event.key === 'Enter') event.currentTarget.blur();
 
                             if (event.key === 'Escape') {
+                                // Claimed, so the sheet this sits in stays
+                                // open: the key closes the keypad, not both.
+                                event.preventDefault();
                                 abandoned.current = true;
                                 event.currentTarget.blur();
                             }

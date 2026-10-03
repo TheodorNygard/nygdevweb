@@ -1,4 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+
+import { useDialog } from '../hooks/useDialog';
 
 interface SheetProps {
     /** Named for assistive technology; the visible title is inside `children`. */
@@ -22,15 +24,8 @@ interface SheetProps {
  * keyboard cannot leave.
  */
 export function Sheet({ label, onClose, tall = false, children }: SheetProps) {
-    useEffect(() => {
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
-        };
-
-        window.addEventListener('keydown', onKey);
-
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    // Escape closes the top sheet only; see `useDialog`.
+    useDialog(onClose);
 
     return (
         <div className="scrim" role="dialog" aria-modal="true" aria-label={label}>
