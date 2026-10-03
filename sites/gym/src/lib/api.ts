@@ -9,6 +9,7 @@ import type {
     EditSetResult,
     EntryMoveResult,
     EntryResult,
+    LifterProfile,
     Mesocycle,
     PlannedExercise,
     RemoveEntryResult,
@@ -191,7 +192,24 @@ export class GymApi {
             // Absent from an API deployed before favourites; empty is right.
             favorites: body.favorites ?? [],
             recent: body.recent ?? [],
+
+            // Likewise from one deployed before the profile.
+            profile: body.profile ?? {},
         };
+    }
+
+    /**
+     * Replaces the lifter's profile, whole: a field left off is cleared. The
+     * answer is the profile as stored, unknown fields left off.
+     */
+    async setProfile(profile: LifterProfile): Promise<LifterProfile> {
+        const body = await this.send<{ profile: LifterProfile }>({
+            method: 'PUT',
+            path: '/gym/profile',
+            body: profile,
+        });
+
+        return body.profile;
     }
 
     /**

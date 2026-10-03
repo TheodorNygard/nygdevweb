@@ -18,6 +18,9 @@ export interface LiftPoint {
     sets: number;
     rpe: number | null;
     week: number;
+
+    /** Which plan day the session was logged against — D1 is 0. */
+    dayIndex: number;
 }
 
 export interface LiftSeries {
@@ -85,6 +88,7 @@ export function seriesOf(
                 sets: entry.sets.length,
                 rpe: rpeCount === 0 ? null : Math.round((rpeTotal / rpeCount) * 10) / 10,
                 week: session.week,
+                dayIndex: session.dayIndex,
             });
 
             byName.set(entry.exerciseName, points);

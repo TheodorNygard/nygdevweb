@@ -1,14 +1,35 @@
 import { useEffect, useState } from 'react';
 
+import { type ProfileState } from '../hooks/useProfile';
 import { coachingExport, coachingFilename, type CoachingInput } from '../lib/coaching';
+import { num, type LifterProfile } from '../lib/gym';
+import { ProfileModal } from './ProfileModal';
 
 interface CoachingExportProps {
     /** What to export, or null while the block's sets are still being read. */
     input: CoachingInput | null;
+
+    /** The lifter's profile, which the export's *Goals and context* opens on. */
+    profile: ProfileState;
 }
 
 /** How long "Copied" stays on the button before it goes back to saying what it does. */
 const CONFIRM_MS = 2500;
+
+/** `Intermediate · 82 kg · goal set · injuries noted`, or null for an empty profile. */
+function profileSummary(profile: LifterProfile): string | null {
+    const parts: string[] = [];
+
+    if (profile.experience) {
+        parts.push(profile.experience.charAt(0).toUpperCase() + profile.experience.slice(1));
+    }
+
+    if (profile.bodyweightKg !== undefined) parts.push(`${num(profile.bodyweightKg)} kg`);
+    if (profile.goal) parts.push('goal set');
+    if (profile.injuries) parts.push('injuries noted');
+
+    return parts.length === 0 ? null : parts.join(' · ');
+}
 
 /**
  * The block, written out for a coaching conversation — copied, or saved as a
@@ -21,9 +42,14 @@ const CONFIRM_MS = 2500;
  * Copy is the first button because a chat is where this goes; the file is for
  * a coach who takes attachments, or for keeping. Nothing leaves the browser
  * until the person pastes or attaches it themselves.
+ *
+ * The profile sits under the buttons because it is read in exactly one place —
+ * the export's closing section — and this is where somebody notices that
+ * section is empty.
  */
-export function CoachingExport({ input }: CoachingExportProps) {
+export function CoachingExport({ input, profile }: CoachingExportProps) {
     const [copied, setCopied] = useState<'yes' | 'failed' | null>(null);
+    const [editing, setEditing] = useState(false);
 
     useEffect(() => {
         if (copied === null) return;
@@ -73,6 +99,8 @@ export function CoachingExport({ input }: CoachingExportProps) {
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
     }
 
+    const summary = profileSummary(profile.profile);
+
     return (
         <div className="coach">
             <span className="stats__list-label">FOR A COACH</span>
@@ -95,6 +123,29 @@ export function CoachingExport({ input }: CoachingExportProps) {
                     Download
                 </button>
             </div>
+            <div className="coach__profile">
+                <span className="coach__profile-text">
+                    {summary ?? 'No profile yet — the export’s Goals and context stays blank.'}
+                </span>
+                <button
+                    type="button"
+                    className="coach__profile-edit"
+                    onClick={() => setEditing(true)}
+                    title="Experience, bodyweight, goal and injuries, for the export's Goals and context"
+                >
+                    {summary ? 'Edit profile' : 'Add profile'}
+                </button>
+            </div>
+
+            {editing ? (
+                <ProfileModal
+                    initial={profile.profile}
+                    busy={profile.busy}
+                    error={profile.error}
+                    onSave={profile.save}
+                    onClose={() => setEditing(false)}
+                />
+            ) : null}
         </div>
     );
 }

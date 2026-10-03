@@ -31,3 +31,10 @@ export const MAX_TAG = 40;
 
 /** What a custom exercise trains, main muscle first — `GymLimits.MaxMusclesPerExercise`. */
 export const MAX_MUSCLES = 3;
+
+/** The profile's goal and injuries, each — `GymLimits.MaxProfileTextLength`. */
+export const MAX_PROFILE_TEXT = 400;
+
+/** Bodyweight in kilograms — `GymLimits.MinBodyweightKg` and `MaxBodyweightKg`. */
+export const MIN_BODYWEIGHT_KG = 20;
+export const MAX_BODYWEIGHT_KG = 400;

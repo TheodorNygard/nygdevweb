@@ -157,9 +157,30 @@ export interface CurrentBlock extends Partial<ExercisePicks> {
     sessions: SessionSummary[];
 }
 
-/** `GET /gym/mesocycles`: every block, and the same picks `/current` carries. */
+/** How long the lifter has trained, as the profile's closed vocabulary spells it. */
+export type Experience = 'beginner' | 'intermediate' | 'advanced';
+
+/**
+ * What a coach should know about the lifter that no session records. Every
+ * field optional, and absent rather than null when not given, which is how
+ * `PUT /gym/profile` answers. Written by the planner and read by its coaching
+ * export, which pre-fills its *Goals and context* from it; nothing on the
+ * phone shows it.
+ */
+export interface LifterProfile {
+    experience?: Experience;
+    bodyweightKg?: number;
+    goal?: string;
+    injuries?: string;
+}
+
+/**
+ * `GET /gym/mesocycles`: every block, the same picks `/current` carries, and
+ * the lifter's profile — `{}` until one is saved.
+ */
 export interface BlockList extends ExercisePicks {
     mesocycles: MesocycleSummary[];
+    profile: LifterProfile;
 }
 
 /** `POST /gym/workouts` — `resumed` says whether this Start found a draft. */

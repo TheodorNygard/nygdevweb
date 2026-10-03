@@ -1052,15 +1052,43 @@ what a language model reads most fluently and what the person sending it can
 read and edit first. And it opens by **explaining its own conventions**, because
 they are this app's and nobody could guess them — that RPE 5 and 5.5 are
 warm-ups and count toward nothing, that a plan prescribes sets and never a
-weight, that intensity is a reps-in-reserve target tightening week by week, and
-that the last week is a deload. A model told none of that reads a warm-up as a
-bad set and the rest week as a collapse. Every number in it comes from the same
-functions the phone used — `repsInTank`, `rpeForTank`, `targetsFor`,
+weight, that intensity is a reps-in-reserve target tightening week by week, that
+the last week is a deload at half the sets rounded up, that a barbell weight
+includes the 20 kg bar and a dumbbell weight is per hand. A model told none of
+that reads a warm-up as a bad set, the rest week as a collapse and a dumbbell
+press as half the lift. Every target in it comes from the same functions the
+phone used — `repsInTank`, `rpeForTank`, `targetsFor`, `setsForWeek`,
 `isWarmUpRpe` — so the export cannot state a target the phone did not show.
 
-It ends with an empty *Goals and context* section, because the most useful
-things a coach needs — what the block is for, what hurts, how the week went —
-are not in the log, and a placeholder is how the person exporting it is
+Three things in it are shaped by how a reader would otherwise misread a block:
+
+- **Comparisons are like with like.** The progress table's *Change* compares
+  the top set of the same exercise on the same plan day — D1's bench against
+  D1's bench, first week against latest — never D1 against D2 in the same
+  week, which would compare two slots of the week and call the difference
+  progress. It is a weight delta with the reps of both top sets beside it, and
+  an exercise on two plan days gets a line per day. Every top set and every
+  session is labelled `Wk2 D1` as well as dated, because two sessions can
+  share a date and a date alone cannot tell them apart.
+- **Volume agrees with the stated convention.** The export sums weight × reps
+  itself and counts a dumbbell set for both hands, since it says dumbbells are
+  per hand. The API's `volumeKg` counts the weight as logged, and the document
+  says so, so the two numbers can be reconciled rather than puzzled over.
+- **Planned sits beside logged.** The sets-per-group table reads
+  `logged / planned` per week, with the deload's halving applied to the planned
+  side, and the note under it says what a full training week prescribes and
+  where that falls against the planner's 10–20 guide — fewer, more or none —
+  as the plan's choice rather than a shortfall. A workout started and never
+  lifted is one line, not a plan read out with "nothing logged" after each
+  exercise.
+
+It ends with *Goals and context*, because the most useful things a coach needs —
+what the block is for, what hurts — are not in the log. The section opens on
+the **lifter's profile** when there is one: experience, bodyweight, goal and
+injuries, four optional fields edited from a modal beside the export's buttons
+and stored on the account (`PUT /gym/profile`, riding along on
+`GET /gym/mesocycles` with the favourites). With no profile saved the section
+is the placeholder it always was, which is how the person exporting it is
 reminded to say them.
 
 ### The domain layer is shared, and the design is not

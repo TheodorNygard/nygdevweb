@@ -77,6 +77,7 @@ export {
     rpeLabel,
     sessionDate,
     sessionDateLabel,
+    sessionOrdinal,
 } from '@gym/lib/format';
 
 export type {
@@ -85,10 +86,13 @@ export type {
     CustomExerciseInput,
     DayInput,
     DayTemplate,
+    Experience,
     ExerciseLibrary,
+    LifterProfile,
     MesocycleSummary,
     PlannedExercise,
     SessionDetail,
+    SessionEntry,
     SessionSummary,
     WorkSet,
 } from '@gym/lib/types';

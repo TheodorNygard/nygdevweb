@@ -203,7 +203,8 @@ button:disabled {
 }
 
 input,
-select {
+select,
+textarea {
     font: inherit;
 }
 
@@ -1849,6 +1850,82 @@ a:hover {
 .coach__buttons > * {
     flex: 1;
     white-space: nowrap;
+}
+
+/* The profile line under the buttons: what the export's closing section will
+   open on, and the one way to change it. */
+.coach__profile {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 2px 4px 0;
+}
+
+.coach__profile-text {
+    min-width: 0;
+    font: 400 11px/1.5 var(--sans);
+    color: var(--fg-45);
+    text-wrap: pretty;
+}
+
+.coach__profile-edit {
+    flex: none;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: 600 11px/1.5 var(--sans);
+    color: var(--accent-ink);
+    cursor: pointer;
+}
+
+.coach__profile-edit:hover {
+    text-decoration: underline;
+}
+
+/* The profile form, inside a modal panel. */
+.profile {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.profile__body {
+    padding: 6px 20px 10px;
+    gap: 18px;
+}
+
+.profile__group {
+    display: grid;
+    gap: 10px;
+}
+
+.profile__group .panel__note {
+    margin-top: 0;
+}
+
+.profile__group .text-input {
+    margin-top: 0;
+}
+
+.profile__weight {
+    max-width: 160px;
+}
+
+.text-area {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 14px/1.5 var(--sans);
+    outline: none;
+    resize: vertical;
+}
+
+.text-area:focus {
+    border-color: var(--accent-40);
 }
 
 .stats__list-label {

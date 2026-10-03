@@ -2,6 +2,7 @@ import {
     useResource,
     type BlockList,
     type GymApi,
+    type LifterProfile,
     type MesocycleSummary,
     type Resource,
 } from '../lib/gym';
@@ -12,9 +13,12 @@ export interface BlocksState extends Omit<Resource<BlockList>, 'data'> {
     /** The starred and recently used exercises, which ride along on this read. */
     favorites: string[];
     recent: string[];
+
+    /** The lifter's profile, which rides along too — `{}` until one is saved. */
+    profile: LifterProfile;
 }
 
-const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [] };
+const EMPTY: BlockList = { mesocycles: [], favorites: [], recent: [], profile: {} };
 const load = (api: GymApi) => api.mesocycles();
 
 /**
@@ -35,5 +39,11 @@ const load = (api: GymApi) => api.mesocycles();
 export function useBlocks(api: GymApi | null): BlocksState {
     const { data, ...rest } = useResource(api, load, EMPTY);
 
-    return { blocks: data.mesocycles, favorites: data.favorites, recent: data.recent, ...rest };
+    return {
+        blocks: data.mesocycles,
+        favorites: data.favorites,
+        recent: data.recent,
+        profile: data.profile,
+        ...rest,
+    };
 }
