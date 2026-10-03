@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-import { bridgeChunks } from '../gym/vite.bridge-chunks';
+import { bridgeChunks } from '../gym/vite.bridge-chunks.ts';
 
 // `dist/` is uploaded to Azure Static Web Apps as-is. `public/` carries what has
 // to reach the site root untouched: favicons, the first-party 404 page, and
