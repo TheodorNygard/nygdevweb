@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { type Exercise } from '../lib/groups';
-import { type ExerciseLibrary } from '../lib/gym';
+import { useDialog, type ExerciseLibrary } from '../lib/gym';
 
 interface ExercisePickerProps {
     /** The day being planned, for the eyebrow. */
@@ -38,20 +38,11 @@ export function ExercisePicker({
     const searchRef = useRef<HTMLInputElement>(null);
 
     // Opened by a click on "+ Add exercise", and the next thing anybody does is
-    // type. On a keyboard that is worth doing for them.
-    useEffect(() => { searchRef.current?.focus(); }, []);
-
-    // Escape closes it. The scrim behind handles the mouse; this is the half a
-    // pointer-only close would leave out.
-    useEffect(() => {
-        function onKey(event: KeyboardEvent) {
-            if (event.key === 'Escape') onClose();
-        }
-
-        window.addEventListener('keydown', onKey);
-
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    // type, so focus opens in the search field rather than on the panel. Escape
+    // closes it — the scrim behind handles the mouse; this is the half a
+    // pointer-only close would leave out — and Tab stays inside until it
+    // closes, when focus goes back to the button that opened it. `useDialog`.
+    const root = useDialog<HTMLDivElement>(onClose, searchRef);
 
     const filters = ['All', ...(library?.equipment ?? [])];
     const trimmed = query.trim();
@@ -68,7 +59,13 @@ export function ExercisePicker({
         && !catalogue.some((exercise) => exercise.name.toLowerCase() === needle);
 
     return (
-        <div className="modal" role="dialog" aria-modal="true" aria-label="Add exercise">
+        <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add exercise"
+            ref={root}
+        >
             <button
                 type="button"
                 className="modal__scrim"

@@ -1840,6 +1840,12 @@ button {
     animation: g-sheet 0.26s cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
+/* The sheet takes focus when it opens, only to hold it inside (see
+   `useDialog`). A ring round the whole sheet would read as one big control. */
+.sheet:focus-visible {
+    outline: none;
+}
+
 .sheet--tall {
     max-height: 80dvh;
     display: flex;

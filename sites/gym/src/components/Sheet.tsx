@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 import { useDialog } from '../hooks/useDialog';
 
@@ -22,20 +22,31 @@ interface SheetProps {
  * that is where the thumb is. The scrim is a button rather than a div with an
  * onClick: a tap-to-dismiss target a keyboard cannot reach is a modal a
  * keyboard cannot leave.
+ *
+ * Focus opens on the sheet itself rather than its first control. On a phone the
+ * first control is often a search field, and focusing it would throw the
+ * keyboard up over the list before anything was asked of it; elsewhere it is a
+ * button, and Enter on a sheet just opened should not press something unread.
+ * The next Tab from the sheet reaches its first control anyway.
  */
 export function Sheet({ label, onClose, tall = false, children }: SheetProps) {
-    // Escape closes the top sheet only; see `useDialog`.
-    useDialog(onClose);
+    const sheet = useRef<HTMLDivElement>(null);
+
+    // Escape closes the top sheet only, focus moves in and comes back, and Tab
+    // stays inside; see `useDialog`.
+    const root = useDialog<HTMLDivElement>(onClose, sheet);
 
     return (
-        <div className="scrim" role="dialog" aria-modal="true" aria-label={label}>
+        <div className="scrim" role="dialog" aria-modal="true" aria-label={label} ref={root}>
             <button
                 type="button"
                 className="scrim__dismiss"
                 onClick={onClose}
                 aria-label={`Close ${label.toLowerCase()}`}
             />
-            <div className={tall ? 'sheet sheet--tall' : 'sheet'}>{children}</div>
+            <div className={tall ? 'sheet sheet--tall' : 'sheet'} ref={sheet} tabIndex={-1}>
+                {children}
+            </div>
         </div>
     );
 }

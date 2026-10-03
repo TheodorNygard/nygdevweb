@@ -39,6 +39,8 @@ export { useTemplates, type TemplatesState } from '@gym/hooks/useTemplates';
 
 export { reordered, useDragReorder } from '@gym/hooks/useDragReorder';
 
+export { useDialog } from '@gym/hooks/useDialog';
+
 export { setsIn } from '@gym/lib/templates';
 
 export { useTheme } from '@gym/hooks/useTheme';

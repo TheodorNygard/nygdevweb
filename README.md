@@ -1010,7 +1010,8 @@ hooks through a `@gym` alias declared in both `vite.config.ts` and
 `tsconfig.app.json`. The wire types, the block maths (`repsInTank`,
 `setsForWeek`, `isRestWeek`, `progressOf`), the formatting, the `GymApi` client,
 the AADSTS error map, `useAuth`, `useResource`, `useHistory` (a block's
-sessions, read once and held), `useLibrary`, `useTemplates`, `useDragReorder`
+sessions, read once and held), `useLibrary`, `useTemplates`, `useDragReorder`,
+`useDialog` (Escape for the top modal only, focus in and back, Tab kept inside)
 and `useTheme` all live once, in `sites/gym/src`.
 
 That is the point of `lib/types.ts` being written as a transcription of the API

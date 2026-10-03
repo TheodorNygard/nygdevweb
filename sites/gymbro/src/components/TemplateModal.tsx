@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
     setsIn,
+    useDialog,
     type DayTemplate,
     type PlannedExercise,
     type TemplatesState,
@@ -48,15 +49,11 @@ export function TemplateModal({
     // modal: what is being destroyed is a shortcut, not a workout.
     const [confirming, setConfirming] = useState<string | null>(null);
 
-    useEffect(() => {
-        function onKey(event: KeyboardEvent) {
-            if (event.key === 'Escape') onClose();
-        }
-
-        window.addEventListener('keydown', onKey);
-
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    // Focus opens on the panel rather than its first control, which is a
+    // template: Enter on a modal just opened should not replace the day's
+    // plan. Escape, the Tab trap and the way back are `useDialog`'s.
+    const panel = useRef<HTMLElement>(null);
+    const root = useDialog<HTMLDivElement>(onClose, panel);
 
     const typed = name.trim();
 
@@ -131,14 +128,20 @@ export function TemplateModal({
     }
 
     return (
-        <div className="modal" role="dialog" aria-modal="true" aria-label="Templates">
+        <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Templates"
+            ref={root}
+        >
             <button
                 type="button"
                 className="modal__scrim"
                 aria-label="Close"
                 onClick={onClose}
             />
-            <section className="modal__panel">
+            <section className="modal__panel" ref={panel} tabIndex={-1}>
                 <div className="modal__head">
                     <div className="modal__title-row">
                         <div>

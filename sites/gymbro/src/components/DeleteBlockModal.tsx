@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
 
-import { kg, type MesocycleSummary } from '../lib/gym';
+import { kg, useDialog, type MesocycleSummary } from '../lib/gym';
 
 interface DeleteBlockModalProps {
     block: MesocycleSummary;
@@ -33,29 +33,31 @@ export function DeleteBlockModal({
     onDelete,
     onClose,
 }: DeleteBlockModalProps) {
-    useEffect(() => {
-        function onKey(event: KeyboardEvent) {
-            if (event.key === 'Escape') onClose();
-        }
-
-        window.addEventListener('keydown', onKey);
-
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    // Focus opens on the panel rather than on a button: Enter on a dialog that
+    // destroys training history should not press anything before it is read.
+    // Escape, the Tab trap and the way back are `useDialog`'s.
+    const panel = useRef<HTMLElement>(null);
+    const root = useDialog<HTMLDivElement>(onClose, panel);
 
     const sessions = block.sessionCount === 1
         ? '1 logged session'
         : `${block.sessionCount} logged sessions`;
 
     return (
-        <div className="modal" role="dialog" aria-modal="true" aria-label="Delete block">
+        <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete block"
+            ref={root}
+        >
             <button
                 type="button"
                 className="modal__scrim"
                 aria-label="Close"
                 onClick={onClose}
             />
-            <section className="modal__panel modal__panel--narrow">
+            <section className="modal__panel modal__panel--narrow" ref={panel} tabIndex={-1}>
                 <div className="modal__head">
                     <div className="modal__eyebrow modal__eyebrow--danger">DELETE BLOCK</div>
                     <div className="modal__title">{block.name}</div>

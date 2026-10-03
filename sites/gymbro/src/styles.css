@@ -1977,6 +1977,12 @@ a:hover {
     text-wrap: pretty;
 }
 
+/* The panel takes focus when a modal opens, only to hold it inside (see
+   `useDialog`). A ring round the whole panel would read as one big control. */
+.modal__panel:focus-visible {
+    outline: none;
+}
+
 .modal__panel--narrow {
     max-width: 460px;
 }
