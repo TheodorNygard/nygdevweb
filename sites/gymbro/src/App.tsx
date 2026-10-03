@@ -65,12 +65,19 @@ export function App() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [theme, pickTheme] = useTheme();
 
-    // Only read once the builder is opened: templates are used by nothing else
-    // here, and the built-in half is a CDN fetch a session that only reads the
-    // dashboard would be paying for. Held after that — the hook keeps what it has
-    // when `api` goes back to null, so returning to the builder shows the list at
-    // once while it is read again.
-    const templates = useTemplates(view === 'block' ? api : null);
+    // Only read once the builder is first opened: templates are used by nothing
+    // else here, and the built-in half is a CDN fetch a session that only reads
+    // the dashboard would be paying for. Held from then on, the way the
+    // logger's `opened` record holds its tabs: passing `api` only while the
+    // builder was showing flipped it back to null on every other view, and the
+    // hook re-read `GET /gym/templates` — a function invocation — on every
+    // return. Its own writes keep the list current, and the list only changes
+    // through them or the phone.
+    const [builderOpened, setBuilderOpened] = useState(false);
+
+    if (view === 'block' && !builderOpened) setBuilderOpened(true);
+
+    const templates = useTemplates(builderOpened ? api : null);
 
     // Edits in flight, by block id. Keyed rather than single so that clicking
     // another block in the sidebar — the ordinary thing to do here — cannot
