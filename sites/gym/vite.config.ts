@@ -16,6 +16,15 @@ export default defineConfig({
         // here is small enough for that to buy a request.
         assetsInlineLimit: 0,
 
+        // No polyfill for `<link rel="modulepreload">`. It shipped as a chunk
+        // of its own that the entry imports statically, so it ran only after
+        // the browser had already fetched every static import it could have
+        // preloaded — and there are no dynamic imports for it to help with
+        // later. Even Safari 16.4, the one target without native support, got
+        // nothing from it but one more request, on index.html and auth.html
+        // alike.
+        modulePreload: { polyfill: false },
+
         rollupOptions: {
             // Two pages, not one. `auth.html` is MSAL's redirect URI: every
             // sign-in and renewal comes back from Entra through it before the
