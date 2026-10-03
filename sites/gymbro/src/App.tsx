@@ -16,6 +16,7 @@ import {
     useLibrary,
     useTemplates,
     useTheme,
+    type MesocycleSummary,
     type SessionSummary,
 } from './lib/gym';
 import { DEFAULT_DAY_LABELS, MAX_NAME, MIN_DAYS } from './lib/limits';
@@ -34,6 +35,16 @@ const NEW_BLOCK_DAYS = 4;
 
 /** What a copied block is called until it is renamed. */
 const COPY_SUFFIX = ' (copy)';
+
+/**
+ * Putting the phone back where it was after a create, which on this API is
+ * also a switch. `to` is the block that was being trained; `from` is the name
+ * of the one just made, for the notice that follows.
+ */
+interface Undo {
+    to: MesocycleSummary;
+    from: string;
+}
 
 export function App() {
     const auth = useAuth();
@@ -74,6 +85,11 @@ export function App() {
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+
+    // The way back from the switch a create made, offered on the notice that
+    // says so. Lives exactly as long as that notice: any other notice, or
+    // dismissing it, takes it away.
+    const [undo, setUndo] = useState<Undo | null>(null);
     const [saved, setSaved] = useState(false);
 
     // Open on the block the phone is training, and fall back to the newest —
@@ -241,7 +257,32 @@ export function App() {
         });
     }
 
+    /** A notice, and the undo that goes with it if there is one. Null clears both. */
+    function announce(message: string | null, offer: Undo | null = null) {
+        setNotice(message);
+        setUndo(offer);
+    }
+
+    // The block the phone opens on before a create moves it. Null for the
+    // very first block, which has nothing to go back to.
+    function trainedNow(): MesocycleSummary | null {
+        return blocks.blocks.find((block) => block.isCurrent) ?? null;
+    }
+
+    function undoSwitch(offer: Undo) {
+        void write(async (client) => {
+            await client.switchMesocycle(offer.to.id);
+            blocks.reload();
+            announce(
+                `The phone opens on ${offer.to.name} again. ${offer.from} stays in the list, `
+                + 'and Train this block moves the phone to it whenever you mean it to.',
+            );
+        });
+    }
+
     function createBlock() {
+        const previous = trainedNow();
+
         void write(async (client) => {
             const created = await client.createMesocycle(
                 `Block ${blocks.blocks.length + 1}`,
@@ -257,9 +298,10 @@ export function App() {
             // Worth saying out loud: create is also switch on this API, so a
             // block started at the desk is the one the phone opens on from
             // now — which is not what "new" implies on its own.
-            setNotice(
+            announce(
                 'Block created, and the phone now opens on it. Name it and plan the days here; '
                 + 'the block you were training is still in the list.',
+                previous ? { to: previous, from: created.name } : null,
             );
         });
     }
@@ -273,6 +315,7 @@ export function App() {
      */
     function copyBlock(from: Draft) {
         const name = `${from.name.trim().slice(0, MAX_NAME - COPY_SUFFIX.length)}${COPY_SUFFIX}`;
+        const previous = trainedNow();
 
         void write(async (client) => {
             const created = await client.createMesocycle(
@@ -283,9 +326,10 @@ export function App() {
 
             setSelectedId(created.id);
             blocks.reload();
-            setNotice(
+            announce(
                 `Copied to ${created.name}, and the phone now opens on it. Rename it in the `
                 + 'block name field; the original is unchanged.',
+                previous ? { to: previous, from: created.name } : null,
             );
         });
     }
@@ -307,7 +351,7 @@ export function App() {
             // The list still holds it until the read below lands, and the effect
             // above moves the selection off a block that is gone.
             blocks.reload();
-            setNotice(
+            announce(
                 `Deleted ${gone.name} and `
                 + (gone.sessionCount === 1 ? '1 logged session.' : `${gone.sessionCount} logged sessions.`),
             );
@@ -320,7 +364,7 @@ export function App() {
         void write(async (client) => {
             await client.switchMesocycle(selected.id);
             blocks.reload();
-            setNotice(`The phone now opens on ${selected.name}.`);
+            announce(`The phone now opens on ${selected.name}.`);
         });
     }
 
@@ -411,7 +455,12 @@ export function App() {
                         kind="notice"
                         label="Heads up"
                         message={notice}
-                        onDismiss={() => setNotice(null)}
+                        action={undo ? {
+                            label: `Undo: keep training ${undo.to.name}`,
+                            busy,
+                            onClick: () => undoSwitch(undo),
+                        } : null}
+                        onDismiss={() => announce(null)}
                     />
                 ) : null}
 

@@ -958,7 +958,9 @@ this block** button for when moving the phone is what you meant.
 **New block** is the one place that is unavoidably both.
 `POST /gym/mesocycles` creates and switches in the same transaction — creating
 *is* switching on this API — so the planner says so in a banner rather than
-letting the phone quietly move under you.
+letting the phone quietly move under you, and the banner carries **Undo: keep
+training …**, which switches the phone back to the block it was on. Copying a
+block does the same.
 
 ### Planning parity with the logger
 
