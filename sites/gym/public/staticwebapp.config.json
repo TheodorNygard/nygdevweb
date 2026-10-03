@@ -17,6 +17,12 @@
             }
         },
         {
+            "route": "/*.{png,ico,webmanifest}",
+            "headers": {
+                "Cache-Control": "public, max-age=604800"
+            }
+        },
+        {
             "route": "/auth.html",
             "headers": {
                 "Content-Security-Policy": "default-src 'none'; script-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'",

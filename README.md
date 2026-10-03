@@ -732,7 +732,12 @@ which is why `manualChunks` names the chunk rather than returning `undefined`.
 And `/assets/*` is served `immutable` for a year from
 `staticwebapp.config.json`, which is safe because every file under it is
 content-hashed. `index.html` and `auth.html` are `no-cache` for the same
-reason — they are the files that name the hashes.
+reason — they are the files that name the hashes. The icons, `favicon.ico` and
+the logger's `manifest.webmanifest` sit in between: unhashed, because the
+manifest and the `<link>` tags name them by path, and cached for a week rather
+than the platform's `max-age=30, must-revalidate`, because they change only
+with a redesign and an installed app otherwise revalidates every one of them on
+open.
 
 That covers a page load, not an installed app that is resumed rather than
 reloaded, which can run the build it started with for days. gym.nygard.dev has
