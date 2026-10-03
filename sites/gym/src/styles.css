@@ -509,6 +509,7 @@ button {
 }
 
 .arrow {
+    position: relative;
     width: 38px;
     height: 32px;
     border: none;
@@ -516,6 +517,15 @@ button {
     background: var(--fill);
     color: var(--fg-60);
     font: 400 15px/1 var(--sans);
+}
+
+/* The 44px target round a 38×32 key. Padding would grow the filled box, so the
+   hit area is an invisible layer past its edges instead; the two arrows'
+   layers meet in the 2px between them rather than leaving a dead strip. */
+.arrow::before {
+    content: '';
+    position: absolute;
+    inset: -6px -3px;
 }
 
 .arrow:disabled {
@@ -1378,8 +1388,12 @@ button {
    something is logged, since an exercise that was lifted is not a mis-tap. */
 .exercise__del {
     flex: none;
-    width: 40px;
-    height: 36px;
+
+    /* 44px to the thumb, 40×36 to the layout: the margin hands back what the
+       target added, the way the wordmark's does. */
+    width: 44px;
+    height: 44px;
+    margin: -4px -2px;
     border: none;
     background: transparent;
     color: var(--fg-28);
@@ -1475,18 +1489,34 @@ button {
 
 .set__del {
     min-width: 44px;
-    height: 36px;
+
+    /* 44px tall to the thumb and 36 to the row, the same trade as the ×
+       above it. In the day plan's head it sits at the top of the row, so the
+       margin is split evenly to keep the glyph where it was. */
+    height: 44px;
+    margin: -4px 0;
     border: none;
     background: transparent;
     color: var(--fg-28);
     font: 400 17px/1 var(--sans);
 }
 
+.set__del--armed::before {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
+}
+
 /* The second tap of a delete. It says what it does, in the same red the other
    destructive buttons use, and it is wider than the × it replaced so the thumb
    that armed it has to mean the second tap. */
 .set__del--armed {
-    margin-right: 4px;
+    position: relative;
+
+    /* Outlined, so it stays drawn at 36 and takes the rest of its 44 from an
+       invisible layer, like the week arrows. */
+    height: 36px;
+    margin: 0 4px 0 0;
     padding: 0 12px;
     border: 1px solid rgba(255, 120, 110, 0.35);
     border-radius: 9px;
@@ -1970,8 +2000,8 @@ button {
 
 .picker__done {
     width: 60px;
-    height: 36px;
-    margin-right: -10px;
+    height: 44px;
+    margin: -4px -10px -4px 0;
     border: none;
     background: transparent;
     color: var(--fg-50);
@@ -1999,12 +2029,17 @@ button {
 .chips {
     display: flex;
     gap: 7px;
-    margin-top: 12px;
+
+    /* 5px more room above and below than it shows, handed back by the
+       margins: a horizontal scroller clips whatever reaches past it, and the
+       chips' hit areas reach 5px past their outlines. */
+    margin: 7px 0 -5px;
     overflow-x: auto;
-    padding-bottom: 2px;
+    padding: 5px 0 7px;
 }
 
 .chip {
+    position: relative;
     flex: none;
     height: 34px;
     padding: 0 13px;
@@ -2014,6 +2049,14 @@ button {
     color: var(--fg-60);
     font: 500 13px/1 var(--sans);
     white-space: nowrap;
+}
+
+/* The 44px target round a 34px pill. The outline is the chip, so it is not
+   padded out; the extra 10px is invisible and inside the row's room. */
+.chip::before {
+    content: '';
+    position: absolute;
+    inset: -5px 0;
 }
 
 .chip--on {
@@ -2192,10 +2235,21 @@ button {
 
 .tpl__keep,
 .tpl__delete {
+    position: relative;
     height: 34px;
     padding: 0 12px;
     border-radius: 9px;
     font: 500 13px/1 var(--sans);
+}
+
+/* 44px to the thumb round outlined 34px buttons, from an invisible layer
+   rather than padding that would grow the outline. The row's own 11px of
+   padding is where it reaches. */
+.tpl__keep::before,
+.tpl__delete::before {
+    content: '';
+    position: absolute;
+    inset: -5px 0;
 }
 
 .tpl__keep {
@@ -2293,9 +2347,12 @@ button {
 
 .banner__close {
     flex: none;
-    width: 32px;
-    height: 32px;
-    margin: -4px -4px 0 0;
+
+    /* 44px to the thumb, and the same 28px of the row it took at 32 with its
+       -4px margins: the glyph stays put and the message keeps its width. */
+    width: 44px;
+    height: 44px;
+    margin: -10px -10px -6px -6px;
     border: none;
     border-radius: 8px;
     background: transparent;
