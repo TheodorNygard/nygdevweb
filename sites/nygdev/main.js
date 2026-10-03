@@ -104,6 +104,12 @@ async function checkFoundryStatus() {
     setDiceState('is-checking');
     buttonText.textContent = 'Checking status...';
 
+    // Nothing to press until the answer is in: the handler left over from the
+    // last check would open a server that may be down, or start one that is
+    // already up. `settle` puts both back.
+    foundryButton.onclick = null;
+    foundryButton.disabled = true;
+
     try {
         await ping();
         setFoundryOnline();
