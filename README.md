@@ -161,7 +161,9 @@ Adding an `Accept` or auth header would put an `OPTIONS` round trip in front of
 every load. The feed is served with `Cache-Control: public, max-age=300`, so the
 refresh button appends a cache-busting query parameter rather than a
 `Cache-Control` request header, which would cost a preflight for the same
-reason.
+reason. Only the refresh button does: the first load asks for the plain URL, so
+a second visit inside those five minutes is answered from the browser's cache —
+the feed is rebuilt on a timer, and nothing newer would have been there.
 
 Keep the feed anonymous-readable and rely on CORS. A SAS token in `main.js` is
 served to every visitor in plain text, so it authenticates nobody.

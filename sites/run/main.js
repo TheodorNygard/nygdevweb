@@ -1227,7 +1227,12 @@ function showLoadError(detail) {
     loadErrorEl.style.display = 'block';
 }
 
-async function loadFeed() {
+// `bust` is the Refresh button's: a request that has to skip the cache. The
+// first load does not need one — the feed is rebuilt on a timer and the blob
+// says it is good for five minutes, so a reader inside that window loses
+// nothing, and a second visit inside it is answered by the browser's cache
+// rather than another round trip to storage.
+async function loadFeed({bust = false} = {}) {
     setBusy(true);
     setStatus('Reading the training feed…');
     loadErrorEl.style.display = 'none';
@@ -1235,7 +1240,7 @@ async function loadFeed() {
     try {
         // The blob has a five-minute cache, so a manual refresh carries a
         // cache-buster. No request headers: a simple request needs no preflight.
-        const response = await fetch(`${FEED_URL}?t=${Date.now()}`, {
+        const response = await fetch(bust ? `${FEED_URL}?t=${Date.now()}` : FEED_URL, {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT)
         });
 
@@ -1259,7 +1264,9 @@ async function loadFeed() {
     }
 }
 
-refreshButton.addEventListener('click', loadFeed);
+// Wrapped rather than passed: a listener is handed the click event, and that
+// is not the options object `loadFeed` reads.
+refreshButton.addEventListener('click', () => loadFeed({bust: true}));
 
 // Charts are drawn at pixel sizes, so a width change needs a redraw. Debounced,
 // and width-only: a mobile browser collapsing its address bar changes the
