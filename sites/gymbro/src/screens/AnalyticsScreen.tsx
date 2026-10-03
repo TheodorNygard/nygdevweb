@@ -1,11 +1,16 @@
+import { CoachingExport } from '../components/CoachingExport';
 import { num, rpeLabel } from '../lib/gym';
 import { type LiftSeries } from '../lib/analytics';
+import { type CoachingInput } from '../lib/coaching';
 
 interface AnalyticsScreenProps {
     series: LiftSeries[];
     selected: string | null;
     onSelect: (name: string) => void;
     loading: boolean;
+
+    /** The block for the coaching export, or null until its sets are in hand. */
+    coaching: CoachingInput | null;
 }
 
 /** The chart's viewBox, and the box the line is drawn inside it. */
@@ -42,6 +47,7 @@ export function AnalyticsScreen({
     selected,
     onSelect,
     loading,
+    coaching,
 }: AnalyticsScreenProps) {
     const lift = series.find((one) => one.name === selected) ?? series[0] ?? null;
     const points = lift?.points ?? [];
@@ -92,6 +98,7 @@ export function AnalyticsScreen({
     return (
         <div className="view stats">
             <div className="stats__list">
+                <CoachingExport input={coaching} />
                 <span className="stats__list-label">TRACKED LIFTS</span>
                 {series.map((one) => {
                     const first = one.points[0];

@@ -1037,6 +1037,32 @@ What it charts is the **heaviest set actually logged** — `95 kg × 3` — not 
 estimated one-rep max. A number nobody has put on a bar is a poor thing to plan
 the next session against.
 
+### The coaching export
+
+Analytics can hand the selected block to a coach — a person or an AI model — as
+one Markdown document: **Copy** for pasting into a chat, **Download** for a `.md`
+file. It is the block as saved, its weekly targets, the plan, a top-set table
+per lift, working sets per muscle group per week, and then every session, set by
+set, oldest first, with drafts marked as in progress. `src/lib/coaching.ts`
+writes it from what Analytics already read; nothing new is fetched and nothing
+leaves the browser until somebody pastes it.
+
+Markdown rather than JSON or CSV because a conversation is where it goes: it is
+what a language model reads most fluently and what the person sending it can
+read and edit first. And it opens by **explaining its own conventions**, because
+they are this app's and nobody could guess them — that RPE 5 and 5.5 are
+warm-ups and count toward nothing, that a plan prescribes sets and never a
+weight, that intensity is a reps-in-reserve target tightening week by week, and
+that the last week is a deload. A model told none of that reads a warm-up as a
+bad set and the rest week as a collapse. Every number in it comes from the same
+functions the phone used — `repsInTank`, `rpeForTank`, `targetsFor`,
+`isWarmUpRpe` — so the export cannot state a target the phone did not show.
+
+It ends with an empty *Goals and context* section, because the most useful
+things a coach needs — what the block is for, what hurts, how the week went —
+are not in the log, and a placeholder is how the person exporting it is
+reminded to say them.
+
 ### The domain layer is shared, and the design is not
 
 `sites/gymbro/src/lib/gym.ts` re-exports the logger's `lib/` and a handful of its

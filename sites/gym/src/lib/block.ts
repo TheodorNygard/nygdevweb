@@ -1,4 +1,5 @@
-import { isWarmUpRpe } from './format';
+import { MIN_WORKING_RPE, isWarmUpRpe } from './format';
+import { RPE_MAX } from './steps';
 import type {
     CurrentBlock,
     Mesocycle,
@@ -219,6 +220,24 @@ export function repsInTank(week: number, weeks: number): number {
     const remaining = Math.max(0, weeks - 1 - week);
 
     return TANK_RAMP[Math.min(remaining, TANK_RAMP.length - 1)] ?? OPENING_TANK;
+}
+
+/**
+ * The RPE a reps-in-the-tank target is, since the slider is the control that
+ * target is actually aimed at: RPE 10 is nothing left, 8 is two left.
+ *
+ * Floored at the first *working* rating rather than at the bottom of the
+ * slider. The two are not the same: the slider opens at 5, but 5 and 5.5 are
+ * warm-ups, so a target there would be a week asking for sets that count toward
+ * nothing. A tank deep enough to fall off the scale gets the easiest rating
+ * that is still a set.
+ *
+ * Here rather than on the session screen because two things say it: the
+ * logger, where the RPE control repeats it, and gymbro's coaching export,
+ * which has to state the same target the phone showed.
+ */
+export function rpeForTank(tank: number): number {
+    return Math.min(RPE_MAX, Math.max(MIN_WORKING_RPE, 10 - tank));
 }
 
 /**

@@ -104,7 +104,7 @@ export function todayLabel(date: Date = new Date()): string {
  * `_2` for a second session that day, which is what lets History show a date
  * the API never sends as a field of its own.
  */
-function sessionDate(sessionId: string): string | null {
+export function sessionDate(sessionId: string): string | null {
     const match = /^session_(\d{4})-(\d{2})-(\d{2})(?:_(\d+))?$/.exec(sessionId);
 
     if (!match) return null;

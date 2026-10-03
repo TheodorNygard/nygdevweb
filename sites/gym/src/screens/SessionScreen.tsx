@@ -11,11 +11,12 @@ import {
     completesTarget,
     isRestWeek,
     repsInTank,
+    rpeForTank,
     swappedAway,
     targetsFor,
     workingSetCount,
 } from '../lib/block';
-import { MIN_WORKING_RPE, isWarmUpRpe, kg, num, rpeNote, tankLabel } from '../lib/format';
+import { isWarmUpRpe, kg, num, rpeNote, tankLabel } from '../lib/format';
 import { equipmentFor } from '../lib/library';
 import {
     MAX_REPS,
@@ -45,20 +46,6 @@ const DELETE_ARMED_MS = 3000;
  * reach this: it opens on what it was last done with.
  */
 const OPENING = { weightKg: 0, reps: 8, rpe: 7 };
-
-/**
- * The RPE a reps-in-the-tank target is, since the slider is the control that
- * target is actually aimed at: RPE 10 is nothing left, 8 is two left.
- *
- * Floored at the first *working* rating rather than at the bottom of the
- * slider. The two are not the same: the slider opens at 5, but 5 and 5.5 are
- * warm-ups, so a target there would be a week asking for sets that count toward
- * nothing. A tank deep enough to fall off the scale gets the easiest rating
- * that is still a set.
- */
-function rpeForTank(tank: number): number {
-    return Math.min(RPE_MAX, Math.max(MIN_WORKING_RPE, 10 - tank));
-}
 
 /**
  * What each set of an exercise is called on screen. Working sets are numbered

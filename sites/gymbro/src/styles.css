@@ -1800,6 +1800,39 @@ a:hover {
     gap: 2px;
 }
 
+/* The coaching export, above the lift list: the one thing in this view that
+   is about the whole block rather than one lift. */
+.coach {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding: 16px 4px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.coach .stats__list-label {
+    padding-bottom: 0;
+}
+
+.coach__note {
+    margin: 0;
+    padding: 0 4px;
+    font: 400 12px/1.5 var(--sans);
+    color: var(--fg-45);
+    text-wrap: pretty;
+}
+
+.coach__buttons {
+    display: flex;
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.coach__buttons > * {
+    flex: 1;
+    white-space: nowrap;
+}
+
 .stats__list-label {
     padding: 0 4px 8px;
     font: 600 11px/1 var(--mono);

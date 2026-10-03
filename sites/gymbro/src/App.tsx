@@ -9,6 +9,7 @@ import { seriesOf } from './lib/analytics';
 import {
     currentWeek,
     GymApi,
+    localDate,
     messageOf,
     sessionDateLabel,
     useAuth,
@@ -239,6 +240,22 @@ export function App() {
     const series = useMemo(
         () => seriesOf(workouts.sessions, sessionDateLabel),
         [workouts.sessions],
+    );
+
+    // What Analytics' coaching export writes out: the block as saved — not a
+    // draft in the builder, which nobody has trained — with every set it holds.
+    // Null until those sets are in hand, which is what keeps the buttons off.
+    const coaching = useMemo(
+        () => (selected && !workouts.loading && workouts.sessions.length > 0
+            ? {
+                block: selected,
+                sessions: workouts.sessions,
+                library,
+                custom: customExercises.exercises,
+                exportedOn: localDate(),
+            }
+            : null),
+        [selected, workouts.loading, workouts.sessions, library, customExercises.exercises],
     );
 
     function setDraft(next: Draft) {
@@ -564,6 +581,7 @@ export function App() {
                             selected={lift}
                             onSelect={setLift}
                             loading={workouts.loading}
+                            coaching={coaching}
                         />
                     )}
                 </div>

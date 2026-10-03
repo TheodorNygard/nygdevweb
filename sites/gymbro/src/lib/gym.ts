@@ -56,14 +56,26 @@ export { useResource, type Resource } from '@gym/hooks/useResource';
 
 export {
     currentWeek,
+    dayLabel,
     daysForWeek,
     isRestWeek,
     progressOf,
     repsInTank,
+    rpeForTank,
     setsForWeek,
+    swappedAway,
+    targetsFor,
 } from '@gym/lib/block';
 
-export { kg, num, rpeLabel, sessionDateLabel } from '@gym/lib/format';
+export {
+    isWarmUpRpe,
+    kg,
+    localDate,
+    num,
+    rpeLabel,
+    sessionDate,
+    sessionDateLabel,
+} from '@gym/lib/format';
 
 export type {
     CustomExercise,
@@ -75,4 +87,5 @@ export type {
     PlannedExercise,
     SessionDetail,
     SessionSummary,
+    WorkSet,
 } from '@gym/lib/types';
