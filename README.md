@@ -973,10 +973,10 @@ The deletes share the logger's rule: a block takes every session logged in it,
 so the confirmation names the session count and volume, and stays disabled until
 the block's sessions have been read — it never understates.
 
-One deliberate difference: Save is not blocked by a day with no exercises. The
-logger refuses it; here a fresh block starts with every day empty, so refusing
-would make an incremental plan unsavable until the last day was filled. The
-builder says which days are empty instead.
+Neither app blocks Save on a day with no exercises. A fresh block starts with
+every day empty, so refusing would make an incremental plan unsavable until the
+last day was filled — and, on the phone, the very first block uncreatable. Both
+say which days are empty instead, in the same words.
 
 Exercises are still typed names, not records. Neither app can *create* one in any
 lasting sense — the API has no `/gym/exercises` route, so a custom name lives only

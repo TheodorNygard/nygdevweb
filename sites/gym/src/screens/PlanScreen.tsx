@@ -247,24 +247,32 @@ export function PlanScreen({
     // What the deload comes out at for this cadence, for the note under the map.
     const restRuns = daysForWeek(draft.days.length, draft.weeks, draft.weeks);
 
-    // Every day needs a name and at least one exercise: a day with nothing in
-    // it opens in the logger as a blank session, which is the problem the plan
-    // exists to solve.
+    // Every day needs a name. It does not need an exercise: a first block
+    // starts with every day empty, and refusing to save until the last one was
+    // planned made a plan written a day at a time unsavable — and the very
+    // first block uncreatable. gymbro made the same call for the same reason.
     const unnamed = draft.days.some((day) => day.label.trim().length === 0);
     const unplanned = draft.days
         .map((day, index) => (day.plan.length === 0 ? `D${index + 1}` : null))
         .filter((badge): badge is string => badge !== null);
 
-    const canSave = draft.name.trim().length > 0 && !unnamed && unplanned.length === 0;
+    const canSave = draft.name.trim().length > 0 && !unnamed;
 
     // Why Save is disabled, said under it rather than left to guesswork.
     const blocker = draft.name.trim().length === 0
         ? 'Name the block before saving.'
         : unnamed
             ? 'Give every day a name before saving.'
-            : unplanned.length > 0
-                ? `Pick at least one exercise for ${listOf(unplanned)} before saving.`
-                : null;
+            : null;
+
+    // Not a blocker, but still worth saying: a day with nothing in it opens in
+    // the logger as a blank session, which is the problem the plan exists to
+    // solve. Worded as gymbro's builder words it.
+    const unplannedNote = unplanned.length > 0
+        ? `${listOf(unplanned)} ${unplanned.length === 1 ? 'has' : 'have'} no exercises. `
+            + 'It can still be saved, but a day with nothing on it opens in the logger as a '
+            + 'blank session — which is the problem the plan exists to solve.'
+        : null;
 
     return (
         <div className="screen">
@@ -403,6 +411,7 @@ export function PlanScreen({
                             : 'Create mesocycle'}
                 </button>
                 {blocker && !busy ? <p className="save-blocker">{blocker}</p> : null}
+                {!blocker && unplannedNote ? <p className="save-note">{unplannedNote}</p> : null}
             </div>
 
             {exists ? (

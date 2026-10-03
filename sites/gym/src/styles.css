@@ -912,6 +912,16 @@ button {
     text-align: center;
 }
 
+/* Under Save as well, but about something that does not stop it — the days
+   with nothing planned — so it is the muted grey rather than the accent the
+   blocker uses to say why the button is off. */
+.save-note {
+    margin: 10px 0 0;
+    font: 400 13px/1.5 var(--sans);
+    color: var(--fg-50);
+    text-align: center;
+}
+
 /* One planned exercise in the day-plan sheet: the name, and the two steppers
    that say how much of it. */
 .planned {
