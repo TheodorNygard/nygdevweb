@@ -130,6 +130,34 @@ export function App() {
     const draft = selected ? drafts[selected.id] ?? draftOf(selected) : null;
     const dirty = selected !== null && draft !== null && isDirty(draft, selected);
 
+    // Any block's, not only the one on screen: the drafts are keyed so that
+    // selecting another block keeps a half-written plan, and closing the tab
+    // would throw away every one of them at once.
+    const anyDirty = blocks.blocks.some((block) => {
+        const held = drafts[block.id];
+
+        return held !== undefined && isDirty(held, block);
+    });
+
+    // The browser's own "leave site?" while there is something to lose, and
+    // only then — a prompt on every close teaches people to click through it.
+    // Signing out navigates away too, and is covered by the same prompt.
+    useEffect(() => {
+        if (!anyDirty) return;
+
+        function onBeforeUnload(event: BeforeUnloadEvent) {
+            event.preventDefault();
+
+            // What older Chromium and Safari still look for; the text is
+            // ignored everywhere, so it is left empty.
+            event.returnValue = '';
+        }
+
+        window.addEventListener('beforeunload', onBeforeUnload);
+
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [anyDirty]);
+
     // What deleting the block would take with it, from its own sessions. Null
     // until they have been read, and the confirmation waits on it.
     const blockVolumeKg = sessionsRead
