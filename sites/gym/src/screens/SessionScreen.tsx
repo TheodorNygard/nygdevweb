@@ -323,17 +323,20 @@ export function SessionScreen({
     }
 
     // One target for the whole session: how deep into each set to go, read off
-    // where this week sits in the block rather than off the plan.
-    const rest = isRestWeek(workout.week, weeks);
-    const tank = repsInTank(workout.week, weeks);
-    const targetRpe = rpeForTank(tank);
+    // where this week sits in the block rather than off the plan. A
+    // freestanding workout is in no block, so it has no week to read one off:
+    // no target, no rest week, and the RPE is whatever the set was.
+    const week = workout.freestanding ? null : workout.week;
+    const rest = week !== null && isRestWeek(week, weeks);
+    const tank = week === null ? null : repsInTank(week, weeks);
+    const targetRpe = tank === null ? null : rpeForTank(tank);
 
     // How many sets this week wants of each entry, or none where nothing is
     // planned. The plan's count in a training week; half of it in the rest
     // week, which is the whole of what the deload changes — same exercises,
     // less of them. Across a swap the count is shared rather than repeated:
     // the substitute owes what the original had left.
-    const targets = targetsFor(plan, workout.entries, workout.week, weeks);
+    const targets = week === null ? [] : targetsFor(plan, workout.entries, week, weeks);
 
     function targetSetsFor(entryIndex: number): number | undefined {
         return targets[entryIndex];
@@ -357,17 +360,23 @@ export function SessionScreen({
         // Nothing logged against it today, so open on the last time it was
         // done at all. The weight and the reps carry over; the RPE does not,
         // because the week asks for something different from what last week
-        // did and that is the whole shape of the block.
+        // did and that is the whole shape of the block. Outside a block
+        // nothing asks for anything, so last time's RPE is as good a guess as
+        // its weight.
         const previous = entry ? lastSets[entry.exerciseName] : undefined;
 
         if (previous) {
-            return { weightKg: previous.weightKg, reps: previous.reps, rpe: targetRpe };
+            return {
+                weightKg: previous.weightKg,
+                reps: previous.reps,
+                rpe: targetRpe ?? previous.rpe ?? OPENING.rpe,
+            };
         }
 
         // Never done. No weight to guess at, a generic eight reps, and the
         // week's intensity target — which is where intensity now comes from,
         // since the plan no longer names a rep count.
-        return { ...OPENING, rpe: targetRpe };
+        return { ...OPENING, rpe: targetRpe ?? OPENING.rpe };
     }
 
     function adjust(entryIndex: number, patch: Partial<Pending>) {
@@ -603,25 +612,27 @@ export function SessionScreen({
                 </div>
             </header>
 
-            <div className={rest ? 'tank tank--rest' : 'tank'}>
-                <div className="tank__head">
-                    <span className="tank__week">
-                        {rest ? `WEEK ${workout.week} · REST` : `WEEK ${workout.week} OF ${weeks}`}
-                    </span>
-                    <span className="tank__value">{tankLabel(tank)}</span>
+            {week !== null && tank !== null && targetRpe !== null ? (
+                <div className={rest ? 'tank tank--rest' : 'tank'}>
+                    <div className="tank__head">
+                        <span className="tank__week">
+                            {rest ? `WEEK ${week} · REST` : `WEEK ${week} OF ${weeks}`}
+                        </span>
+                        <span className="tank__value">{tankLabel(tank)}</span>
+                    </div>
+                    <p className="tank__note">
+                        {rest
+                            ? 'Deload. Same exercises, half the sets, and every set stopped with '
+                                + `${tankLabel(tank)} — around RPE ${num(targetRpe)}. Easy, but still `
+                                + 'sets: log them the way you log any other.'
+                            : tank === 0
+                                ? 'Last training week. Take each set to the last rep you can hold '
+                                    + `form on, around RPE ${num(targetRpe)}.`
+                                : `Stop each set with about ${tankLabel(tank)}, around RPE `
+                                    + `${num(targetRpe)}.`}
+                    </p>
                 </div>
-                <p className="tank__note">
-                    {rest
-                        ? 'Deload. Same exercises, half the sets, and every set stopped with '
-                            + `${tankLabel(tank)} — around RPE ${num(targetRpe)}. Easy, but still `
-                            + 'sets: log them the way you log any other.'
-                        : tank === 0
-                            ? 'Last training week. Take each set to the last rep you can hold '
-                                + `form on, around RPE ${num(targetRpe)}.`
-                            : `Stop each set with about ${tankLabel(tank)}, around RPE `
-                                + `${num(targetRpe)}.`}
-                </p>
-            </div>
+            ) : null}
 
             <div className="session__body">
                 {workout.entries.map((entry, entryIndex) => {
@@ -859,7 +870,7 @@ export function SessionScreen({
                                     <div className="rpe">
                                         <div className="rpe__head">
                                             <span className="field-label">
-                                                RPE · TARGET {tank} LEFT
+                                                {tank === null ? 'RPE' : `RPE · TARGET ${tank} LEFT`}
                                             </span>
                                             <span
                                                 className={values.rpe === targetRpe

@@ -40,16 +40,36 @@ export interface SessionTotals {
 
 export type SessionStatus = 'draft' | 'submitted';
 
-/** A session in full — what the logging screen edits. */
-export interface Workout {
+interface WorkoutBase {
     id: string;
-    mesoId: string;
-    week: number;
-    dayIndex: number;
     status: SessionStatus;
     entries: SessionEntry[];
     totals: SessionTotals;
 }
+
+/** A workout logged against a cell of a block: which block, which week, which day. */
+export interface BlockWorkout extends WorkoutBase {
+    mesoId: string;
+    week: number;
+    dayIndex: number;
+    freestanding?: undefined;
+}
+
+/**
+ * A workout in no block — for someone who does not train in blocks, so no
+ * ramp across weeks and no deload. The API leaves `mesoId`, `week` and
+ * `dayIndex` off and sends `freestanding: true` in their place.
+ */
+export interface FreeWorkout extends WorkoutBase {
+    freestanding: true;
+}
+
+/**
+ * A session in full — what the logging screen edits. A union rather than
+ * optional fields, so a screen cannot read a week off a workout that has none
+ * without first asking which kind it holds.
+ */
+export type Workout = BlockWorkout | FreeWorkout;
 
 /**
  * A session as the block map and History see it: totals flattened onto the
@@ -81,6 +101,26 @@ export interface SessionSummary {
 export interface SessionDetail extends SessionSummary {
     entries: SessionEntry[];
 }
+
+/** What every row of the date-range list has, block or not. */
+interface DatedBase {
+    id: string;
+    status: SessionStatus;
+    exerciseCount: number;
+    setCount: number;
+    volumeKg: number;
+    avgRpe: number | null;
+    entries?: SessionEntry[];
+}
+
+/**
+ * One row of `GET /gym/workouts?from=&to=`: every session in a date range,
+ * whichever block it was in or none. A session in a block names it; a
+ * freestanding one says so instead and has no week or day.
+ */
+export type DatedSession =
+    | (DatedBase & { mesoId: string; week: number; dayIndex: number; freestanding?: undefined })
+    | (DatedBase & { freestanding: true });
 
 /**
  * One exercise a day prescribes: a name and a number of sets.

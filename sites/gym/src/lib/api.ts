@@ -4,6 +4,7 @@ import type {
     CurrentBlock,
     CustomExercise,
     CustomExerciseInput,
+    DatedSession,
     DayInput,
     DayTemplate,
     EditSetResult,
@@ -416,6 +417,34 @@ export class GymApi {
             path: '/gym/workouts',
             body: { date, week, dayIndex },
         });
+    }
+
+    /**
+     * Start, in no block. No week and no day — nothing ramps, nothing deloads
+     * — and `exercises` opens it with those already in place, usually from a
+     * template. Works before any block has been planned.
+     */
+    startFreestanding(date: string, exercises: string[] = []): Promise<StartedWorkout> {
+        return this.send<StartedWorkout>({
+            method: 'POST',
+            path: '/gym/workouts',
+            body: { date, freestanding: true, exercises },
+        });
+    }
+
+    /**
+     * Every session from `from` to `to`, both local dates included, newest
+     * first — freestanding ones and those in any block. The only list that can
+     * see a freestanding session; at most 366 days at a time.
+     */
+    async sessionsBetween(from: string, to: string, withEntries = false): Promise<DatedSession[]> {
+        const include = withEntries ? '&include=entries' : '';
+        const body = await this.send<{ sessions: DatedSession[] }>({
+            method: 'GET',
+            path: `/gym/workouts?from=${from}&to=${to}${include}`,
+        });
+
+        return body.sessions;
     }
 
     async workout(sessionId: string): Promise<Workout> {

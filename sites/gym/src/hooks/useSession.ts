@@ -5,7 +5,7 @@ import { ApiError, NetworkError, messageOf, type GymApi } from '../lib/api';
 import { swapped } from '../lib/block';
 import { localDate } from '../lib/format';
 import { computeTotals } from '../lib/totals';
-import type { SessionEntry, WorkSet, Workout } from '../lib/types';
+import type { SessionEntry, StartedWorkout, WorkSet, Workout } from '../lib/types';
 
 export interface SessionState {
     workout: Workout | null;
@@ -43,6 +43,13 @@ export interface Waiting {
 
 export interface SessionActions {
     start: (week: number, dayIndex: number) => Promise<Workout | null>;
+
+    /**
+     * Start, in no block: today's workout with these exercises already in it,
+     * or none. Resumes a freestanding draft already open today, the way Start
+     * on a cell does.
+     */
+    startFree: (exercises: string[]) => Promise<Workout | null>;
     open: (sessionId: string) => Promise<Workout | null>;
     close: () => void;
     addEntry: (exerciseName: string) => Promise<void>;
@@ -259,7 +266,9 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         }
     }, [api, put]);
 
-    const start = useCallback(async (week: number, dayIndex: number): Promise<Workout | null> => {
+    const begin = useCallback(async (
+        call: (client: GymApi, date: string) => Promise<StartedWorkout>,
+    ): Promise<Workout | null> => {
         if (!api) return null;
 
         setBusy(true);
@@ -270,12 +279,14 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         try {
             // The phone's date, not the server's. A 21:00 session in Oslo is
             // already tomorrow in UTC for half the year.
-            const started = await api.startWorkout(localDate(), week, dayIndex);
+            const started = await call(api, localDate());
 
             put(started.workout);
 
             if (started.resumed) {
-                setNotice('Picked up the draft already open on this day.');
+                setNotice(started.workout.freestanding
+                    ? 'Picked up the workout already open today.'
+                    : 'Picked up the draft already open on this day.');
             }
 
             return started.workout;
@@ -287,6 +298,18 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
             setBusy(false);
         }
     }, [api, put]);
+
+    const start = useCallback(
+        (week: number, dayIndex: number) => begin(
+            (client, date) => client.startWorkout(date, week, dayIndex),
+        ),
+        [begin],
+    );
+
+    const startFree = useCallback(
+        (exercises: string[]) => begin((client, date) => client.startFreestanding(date, exercises)),
+        [begin],
+    );
 
     const open = useCallback(async (sessionId: string): Promise<Workout | null> => {
         if (!api) return null;
@@ -697,6 +720,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         savedAt,
         waiting,
         start,
+        startFree,
         open,
         close,
         addEntry,

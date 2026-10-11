@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GymApi } from '../lib/api';
-import type { SessionSummary, WorkSet, Workout } from '../lib/types';
+import type { DatedSession, SessionSummary, WorkSet, Workout } from '../lib/types';
 
 /** The last set logged for an exercise, by name. */
 export type LastSets = Record<string, WorkSet>;
@@ -51,6 +51,34 @@ function lastSetsOf(previous: Workout): LastSets {
 }
 
 /**
+ * The same, for a workout in no block: each exercise's last set in the most
+ * recent submitted session that lifted it, other than the one being logged.
+ *
+ * Searched across sessions rather than read off one, because there is no "same
+ * day" to read: a freestanding lifter's Monday is not a cell anything points
+ * at, and the bench they did last Thursday is the bench they want today. The
+ * sessions are the ones Today already read with their sets on — so this costs
+ * nothing, and an exercise not lifted in that window opens on nothing, as one
+ * missing from last week's day does in a block.
+ */
+function lastSetsAcross(sessions: DatedSession[], excludeId: string): LastSets {
+    const found: LastSets = {};
+
+    // Newest first, so the first session to name an exercise is the one kept.
+    for (const session of sessions) {
+        if (session.id === excludeId || session.status !== 'submitted') continue;
+
+        for (const entry of session.entries ?? []) {
+            const last = entry.sets[entry.sets.length - 1];
+
+            if (last && !(entry.exerciseName in found)) found[entry.exerciseName] = last;
+        }
+    }
+
+    return found;
+}
+
+/**
  * What each exercise was last done with, so the logger opens on it.
  *
  * The lookup is the previous submitted session on the *same day of the block*,
@@ -80,9 +108,12 @@ export function useLastSets(
     api: GymApi | null,
     sessions: SessionSummary[],
     workout: Workout | null,
+    dated: DatedSession[],
 ): LastSetsState {
     const previousId = useMemo(
-        () => (workout ? previousOf(sessions, workout.dayIndex, workout.id) : null),
+        () => (workout && !workout.freestanding
+            ? previousOf(sessions, workout.dayIndex, workout.id)
+            : null),
         [sessions, workout],
     );
 
@@ -146,13 +177,17 @@ export function useLastSets(
         };
     }, [workoutId]);
 
+    const freeId = workout?.freestanding ? workout.id : null;
+
     const sets = useMemo(() => {
+        if (freeId) return lastSetsAcross(dated, freeId);
+
         const previous = previousId ? held.current.get(previousId) : undefined;
 
         return previous ? lastSetsOf(previous) : {};
 
     // `landed` is what tells this that `held` has something new.
-    }, [previousId, landed]);
+    }, [previousId, landed, freeId, dated]);
 
     return { sets, prefetch };
 }

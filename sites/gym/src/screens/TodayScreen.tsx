@@ -8,7 +8,6 @@ import {
     sessionsFor,
 } from '../lib/block';
 import { kg, rpeLabel, tankLabel } from '../lib/format';
-import { IntroScreen } from './IntroScreen';
 import { Masthead } from '../components/Masthead';
 import type { Theme } from '../lib/theme';
 import type { CurrentBlock } from '../lib/types';
@@ -19,6 +18,12 @@ interface TodayScreenProps {
     onWeek: (week: number) => void;
     onOpenDay: (dayIndex: number) => void;
     onPlan: () => void;
+
+    /**
+     * Opens the start sheet for a workout in no block — the session that does
+     * not fit this week's days. Never counts toward the block.
+     */
+    onStartFree: () => void;
 
     /** The palette, and the tap that changes it — the masthead's mark. */
     theme: Theme;
@@ -37,17 +42,14 @@ export function TodayScreen({
     onWeek,
     onOpenDay,
     onPlan,
+    onStartFree,
     theme,
     onTheme,
 }: TodayScreenProps) {
     const { mesocycle, sessions } = block;
 
-    if (!mesocycle) {
-        // A first run, not an error: the API answers `mesocycle: null` when
-        // nobody has planned a block yet. It is also the only moment anyone
-        // will read what a mesocycle is, so that is what the screen is.
-        return <IntroScreen theme={theme} onTheme={onTheme} />;
-    }
+    // No block is `FreeTodayScreen`'s, which App shows in this one's place.
+    if (!mesocycle) return null;
 
     const progress = progressOf(mesocycle, sessions);
     const days = mesocycle.days;
@@ -196,6 +198,15 @@ export function TodayScreen({
                     the next one.
                 </button>
             ) : null}
+
+            <button
+                type="button"
+                className="add-exercise stack-22"
+                style={{ width: '100%' }}
+                onClick={onStartFree}
+            >
+                Log a workout outside this block
+            </button>
         </div>
     );
 }

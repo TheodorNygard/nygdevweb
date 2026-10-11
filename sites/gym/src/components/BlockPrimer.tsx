@@ -1,6 +1,4 @@
-import { EffortGraph } from '../components/EffortGraph';
-import { Masthead } from '../components/Masthead';
-import type { Theme } from '../lib/theme';
+import { EffortGraph } from './EffortGraph';
 
 /** The three moves a block makes, in the order it makes them. */
 const STEPS = [
@@ -22,29 +20,19 @@ const STEPS = [
 ];
 
 /**
- * What the first tab shows before there is anything to train.
+ * What a mesocycle is, the shape it makes, and how long to make one — the
+ * explanation a first run shows beside the plainer way in.
  *
- * A first run has no week to open on, and an empty screen teaches nothing —
- * least of all to someone who has never planned a block and is about to be
- * asked how many weeks it should be. So the empty state is the explanation
- * instead: what a mesocycle is, the shape it makes, and how long to make one.
- *
+ * The no-block Today carries it under its own Start: someone who opens the app
+ * wanting to log a workout can, and someone curious about blocks can read on.
  * It carries no call to action of its own. Plan is the second tab, pinned to
- * the bottom of every screen including this one, so a button here would be a
- * second door onto the same room — and one that pushes the reader past the
- * thing they are here to read.
+ * the bottom of every screen, so a button here would be a second door onto the
+ * same room.
  */
-interface IntroScreenProps {
-    theme: Theme;
-    onTheme: (theme: Theme) => void;
-}
-
-export function IntroScreen({ theme, onTheme }: IntroScreenProps) {
+export function BlockPrimer() {
     return (
-        <div className="screen">
-            <Masthead theme={theme} onTheme={onTheme} />
-
-            <h1 className="title">Train in blocks.</h1>
+        <>
+            <h2 className="title">Or train in blocks.</h2>
             <p className="lede">
                 A mesocycle is one block of training — a few weeks that get harder as they go,
                 closed by one easy week. Run them back to back and effort rises and resets
@@ -68,9 +56,10 @@ export function IntroScreen({ theme, onTheme }: IntroScreenProps) {
                     Four to six weeks is the sweet spot — long enough for the ramp to add up,
                     short enough that the rest week arrives before fatigue outruns the progress.
                     Three is the shortest block worth calling one; past eight you are deloading
-                    late. Blocks here run 3 to 8 weeks, 2 to 6 workouts a week.
+                    late. Blocks here run 3 to 8 weeks, 2 to 6 workouts a week. Plan one in the
+                    Plan tab when you want to.
                 </p>
             </div>
-        </div>
+        </>
     );
 }
