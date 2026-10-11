@@ -5,7 +5,9 @@ import { BlockSheet } from './components/BlockSheet';
 import { DaySheet } from './components/DaySheet';
 import { ExercisePicker } from './components/ExercisePicker';
 import { FinishSheet } from './components/FinishSheet';
+import { FreeSessionSheet } from './components/FreeSessionSheet';
 import { SignInGate } from './components/SignInGate';
+import { StartSheet } from './components/StartSheet';
 import { TabBar, type Tab } from './components/TabBar';
 import { useAuth } from './hooks/useAuth';
 import { useBlock } from './hooks/useBlock';
@@ -15,6 +17,7 @@ import { FavoritesContext, useFavorites } from './hooks/useFavorites';
 import { useHistory } from './hooks/useHistory';
 import { useLastSets } from './hooks/useLastSets';
 import { useLibrary } from './hooks/useLibrary';
+import { useRecentSessions } from './hooks/useRecentSessions';
 import { useSession } from './hooks/useSession';
 import { useTemplates } from './hooks/useTemplates';
 import { useTheme } from './hooks/useTheme';
@@ -22,13 +25,16 @@ import { useUpdateCheck } from './hooks/useUpdateCheck';
 import { GymApi, messageOf } from './lib/api';
 import { currentWeek, dayLabel, progressOf, sessionsFor } from './lib/block';
 import { clearBlock } from './lib/cache';
+import { sessionDateLabel } from './lib/format';
 import { withCustom } from './lib/library';
 import { DoneScreen } from './screens/DoneScreen';
+import { FreeTodayScreen } from './screens/FreeTodayScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PlanScreen, type PlanDraft } from './screens/PlanScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { TodayScreen } from './screens/TodayScreen';
 import type {
+    DatedSession,
     DayInput,
     MesocycleSummary,
     SessionSummary,
@@ -41,9 +47,19 @@ type Screen = 'tabs' | 'session' | 'done';
 
 interface Completed {
     dayLabel: string;
-    week: number;
+
+    /** Null for a workout in no block. */
+    week: number | null;
     totals: SessionTotals;
 }
+
+/** What the logging screen and the finish sheet call a freestanding workout. */
+function freeLabel(workout: Workout): string {
+    return `Workout · ${sessionDateLabel(workout.id)}`;
+}
+
+/** A stable empty list, for the recent sessions before anything wants them. */
+const NO_DATED: DatedSession[] = [];
 
 /** A stable empty list, so the lookup below does not churn before the block lands. */
 const NO_SESSIONS: SessionSummary[] = [];
@@ -132,7 +148,43 @@ export function App() {
     // errors stay inside its sheet rather than joining the banner chain below:
     // nothing else in the app reads this, and a day can still be planned by
     // hand while it is failing.
-    const templates = useTemplates(opened.plan ? api : null);
+    // The start sheet for a workout in no block, and which freestanding
+    // session's sheet is open. Declared here because both decide what gets
+    // read: the start sheet offers the templates, and either needs the recent
+    // workouts below.
+    const [startingFree, setStartingFree] = useState(false);
+    const [openFreeId, setOpenFreeId] = useState<string | null>(null);
+    const [wantTemplates, setWantTemplates] = useState(false);
+
+    if (!wantTemplates && (opened.plan || startingFree)) {
+        setWantTemplates(true);
+    }
+
+    const templates = useTemplates(wantTemplates ? api : null);
+
+    // The last few months of workouts, block or not, with their sets. Only a
+    // lifter with no block needs them on arrival — they *are* that Today — so
+    // anyone else reads them when something asks: History, the start sheet, or
+    // a freestanding workout being logged, which looks up last time in them.
+    // Sticky once wanted, as the custom exercises are.
+    const [wantRecent, setWantRecent] = useState(false);
+
+    if (!wantRecent && block.block && !block.fromCache && (
+        block.block.mesocycle === null
+        || opened.history
+        || startingFree
+        || session.workout?.freestanding
+    )) {
+        setWantRecent(true);
+    }
+
+    const recent = useRecentSessions(wantRecent ? api : null);
+    const recentSessions = wantRecent ? recent.data : NO_DATED;
+    const freeSessions = useMemo(
+        () => recentSessions.filter((one) => one.freestanding),
+        [recentSessions],
+    );
+    const openFree = freeSessions.find((one) => one.id === openFreeId) ?? null;
 
     // The sessions of blocks other than the one being trained — History's
     // second half. Read per block, when the block is opened, so this one needs
@@ -149,6 +201,7 @@ export function App() {
             ? history.sessions[sessionBlock.id] ?? NO_SESSIONS
             : block.block?.sessions ?? NO_SESSIONS,
         session.workout,
+        recentSessions,
     );
 
     // Null until the block arrives: the week being trained is derived from the
@@ -181,7 +234,9 @@ export function App() {
     // so the list is normally in hand by the time the logger needs it.
     const [wantCustom, setWantCustom] = useState(false);
 
-    if (!wantCustom && (openDay !== null || screen !== 'tabs' || opened.plan)) {
+    if (!wantCustom && (
+        openDay !== null || screen !== 'tabs' || opened.plan || startingFree || openFreeId !== null
+    )) {
         setWantCustom(true);
     }
 
@@ -341,7 +396,31 @@ export function App() {
 
         setSessionBlock(null);
         closeDay();
+        setOpenFreeId(null);
         setScreen('session');
+    }
+
+    // A workout in no block, empty or opened on a template's exercises.
+    async function startFree(exercises: string[]) {
+        const started = await session.startFree(exercises);
+
+        if (!started) return;
+
+        setSessionBlock(null);
+        setStartingFree(false);
+        setScreen('session');
+    }
+
+    async function removeFree(sessionId: string) {
+        if (!api) return;
+
+        try {
+            await api.deleteWorkout(sessionId);
+            setOpenFreeId(null);
+            recent.reload();
+        } catch (cause) {
+            setActionError(messageOf(cause));
+        }
     }
 
     // A submitted workout, opened on the logging screen to be corrected. The
@@ -391,14 +470,20 @@ export function App() {
 
         if (!done) return;
 
-        setCompleted({
-            dayLabel: dayLabel(meso, workout.dayIndex),
-            week: workout.week,
-            totals: workout.totals,
-        });
+        setCompleted(workout.freestanding
+            ? { dayLabel: freeLabel(workout), week: null, totals: workout.totals }
+            : {
+                dayLabel: dayLabel(meso, workout.dayIndex),
+                week: workout.week,
+                totals: workout.totals,
+            });
         setFinishing(false);
         setScreen('done');
         block.reload();
+
+        // Recently used and last time are read off this list, so a finished
+        // freestanding workout has to be in it before the next one starts.
+        if (wantRecent) recent.reload();
     }
 
     // Every Plan-tab write is the same shape: one call, both block reads
@@ -502,7 +587,8 @@ export function App() {
         ?? session.error
         ?? block.error
         ?? blocks.error
-        ?? history.error;
+        ?? history.error
+        ?? (wantRecent ? recent.error : null);
     const bannerIsNotice = !banner && session.notice !== null;
 
     // The sessions behind the open cell, out of the block that cell belongs
@@ -573,7 +659,20 @@ export function App() {
                             <div className="spinner">LOADING</div>
                         ) : block.block ? (
                             <>
-                                {tab === 'today' ? (
+                                {tab === 'today' && !meso ? (
+                                    <FreeTodayScreen
+                                        sessions={recentSessions}
+                                        loading={!wantRecent || recent.loading}
+                                        busy={session.busy}
+                                        onStart={() => setStartingFree(true)}
+                                        onResume={(sessionId) => { void resume(sessionId); }}
+                                        onOpen={(one) => setOpenFreeId(one.id)}
+                                        theme={theme}
+                                        onTheme={pickTheme}
+                                    />
+                                ) : null}
+
+                                {tab === 'today' && meso ? (
                                     <TodayScreen
                                         block={block.block}
                                         week={activeWeek}
@@ -603,6 +702,7 @@ export function App() {
                                             );
                                         }}
                                         onPlan={() => pickTab('plan')}
+                                        onStartFree={() => setStartingFree(true)}
                                         theme={theme}
                                         onTheme={pickTheme}
                                     />
@@ -652,6 +752,8 @@ export function App() {
                                             });
                                             setDaySessionId(summary.id);
                                         }}
+                                        free={freeSessions}
+                                        onOpenFree={(one) => setOpenFreeId(one.id)}
                                     />
                                 ) : null}
                             </>
@@ -676,10 +778,16 @@ export function App() {
                 {screen === 'session' && session.workout ? (
                     <SessionScreen
                         workout={session.workout}
-                        label={`W${session.workout.week} · ${dayLabel(sessionBlock ?? meso, session.workout.dayIndex)}`}
+                        label={session.workout.freestanding
+                            ? freeLabel(session.workout)
+                            : `W${session.workout.week} · ${dayLabel(sessionBlock ?? meso, session.workout.dayIndex)}`}
                         library={library}
-                        plan={(sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
-                        weeks={(sessionBlock ?? meso)?.weeks ?? session.workout.week}
+                        plan={session.workout.freestanding
+                            ? []
+                            : (sessionBlock ?? meso)?.days[session.workout.dayIndex]?.plan ?? []}
+                        weeks={session.workout.freestanding
+                            ? 0
+                            : (sessionBlock ?? meso)?.weeks ?? session.workout.week}
                         lastSets={lastSets.sets}
                         savedAt={session.savedAt}
                         waiting={session.waiting}
@@ -698,8 +806,12 @@ export function App() {
                         onReorderEntry={(from, to) => { void session.reorderEntry(from, to); }}
                         onFinish={() => setFinishing(true)}
                         onBack={() => {
+                            const wasFree = session.workout?.freestanding === true;
+
                             session.close();
                             setScreen('tabs');
+
+                            if (wasFree) recent.reload();
 
                             // The totals on the block map and in History are the
                             // server's, summed from the sets on every read — so a
@@ -720,7 +832,7 @@ export function App() {
                     <DoneScreen
                         dayLabel={completed.dayLabel}
                         week={completed.week}
-                        weeks={meso?.weeks ?? completed.week}
+                        weeks={meso?.weeks ?? completed.week ?? 0}
                         doneCount={progress?.doneCount ?? 0}
                         totalCount={progress?.totalCount ?? 0}
                         totals={completed.totals}
@@ -767,6 +879,26 @@ export function App() {
                     />
                 ) : null}
 
+                {startingFree && screen === 'tabs' ? (
+                    <StartSheet
+                        templates={templates}
+                        busy={session.busy}
+                        onStart={(exercises) => { void startFree(exercises); }}
+                        onClose={() => setStartingFree(false)}
+                    />
+                ) : null}
+
+                {openFree && screen === 'tabs' ? (
+                    <FreeSessionSheet
+                        session={openFree}
+                        busy={session.busy}
+                        onResume={(sessionId) => { void resume(sessionId); }}
+                        onEdit={(sessionId) => { void resume(sessionId); }}
+                        onDelete={(sessionId) => { void removeFree(sessionId); }}
+                        onClose={() => setOpenFreeId(null)}
+                    />
+                ) : null}
+
                 {picking && screen === 'session' ? (
                     <ExercisePicker
                         library={library}
@@ -781,7 +913,9 @@ export function App() {
 
                 {finishing && session.workout ? (
                     <FinishSheet
-                        label={dayLabel(meso, session.workout.dayIndex)}
+                        label={session.workout.freestanding
+                            ? 'this workout'
+                            : dayLabel(meso, session.workout.dayIndex)}
                         totals={session.workout.totals}
                         busy={session.busy}
                         onSubmit={() => { void submitWorkout(); }}

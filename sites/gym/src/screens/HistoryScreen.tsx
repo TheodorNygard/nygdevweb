@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
+import { FreeSessionRows } from '../components/FreeSessionRows';
+
 import { dayLabel } from '../lib/block';
 import { kg, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
-import type { CurrentBlock, MesocycleSummary, SessionSummary } from '../lib/types';
+import type { CurrentBlock, DatedSession, MesocycleSummary, SessionSummary } from '../lib/types';
 
 interface HistoryScreenProps {
     /** The block being trained, with its sessions already in hand. */
@@ -20,6 +22,13 @@ interface HistoryScreenProps {
     onLoadBlock: (mesoId: string) => void;
 
     onOpen: (session: SessionSummary, mesocycle: MesocycleSummary) => void;
+
+    /**
+     * Workouts logged in no block, from the last few months, newest first. No
+     * block holds them, so they are listed on their own above the blocks.
+     */
+    free: DatedSession[];
+    onOpenFree: (session: DatedSession) => void;
 }
 
 /** The weeks of one block that hold a submitted session, latest week first. */
@@ -68,6 +77,8 @@ export function HistoryScreen({
     loadingMesoId,
     onLoadBlock,
     onOpen,
+    free,
+    onOpenFree,
 }: HistoryScreenProps) {
     const current = block.mesocycle;
 
@@ -99,16 +110,33 @@ export function HistoryScreen({
         if (mesocycle.id !== current?.id) onLoadBlock(mesocycle.id);
     }
 
+    // Above the blocks rather than among them: a freestanding workout has no
+    // week to group under, so it would be the odd row out inside any of them.
+    const outside = free.length > 0 ? (
+        <section className="hist__block">
+            <div className="hist__head">
+                <span className="eyebrow">OUTSIDE A BLOCK · LAST 90 DAYS</span>
+                <span className="hist__total">
+                    {kg(free.reduce((total, one) => (
+                        one.status === 'submitted' ? total + one.volumeKg : total
+                    ), 0))}
+                </span>
+            </div>
+            <FreeSessionRows sessions={free} onOpen={onOpenFree} />
+        </section>
+    ) : null;
+
     if (listed.length === 0) {
         return (
             <div className="screen">
                 <h1 className="title">History</h1>
-                <p className="empty">
-                    {blocksLoading
-                        ? 'Reading your blocks…'
-                        : 'Nothing logged yet. Plan a block, log a session from Today, and it '
-                            + 'will land here under its week.'}
-                </p>
+                {outside ? <div className="hist">{outside}</div> : (
+                    <p className="empty">
+                        {blocksLoading
+                            ? 'Reading your blocks…'
+                            : 'Nothing logged yet. Log a workout from Today and it will land here.'}
+                    </p>
+                )}
             </div>
         );
     }
@@ -118,6 +146,8 @@ export function HistoryScreen({
             <h1 className="title">History</h1>
 
             <div className="hist">
+                {outside}
+
                 {listed.map((mesocycle) => {
                     const isCurrent = mesocycle.id === current?.id;
                     const isOpen = open.includes(mesocycle.id);

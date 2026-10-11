@@ -3,7 +3,9 @@ import type { SessionTotals } from '../lib/types';
 
 interface DoneScreenProps {
     dayLabel: string;
-    week: number;
+
+    /** Null for a workout in no block: there is no week, and no block to fill. */
+    week: number | null;
     weeks: number;
     doneCount: number;
     totalCount: number;
@@ -41,7 +43,9 @@ export function DoneScreen({
             <div className="done__tick">✓</div>
             <h1 className="done__title">Workout logged.</h1>
             <p className="lede">
-                Week {week} of {weeks} · {doneCount} of {totalCount} workouts in this block.
+                {week === null
+                    ? 'Logged on its own — no block, no week.'
+                    : `Week ${week} of ${weeks} · ${doneCount} of ${totalCount} workouts in this block.`}
             </p>
 
             <div className="stat-rows">
@@ -55,7 +59,7 @@ export function DoneScreen({
 
             <div className="stack-22">
                 <button type="button" className="primary" onClick={onHome}>
-                    Back to this week
+                    {week === null ? 'Back to Today' : 'Back to this week'}
                 </button>
             </div>
         </div>
