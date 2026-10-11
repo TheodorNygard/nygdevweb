@@ -44,11 +44,20 @@ export function useHistory(api: GymApi | null): HistoryState {
     // "already read it" check has to consult, and they are set together.
     const held = useRef<Record<string, SessionSummary[]>>({});
 
+    // The newest read asked for, per block. A reload sent while an earlier
+    // read of the same block is still out can be answered first, and the
+    // older answer landing after it must not put the stale list back.
+    const latest = useRef(new Map<string, number>());
+    const tickets = useRef(0);
+
     // A different client is a different sign-in, and what was read belonged to
-    // whoever was signed in when it was read.
+    // whoever was signed in when it was read — including a read still on its
+    // way, which forgetting its ticket turns away when it lands.
     useEffect(() => {
         held.current = {};
+        latest.current = new Map();
         setSessions({});
+        setLoading(null);
         setError(null);
     }, [api]);
 
@@ -56,18 +65,26 @@ export function useHistory(api: GymApi | null): HistoryState {
         if (!api) return;
         if (!again && held.current[mesoId]) return;
 
+        tickets.current += 1;
+
+        const ticket = tickets.current;
+        const isLatest = () => latest.current.get(mesoId) === ticket;
+
+        latest.current.set(mesoId, ticket);
         setLoading(mesoId);
 
         try {
             const loaded = await api.sessions(mesoId);
 
+            if (!isLatest()) return;
+
             held.current = { ...held.current, [mesoId]: loaded };
             setSessions(held.current);
             setError(null);
         } catch (cause) {
-            setError(messageOf(cause));
+            if (isLatest()) setError(messageOf(cause));
         } finally {
-            setLoading((current) => (current === mesoId ? null : current));
+            if (isLatest()) setLoading((current) => (current === mesoId ? null : current));
         }
     }, [api]);
 

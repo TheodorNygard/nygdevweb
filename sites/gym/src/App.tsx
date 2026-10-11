@@ -462,13 +462,9 @@ export function App() {
     }
 
     async function submitWorkout() {
-        const workout = session.workout;
+        const workout = await session.submit();
 
         if (!workout) return;
-
-        const done = await session.submit();
-
-        if (!done) return;
 
         setCompleted(workout.freestanding
             ? { dayLabel: freeLabel(workout), week: null, totals: workout.totals }
@@ -811,13 +807,15 @@ export function App() {
                             session.close();
                             setScreen('tabs');
 
-                            if (wasFree) recent.reload();
-
                             // The totals on the block map and in History are the
                             // server's, summed from the sets on every read — so a
                             // reload of whichever list holds this session is all an
-                            // edit needs to show everywhere.
-                            if (sessionBlock) {
+                            // edit needs to show everywhere. A freestanding one is
+                            // in no block, so `/current` has nothing new to say
+                            // about it: the recent list is the one that holds it.
+                            if (wasFree) {
+                                recent.reload();
+                            } else if (sessionBlock) {
                                 history.reload(sessionBlock.id);
                             } else {
                                 block.reload();

@@ -68,44 +68,59 @@ export function seriesOf(
         .sort((a, b) => a.id.localeCompare(b.id));
 
     for (const session of ordered) {
+        // One point per exercise per session, however many entries it was
+        // logged under. Swapped away and back again, or added twice, it is
+        // still one day of that lift — two points on one date would chart it
+        // as two sessions, and count it as two in the coaching export.
+        const lifted = new Map<string, {
+            top: { weightKg: number; reps: number } | null;
+            sets: number;
+            rpeTotal: number;
+            rpeCount: number;
+        }>();
+
         for (const entry of session.entries ?? []) {
-            let top: { weightKg: number; reps: number } | null = null;
-            let rpeTotal = 0;
-            let rpeCount = 0;
+            const day = lifted.get(entry.exerciseName)
+                ?? { top: null, sets: 0, rpeTotal: 0, rpeCount: 0 };
 
             for (const set of entry.sets) {
                 if (
-                    top === null
-                    || set.weightKg > top.weightKg
-                    || (set.weightKg === top.weightKg && set.reps > top.reps)
+                    day.top === null
+                    || set.weightKg > day.top.weightKg
+                    || (set.weightKg === day.top.weightKg && set.reps > day.top.reps)
                 ) {
-                    top = { weightKg: set.weightKg, reps: set.reps };
+                    day.top = { weightKg: set.weightKg, reps: set.reps };
                 }
 
                 if (set.rpe !== null) {
-                    rpeTotal += set.rpe;
-                    rpeCount += 1;
+                    day.rpeTotal += set.rpe;
+                    day.rpeCount += 1;
                 }
             }
 
+            day.sets += entry.sets.length;
+            lifted.set(entry.exerciseName, day);
+        }
+
+        for (const [name, { top, sets, rpeTotal, rpeCount }] of lifted) {
             // An exercise added to a session and then not lifted has no top
             // set, and belongs on no chart.
             if (top === null) continue;
 
-            const points = byName.get(entry.exerciseName) ?? [];
+            const points = byName.get(name) ?? [];
 
             points.push({
                 sessionId: session.id,
                 date: dateOf(session.id),
                 weightKg: top.weightKg,
                 reps: top.reps,
-                sets: entry.sets.length,
+                sets,
                 rpe: rpeCount === 0 ? null : Math.round((rpeTotal / rpeCount) * 10) / 10,
                 week: session.week ?? null,
                 dayIndex: session.dayIndex ?? null,
             });
 
-            byName.set(entry.exerciseName, points);
+            byName.set(name, points);
         }
     }
 

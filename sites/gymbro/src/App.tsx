@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Banner } from './components/Banner';
 import { Rail, type View } from './components/Rail';
@@ -180,21 +180,30 @@ export function App() {
 
     // A block that is gone — deleted from the phone between reads — should not
     // leave every view rendering nothing.
+    //
+    // Run when the list changes and not when the selection does. Creating or
+    // copying a block selects it before the list that holds it has been read
+    // again, and checking that selection against the list from before the
+    // create threw it away for the block being trained — so the builder opened
+    // on the old block under a notice saying to name the new one.
     useEffect(() => {
-        if (selectedId === null || blocks.blocks.length === 0) return;
-        if (blocks.blocks.some((block) => block.id === selectedId)) return;
+        if (blocks.blocks.length === 0) return;
 
-        // The block the phone opens on, if it is still there: deleting the one
-        // being read is the ordinary way to land here, and the API repoints the
-        // phone at the newest block left.
-        const fallback = blocks.blocks.find((block) => block.isCurrent) ?? blocks.blocks[0];
+        setSelectedIdState((id) => {
+            if (id === null || blocks.blocks.some((block) => block.id === id)) return id;
 
-        setSelectedIdState(fallback?.id ?? null);
-    }, [blocks.blocks, selectedId]);
+            // The block the phone opens on, if it is still there: deleting the
+            // one being read is the ordinary way to land here, and the API
+            // repoints the phone at the newest block left.
+            const fallback = blocks.blocks.find((block) => block.isCurrent) ?? blocks.blocks[0];
+
+            return fallback?.id ?? null;
+        });
+    }, [blocks.blocks]);
 
     // `load` is stable across renders; the state object around it is not, so
     // the dependency has to be the function rather than the hook's return.
-    const { load: loadSessions } = history;
+    const { load: loadSessions, reload: reloadSessions } = history;
 
     useEffect(() => {
         if (selectedId) loadSessions(selectedId);
@@ -203,6 +212,28 @@ export function App() {
     const selected = blocks.blocks.find((block) => block.id === selectedId) ?? null;
     const blockSessions = selectedId ? history.sessions[selectedId] ?? NO_SESSIONS : NO_SESSIONS;
     const sessionsRead = selectedId !== null && history.sessions[selectedId] !== undefined;
+
+    // A block's sessions are read once and held, so a workout logged on the
+    // phone since would never reach the dashboard, Analytics or the export.
+    // The block list carries each block's counts and is read again after
+    // every write here, so a fresh copy of it that disagrees with the
+    // sessions held is what says they are stale. Once per copy of the list
+    // rather than once per disagreement: counts that still differ after the
+    // re-read — a session landing between the two reads — wait for the next
+    // list instead of reading in a loop.
+    const reconciled = useRef<MesocycleSummary | null>(null);
+
+    useEffect(() => {
+        if (!selected || !sessionsRead || reconciled.current === selected) return;
+
+        reconciled.current = selected;
+
+        const submitted = blockSessions.filter((session) => session.status === 'submitted').length;
+
+        if (blockSessions.length !== selected.sessionCount || submitted !== selected.submittedCount) {
+            reloadSessions(selected.id);
+        }
+    }, [selected, sessionsRead, blockSessions, reloadSessions]);
 
     // The week to read the block at. Not calendar-derived — days are labelled
     // rather than scheduled — so it is the latest week anything was logged in.
@@ -251,11 +282,11 @@ export function App() {
     }, [anyDirty]);
 
     // What deleting the block would take with it, from its own sessions. Null
-    // until they have been read, and the confirmation waits on it.
+    // until they have been read, and the confirmation waits on it. Drafts
+    // included: the delete takes them too, and the count beside this already
+    // counts them — the phone's block sheet sums the same way.
     const blockVolumeKg = sessionsRead
-        ? blockSessions
-            .filter((session) => session.status === 'submitted')
-            .reduce((total, session) => total + session.volumeKg, 0)
+        ? blockSessions.reduce((total, session) => total + session.volumeKg, 0)
         : null;
 
     // Clamped: shortening a block can leave the map pointing past its own end.

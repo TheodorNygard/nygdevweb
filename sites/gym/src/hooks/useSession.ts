@@ -86,7 +86,13 @@ export interface SessionActions {
      * than only re-sorting the local array.
      */
     reorderEntry: (from: number, to: number) => Promise<void>;
-    submit: () => Promise<boolean>;
+
+    /**
+     * The workout as it was submitted, or null when it was not. Read after the
+     * outbox settles rather than when Submit was tapped: a write rolled back in
+     * between is not part of what was filed.
+     */
+    submit: () => Promise<Workout | null>;
     dismiss: () => void;
 }
 
@@ -229,11 +235,20 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         }
     }, []);
 
-    /** Empties the outbox and returns what was in it. Nothing in flight is recalled. */
-    const drop = useCallback((): Job[] => {
-        const dropped = outbox.current;
+    /**
+     * Takes one opening's writes out of the outbox — or every write, with no
+     * generation — and returns them. Nothing in flight is recalled.
+     *
+     * Scoped because a write left in flight by a closed session can fail after
+     * the next one has opened and queued its own behind it. Those were counted
+     * from a different session entirely, and dropping them with it would leave
+     * sets on the new screen that were never sent.
+     */
+    const drop = useCallback((only?: number): Job[] => {
+        const queue = outbox.current;
+        const dropped = only === undefined ? queue : queue.filter((job) => job.generation === only);
 
-        outbox.current = [];
+        outbox.current = only === undefined ? [] : queue.filter((job) => job.generation !== only);
         dropped.forEach((job) => job.done());
         report();
 
@@ -404,7 +419,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                     // stale copy, so it goes too; the re-read is what is left.
                     if (cause instanceof ApiError
                         && (cause.isCountMismatch || cause.isReorderConflict || cause.isEntryConflict)) {
-                        drop();
+                        drop(job.generation);
 
                         if (open) {
                             await resync(job.sessionId);
@@ -431,7 +446,7 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                     // session before it *and* before everything behind it:
                     // rolling back to it takes exactly the unsaved writes off
                     // the screen and leaves every acknowledged one.
-                    const dropped = drop();
+                    const dropped = drop(job.generation);
                     const lost = `${unsaved(dropped)} ${dropped.length === 1 ? 'was' : 'were'} `
                         + 'not saved';
 
@@ -656,10 +671,10 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         );
     }, [write]);
 
-    const submit = useCallback(async (): Promise<boolean> => {
+    const submit = useCallback(async (): Promise<Workout | null> => {
         const session = current.current;
 
-        if (!api || !session) return false;
+        if (!api || !session) return null;
 
         setBusy(true);
         setError(null);
@@ -678,13 +693,22 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                 `${unsaved(unsent)} still waiting to save. Submit once the header says saved.`,
             );
 
-            return false;
+            return null;
         }
 
         try {
             const planned = await api.submit(session.id);
 
-            put({ ...session, status: 'submitted' });
+            // What the screen holds now, not what it held at the tap: a write
+            // that failed while Submit waited has been rolled back since, and
+            // filing the earlier copy would put its set back on screen — and
+            // into the totals the Done screen reads.
+            const filed: Workout = {
+                ...(current.current?.id === session.id ? current.current : session),
+                status: 'submitted',
+            };
+
+            put(filed);
 
             if (planned) {
                 // The day had nothing planned against it and now has this. Said
@@ -697,11 +721,11 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
                 );
             }
 
-            return true;
+            return filed;
         } catch (cause) {
             setError(messageOf(cause));
 
-            return false;
+            return null;
         } finally {
             setBusy(false);
         }
