@@ -38,3 +38,18 @@ export const MAX_PROFILE_TEXT = 400;
 /** Bodyweight in kilograms — `GymLimits.MinBodyweightKg` and `MaxBodyweightKg`. */
 export const MIN_BODYWEIGHT_KG = 20;
 export const MAX_BODYWEIGHT_KG = 400;
+
+/**
+ * The working sets a week of one muscle group — planned in the builder, logged
+ * in the freestanding overview — and where that sits against the range worth
+ * aiming at.
+ *
+ * Ten to twenty working sets a week is the range most of the evidence lands in,
+ * and it is a range rather than a number — so the bar reads three ways rather
+ * than red/green. Below ten is muted: not wrong, just light. Above twenty is
+ * accent: not wrong either, but it is the number to have decided on rather than
+ * arrived at.
+ */
+export const GROUP_FULL_SCALE = 24;
+export const GROUP_LOW = 10;
+export const GROUP_HIGH = 20;

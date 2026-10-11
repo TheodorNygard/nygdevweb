@@ -10,8 +10,11 @@ interface AnalyticsScreenProps {
     onSelect: (name: string) => void;
     loading: boolean;
 
-    /** The block for the coaching export, or null until its sets are in hand. */
+    /** The training for the coaching export, or null until its sets are in hand. */
     coaching: CoachingInput | null;
+
+    /** What is being charted: the selected block, or the workouts in no block. */
+    subject: 'block' | 'free';
 
     /** The lifter's profile, edited beside the export it fills in. */
     profile: ProfileState;
@@ -52,6 +55,7 @@ export function AnalyticsScreen({
     onSelect,
     loading,
     coaching,
+    subject,
     profile,
 }: AnalyticsScreenProps) {
     const lift = series.find((one) => one.name === selected) ?? series[0] ?? null;
@@ -91,9 +95,12 @@ export function AnalyticsScreen({
                     <span className="panel__label">PROGRESSION</span>
                     <p className="empty" style={{ paddingLeft: 0 }}>
                         {loading
-                            ? 'Reading the block…'
-                            : 'Nothing submitted in this block yet. A chart needs sets, and sets '
-                                + 'come from the phone.'}
+                            ? subject === 'block' ? 'Reading the block…' : 'Reading your workouts…'
+                            : subject === 'block'
+                                ? 'Nothing submitted in this block yet. A chart needs sets, and sets '
+                                    + 'come from the phone.'
+                                : 'Nothing logged outside a block in the last year. A chart needs '
+                                    + 'sets, and sets come from the phone.'}
                     </p>
                 </section>
             </div>
@@ -103,7 +110,7 @@ export function AnalyticsScreen({
     return (
         <div className="view stats">
             <div className="stats__list">
-                <CoachingExport input={coaching} profile={profile} />
+                <CoachingExport input={coaching} subject={subject} profile={profile} />
                 <span className="stats__list-label">TRACKED LIFTS</span>
                 {series.map((one) => {
                     const first = one.points[0];

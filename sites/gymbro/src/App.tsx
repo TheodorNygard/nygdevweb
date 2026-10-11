@@ -4,6 +4,7 @@ import { Banner } from './components/Banner';
 import { Rail, type View } from './components/Rail';
 import { SignInGate } from './components/SignInGate';
 import { useBlocks } from './hooks/useBlocks';
+import { useFreestanding } from './hooks/useFreestanding';
 import { useProfile } from './hooks/useProfile';
 import { useWorkouts } from './hooks/useWorkouts';
 import { seriesOf } from './lib/analytics';
@@ -28,6 +29,7 @@ import { DEFAULT_DAY_LABELS, MAX_NAME, MIN_DAYS } from './lib/limits';
 import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { BlockScreen, draftOf, isDirty, isSaveable, type Draft } from './screens/BlockScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
+import { FreeDashboardScreen } from './screens/FreeDashboardScreen';
 import { LibraryScreen } from './screens/LibraryScreen';
 
 /** Stable empties, so a lookup that misses does not churn its consumers. */
@@ -85,19 +87,51 @@ export function App() {
         [shippedLibrary, customExercises.exercises],
     );
 
-    // Every exercise name any block plans. A name typed for last block is
-    // offered in this block's picker rather than retyped — and misspelled,
+    const [view, setView] = useState<View>('dashboard');
+    const [selectedId, setSelectedIdState] = useState<string | null>(null);
+
+    // Whether every view reads the workouts logged in no block rather than the
+    // selected block. A flag beside the selection rather than a sentinel id in
+    // it: the block stays selected underneath, so going back to it from the
+    // rail lands where it was, draft and week included.
+    const [freeSelected, setFreeSelected] = useState(false);
+
+    // Picking a block — from the rail, or by creating or copying one — is also
+    // leaving the freestanding view.
+    function setSelectedId(id: string | null) {
+        setSelectedIdState(id);
+        setFreeSelected(false);
+    }
+
+    // Someone who has never planned a block lands on what they do have.
+    useEffect(() => {
+        if (!blocks.loading && !blocks.error && blocks.blocks.length === 0) setFreeSelected(true);
+    }, [blocks.loading, blocks.error, blocks.blocks.length]);
+
+    // The freestanding workouts are read the first time they are looked at,
+    // and held from then on, the way the builder's templates are.
+    const [freeOpened, setFreeOpened] = useState(false);
+
+    if (freeSelected && !freeOpened) setFreeOpened(true);
+
+    const free = useFreestanding(freeOpened ? api : null);
+
+    // Every exercise name any block plans, and every one lifted in a workout
+    // outside a block once those have been read. A name typed for last block
+    // is offered in this block's picker rather than retyped — and misspelled,
     // which splits its history in two — and the Library view lists the ones
     // nothing describes yet, to describe.
     const knownNames = useMemo(
-        () => [...new Set(blocks.blocks.flatMap((block) => (
-            block.days.flatMap((day) => day.plan.map((planned) => planned.exerciseName))
-        )))],
-        [blocks.blocks],
+        () => [...new Set([
+            ...blocks.blocks.flatMap((block) => (
+                block.days.flatMap((day) => day.plan.map((planned) => planned.exerciseName))
+            )),
+            ...free.sessions.flatMap((session) => (
+                (session.entries ?? []).map((entry) => entry.exerciseName)
+            )),
+        ])],
+        [blocks.blocks, free.sessions],
     );
-
-    const [view, setView] = useState<View>('dashboard');
-    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [theme, pickTheme] = useTheme();
 
     // Only read once the builder is first opened: templates are used by nothing
@@ -141,7 +175,7 @@ export function App() {
 
         const current = blocks.blocks.find((block) => block.isCurrent) ?? blocks.blocks[0];
 
-        if (current) setSelectedId(current.id);
+        if (current) setSelectedIdState(current.id);
     }, [blocks.blocks, selectedId]);
 
     // A block that is gone — deleted from the phone between reads — should not
@@ -155,7 +189,7 @@ export function App() {
         // phone at the newest block left.
         const fallback = blocks.blocks.find((block) => block.isCurrent) ?? blocks.blocks[0];
 
-        setSelectedId(fallback?.id ?? null);
+        setSelectedIdState(fallback?.id ?? null);
     }, [blocks.blocks, selectedId]);
 
     // `load` is stable across renders; the state object around it is not, so
@@ -235,7 +269,8 @@ export function App() {
     // the block's, not theirs. Submitted ones alone: a draft is a workout in
     // progress, and a lift chart that dipped three sets into every session
     // would report the clock.
-    const analyticsIds = view === 'stats'
+    const blockStats = view === 'stats' && !freeSelected;
+    const analyticsIds = blockStats
         ? blockSessions
             .filter((session) => session.status === 'submitted')
             .map((session) => session.id)
@@ -243,7 +278,7 @@ export function App() {
 
     const workouts = useWorkouts(
         api,
-        view === 'stats' ? selectedId : null,
+        blockStats ? selectedId : null,
         analyticsIds,
     );
 
@@ -252,12 +287,20 @@ export function App() {
         [workouts.sessions],
     );
 
+    // The same chart over the workouts in no block. Drafts are dropped inside
+    // `seriesOf`, as they are for a block.
+    const freeSeries = useMemo(
+        () => seriesOf(free.sessions, sessionDateLabel),
+        [free.sessions],
+    );
+
     // What Analytics' coaching export writes out: the block as saved — not a
     // draft in the builder, which nobody has trained — with every set it holds.
     // Null until those sets are in hand, which is what keeps the buttons off.
     const coaching = useMemo(
         () => (selected && !workouts.loading && workouts.sessions.length > 0
             ? {
+                kind: 'block' as const,
                 block: selected,
                 sessions: workouts.sessions,
                 library,
@@ -267,6 +310,22 @@ export function App() {
             }
             : null),
         [selected, workouts.loading, workouts.sessions, library, customExercises.exercises, profile.profile],
+    );
+
+    const freeCoaching = useMemo(
+        () => (!free.loading && free.sessions.length > 0
+            ? {
+                kind: 'free' as const,
+                sessions: free.sessions,
+                from: free.from,
+                to: free.to,
+                library,
+                custom: customExercises.exercises,
+                profile: profile.profile,
+                exportedOn: localDate(),
+            }
+            : null),
+        [free.loading, free.sessions, free.from, free.to, library, customExercises.exercises, profile.profile],
     );
 
     function setDraft(next: Draft) {
@@ -453,12 +512,15 @@ export function App() {
         ?? actionError
         ?? blocks.error
         ?? history.error
-        ?? (view === 'stats' ? workouts.error : null);
+        ?? (freeSelected ? free.error : view === 'stats' ? workouts.error : null);
 
     const exerciseCount = library?.exercises.length ?? 0;
 
     const heading: Record<View, [string, string]> = {
-        dashboard: [selected?.isCurrent ? 'CURRENT BLOCK' : 'SELECTED BLOCK', 'Overview'],
+        dashboard: [
+            freeSelected ? 'OUTSIDE A BLOCK' : selected?.isCurrent ? 'CURRENT BLOCK' : 'SELECTED BLOCK',
+            'Overview',
+        ],
         block: ['MESOCYCLE', 'Block builder'],
         library: ['EXERCISE LIBRARY', exerciseCount === 0 ? 'Exercises' : `${exerciseCount} exercises`],
         stats: ['PROGRESSION', 'Analytics'],
@@ -485,6 +547,11 @@ export function App() {
                 blocksLoading={blocks.loading}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
+                freeSelected={freeSelected}
+                freeCount={freeOpened && !free.loading
+                    ? free.sessions.filter((session) => session.status === 'submitted').length
+                    : null}
+                onSelectFree={() => setFreeSelected(true)}
                 onCreate={createBlock}
                 busy={busy}
                 theme={theme}
@@ -533,7 +600,7 @@ export function App() {
                             <span className={dirty ? 'sync__dot sync__dot--idle' : 'sync__dot'} />
                             <span className="sync__text">{syncLine}</span>
                         </div>
-                        {dirty && draft ? (
+                        {dirty && draft && !freeSelected ? (
                             <button
                                 type="button"
                                 className="primary"
@@ -547,7 +614,42 @@ export function App() {
                 </header>
 
                 <div className="canvas">
-                    {blocks.loading && blocks.blocks.length === 0 ? (
+                    {freeSelected ? (
+                        view === 'dashboard' ? (
+                            <FreeDashboardScreen
+                                sessions={free.sessions}
+                                library={library}
+                                loading={free.loading}
+                            />
+                        ) : view === 'block' ? (
+                            <section className="panel">
+                                <span className="panel__label">NOTHING TO PLAN</span>
+                                <p className="empty" style={{ paddingLeft: 0 }}>
+                                    Freestanding workouts follow no plan, so there is no block to
+                                    build. Pick a block in the sidebar to plan it, or start a new one
+                                    — five weeks of four days, ramping toward a deload.
+                                </p>
+                            </section>
+                        ) : view === 'library' ? (
+                            <LibraryScreen
+                                library={library}
+                                block={null}
+                                knownNames={knownNames}
+                                custom={customExercises}
+                                favorites={favorites}
+                            />
+                        ) : (
+                            <AnalyticsScreen
+                                series={freeSeries}
+                                selected={lift}
+                                onSelect={setLift}
+                                loading={free.loading}
+                                coaching={freeCoaching}
+                                subject="free"
+                                profile={profile}
+                            />
+                        )
+                    ) : blocks.loading && blocks.blocks.length === 0 ? (
                         <p className="empty">Reading your blocks…</p>
                     ) : !selected || !draft ? (
                         <p className="empty" style={{ paddingLeft: 0 }}>
@@ -595,6 +697,7 @@ export function App() {
                             onSelect={setLift}
                             loading={workouts.loading}
                             coaching={coaching}
+                            subject="block"
                             profile={profile}
                         />
                     )}

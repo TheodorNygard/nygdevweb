@@ -1,4 +1,16 @@
-import { type SessionDetail } from './gym';
+import { type SessionEntry, type SessionStatus } from './gym';
+
+/**
+ * What a series is built from: a session with its sets, from a block's list or
+ * the date range. A freestanding one has no week and no day; see `LiftPoint`.
+ */
+export interface LoggedSession {
+    id: string;
+    status: SessionStatus;
+    entries?: SessionEntry[];
+    week?: number;
+    dayIndex?: number;
+}
 
 /**
  * One exercise on one day: the heaviest set that was logged, and what the
@@ -17,10 +29,12 @@ export interface LiftPoint {
     reps: number;
     sets: number;
     rpe: number | null;
-    week: number;
 
-    /** Which plan day the session was logged against — D1 is 0. */
-    dayIndex: number;
+    /** The week of the block, or null for a workout in no block. */
+    week: number | null;
+
+    /** Which plan day the session was logged against — D1 is 0. Null in no block. */
+    dayIndex: number | null;
 }
 
 export interface LiftSeries {
@@ -43,7 +57,7 @@ export interface LiftSeries {
  * reporting the clock rather than the training.
  */
 export function seriesOf(
-    sessions: readonly SessionDetail[],
+    sessions: readonly LoggedSession[],
     dateOf: (sessionId: string) => string,
 ): LiftSeries[] {
     const byName = new Map<string, LiftPoint[]>();
@@ -54,7 +68,7 @@ export function seriesOf(
         .sort((a, b) => a.id.localeCompare(b.id));
 
     for (const session of ordered) {
-        for (const entry of session.entries) {
+        for (const entry of session.entries ?? []) {
             let top: { weightKg: number; reps: number } | null = null;
             let rpeTotal = 0;
             let rpeCount = 0;
@@ -87,8 +101,8 @@ export function seriesOf(
                 reps: top.reps,
                 sets: entry.sets.length,
                 rpe: rpeCount === 0 ? null : Math.round((rpeTotal / rpeCount) * 10) / 10,
-                week: session.week,
-                dayIndex: session.dayIndex,
+                week: session.week ?? null,
+                dayIndex: session.dayIndex ?? null,
             });
 
             byName.set(entry.exerciseName, points);
