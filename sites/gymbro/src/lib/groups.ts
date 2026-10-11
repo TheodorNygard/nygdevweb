@@ -19,7 +19,7 @@ import { type ExerciseLibrary } from './gym';
  * than a guess: a wrong group silently skews the panel that exists to be
  * trusted.
  */
-export const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Posterior', 'Calves'];
+export const GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Posterior', 'Calves', 'Core'];
 
 /**
  * What an exercise can say it trains — the shipped library's closed vocabulary,
@@ -42,6 +42,7 @@ export const MUSCLES = [
     'Glutes',
     'Hamstrings',
     'Calves',
+    'Abs',
 ];
 
 /** No group known. Shown as-is, and counted toward nothing. */

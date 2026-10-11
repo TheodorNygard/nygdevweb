@@ -1134,7 +1134,7 @@ the finer `muscles` the logger ranks swap suggestions by; `groupOf` reads the
 group from there, so a variation such as `Preacher Curl` counts toward arms
 without this site having heard of it. The old map stays as the fallback for a
 library cached from before the field existed. The planner's tally stays on the
-seven groups rather than moving to muscles — "sets of arms" is the question a
+eight groups rather than moving to muscles — "sets of arms" is the question a
 block is planned against, and a compound lift split across three muscles would
 count each set three times.
 
@@ -1174,9 +1174,10 @@ with **Describe** beside it; the picker in the builder offers names from every
 block's plans, not only the selected one, so last block's typed name is picked
 rather than retyped and misspelled into a second history.
 
-One limit: the groups are the seven the tally counts, and the library has no
-core group. An exercise for something none of them covers — abs, say — can still
-be described, with its equipment and family, but it counts toward no group.
+The groups are the eight the tally counts, Core among them, so abs work is
+planned and counted like anything else. An exercise for something none of them
+covers can still be described, with its equipment and family, but it counts
+toward no group.
 
 ### Favourites and recently used
 

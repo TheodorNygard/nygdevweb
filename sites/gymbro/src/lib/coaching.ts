@@ -103,7 +103,7 @@ const READING = {
         + 'count a dumbbell once, so their volume reads lower for dumbbell work.',
     swapped: '- “Swapped in for X” means the exercise replaced X in that session — usually because the '
         + 'equipment was taken.',
-    groups: '- Muscle groups are the seven the planner counts: '
+    groups: '- Muscle groups are the ones the planner counts: '
         + `${GROUPS.join(', ')}. “No group” means the exercise is not described with one.`,
 };
 

@@ -324,7 +324,7 @@ export interface LibraryExercise {
     /** The job the movement does — `horizontal-push`, `hinge`, `curl`. */
     pattern?: string;
 
-    /** The muscle group it is planned against, one of gymbro's seven. */
+    /** The muscle group it is planned against, one of gymbro's eight. */
     group?: string;
 
     /**
