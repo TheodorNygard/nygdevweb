@@ -17,6 +17,15 @@ interface RailProps {
     blocksLoading: boolean;
     selectedId: string | null;
     onSelect: (mesoId: string) => void;
+
+    /**
+     * Whether the workouts logged in no block are what every view is reading,
+     * in place of a block — and how many of them the last year holds, once
+     * that has been read.
+     */
+    freeSelected: boolean;
+    freeCount: number | null;
+    onSelectFree: () => void;
     onCreate: () => void;
     busy: boolean;
 
@@ -47,6 +56,12 @@ function initials(account: string): string {
  * this site reads the selected block, so a past block can be read and edited
  * without disturbing the one being trained; the Block view carries the explicit
  * button for when moving the phone *is* what you meant.
+ *
+ * Above the blocks is the one thing that is not one: the workouts logged on
+ * the phone with no block behind them. It is selected the same way and every
+ * view reads it in a block's place — the overview, the chart and the coaching
+ * export each have a version of themselves for it, and the builder says there
+ * is nothing to plan.
  */
 export function Rail({
     view,
@@ -55,6 +70,9 @@ export function Rail({
     blocksLoading,
     selectedId,
     onSelect,
+    freeSelected,
+    freeCount,
+    onSelectFree,
     onCreate,
     busy,
     theme,
@@ -88,6 +106,25 @@ export function Rail({
             </nav>
 
             <div>
+                <div className="rail__section">NO BLOCK</div>
+                <div className="rail__blocks">
+                    <button
+                        type="button"
+                        className={freeSelected ? 'block-item block-item--on' : 'block-item'}
+                        aria-pressed={freeSelected}
+                        onClick={onSelectFree}
+                    >
+                        <span className="block-item__name">Freestanding workouts</span>
+                        <span className="block-item__sub">
+                            {freeCount === null
+                                ? 'Logged outside any block'
+                                : `${freeCount} logged in the last year`}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
                 <div className="rail__section">BLOCKS</div>
                 <div className="rail__blocks">
                     {blocks.map((block) => (
@@ -95,9 +132,11 @@ export function Rail({
                             key={block.id}
                             type="button"
                             className={
-                                block.id === selectedId ? 'block-item block-item--on' : 'block-item'
+                                !freeSelected && block.id === selectedId
+                                    ? 'block-item block-item--on'
+                                    : 'block-item'
                             }
-                            aria-pressed={block.id === selectedId}
+                            aria-pressed={!freeSelected && block.id === selectedId}
                             onClick={() => onSelect(block.id)}
                         >
                             <span className="block-item__name">

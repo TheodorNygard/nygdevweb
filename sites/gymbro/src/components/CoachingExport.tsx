@@ -9,6 +9,9 @@ interface CoachingExportProps {
     /** What to export, or null while the block's sets are still being read. */
     input: CoachingInput | null;
 
+    /** What the export covers, for the line above the buttons while `input` is still null. */
+    subject: 'block' | 'free';
+
     /** The lifter's profile, which the export's *Goals and context* opens on. */
     profile: ProfileState;
 }
@@ -47,7 +50,7 @@ function profileSummary(profile: LifterProfile): string | null {
  * the export's closing section — and this is where somebody notices that
  * section is empty.
  */
-export function CoachingExport({ input, profile }: CoachingExportProps) {
+export function CoachingExport({ input, subject, profile }: CoachingExportProps) {
     const [copied, setCopied] = useState<'yes' | 'failed' | null>(null);
     const [editing, setEditing] = useState(false);
 
@@ -64,7 +67,7 @@ export function CoachingExport({ input, profile }: CoachingExportProps) {
 
         return {
             text: coachingExport(input),
-            name: coachingFilename(input.block, input.exportedOn),
+            name: coachingFilename(input),
         };
     }
 
@@ -105,8 +108,12 @@ export function CoachingExport({ input, profile }: CoachingExportProps) {
         <div className="coach">
             <span className="stats__list-label">FOR A COACH</span>
             <p className="coach__note">
-                The whole block — plan, weekly targets, every set — as Markdown that explains
-                itself, to paste into a conversation with a coach or an AI.
+                {subject === 'block'
+                    ? 'The whole block — plan, weekly targets, every set — as Markdown that '
+                        + 'explains itself, to paste into a conversation with a coach or an AI.'
+                    : 'A year of workouts outside a block — weekly sets per muscle group, progress, '
+                        + 'every set — as Markdown that explains itself, to paste into a conversation '
+                        + 'with a coach or an AI.'}
             </p>
             <div className="coach__buttons">
                 <button type="button" className="primary" onClick={() => { void copy(); }} disabled={!input}>

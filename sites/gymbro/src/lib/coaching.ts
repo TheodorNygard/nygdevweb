@@ -1,4 +1,5 @@
 import { seriesOf, type LiftPoint } from './analytics';
+import { calendarWeeks } from './freestanding';
 import { GROUPS, NO_GROUP, groupOf } from './groups';
 import {
     dayLabel,
@@ -15,6 +16,7 @@ import {
     swappedAway,
     targetsFor,
     type CustomExercise,
+    type DatedSession,
     type ExerciseLibrary,
     type LifterProfile,
     type MesocycleSummary,
@@ -23,12 +25,8 @@ import {
     type WorkSet,
 } from './gym';
 
-export interface CoachingInput {
-    block: MesocycleSummary;
-
-    /** The block's sessions with their sets, in any order. Drafts included. */
-    sessions: readonly SessionDetail[];
-
+/** What both exports need besides the sessions themselves. */
+interface CoachingCommon {
     /** The merged library — shipped and the user's own — for equipment and groups. */
     library: ExerciseLibrary | null;
 
@@ -41,6 +39,29 @@ export interface CoachingInput {
     /** Today, `YYYY-MM-DD`. Passed in so the document says when it was true. */
     exportedOn: string;
 }
+
+/** One block, its plan, and every session logged in it. */
+export interface BlockCoaching extends CoachingCommon {
+    kind: 'block';
+    block: MesocycleSummary;
+
+    /** The block's sessions with their sets, in any order. Drafts included. */
+    sessions: readonly SessionDetail[];
+}
+
+/** Workouts logged in no block, over a date range. */
+export interface FreeCoaching extends CoachingCommon {
+    kind: 'free';
+
+    /** The freestanding sessions with their sets, in any order. Drafts included. */
+    sessions: readonly DatedSession[];
+
+    /** The range they were read over, both local dates included. */
+    from: string;
+    to: string;
+}
+
+export type CoachingInput = BlockCoaching | FreeCoaching;
 
 /**
  * What a barbell weighs where the lifter trains. The logger stores the number
@@ -60,6 +81,32 @@ const DUMBBELL_HANDS = 2;
 const SETS_LOW = 10;
 const SETS_HIGH = 20;
 
+/**
+ * The lines of *How to read this* that hold for any logged training, block or
+ * not — the units, the RPE scale and what the app's own words mean. Each export
+ * adds what is particular to it between them.
+ */
+const READING = {
+    units: '- Weights are kilograms. A set is written `weight × reps @ RPE`, e.g. `62.5 × 8 @ 8`.',
+    bar: `- **Barbell weights include the bar** (a standard ${BAR_KG} kg bar): \`60 × 5\` on a bench press `
+        + 'is 60 kg total on the bar, not 60 kg of plates. Nothing is logged per side.',
+    dumbbell: '- **Dumbbell weights are per hand**: `30 × 10` on a dumbbell press is two 30 kg dumbbells. '
+        + 'Each exercise carries its equipment in brackets, so a reader can tell which rule applies.',
+    rpe: '- RPE is rated on a 5–10 scale in halves: 10 is nothing left, 9 one rep left, 8 about two, '
+        + '7 about three, 6 four or more. A set without `@` was not rated and is still a working set.',
+    warmUp: '- Sets at RPE 5 or 5.5 are warm-ups and are marked `(warm-up)`. They are recorded but do '
+        + 'not count as working sets',
+    topSet: '- “Top set” is the heaviest set logged for an exercise in a session (more reps break a '
+        + 'tie). It is what was lifted, not an estimated one-rep max.',
+    volume: '- “Total volume” is weight × reps summed over every set in the session, warm-ups included, '
+        + `with a dumbbell set counted for both hands (× ${DUMBBELL_HANDS}). The app’s own screens `
+        + 'count a dumbbell once, so their volume reads lower for dumbbell work.',
+    swapped: '- “Swapped in for X” means the exercise replaced X in that session — usually because the '
+        + 'equipment was taken.',
+    groups: '- Muscle groups are the seven the planner counts: '
+        + `${GROUPS.join(', ')}. “No group” means the exercise is not described with one.`,
+};
+
 /** `62.5 × 8 @ 8`, with the warm-up said out loud rather than left to the RPE. */
 function setText(set: WorkSet): string {
     const rated = set.rpe === null ? '' : ` @ ${num(set.rpe)}`;
@@ -72,9 +119,13 @@ function cellLabel(week: number, dayIndex: number): string {
     return `Wk${week} D${dayIndex + 1}`;
 }
 
-/** `62.5 × 8 (Wk1 D1, 2026-09-03)`. */
+/** `62.5 × 8 (Wk1 D1, 2026-09-03)`, or `62.5 × 8 (2026-09-03)` for a workout in no block. */
 function pointText(point: LiftPoint): string {
-    return `${num(point.weightKg)} × ${point.reps} (${cellLabel(point.week, point.dayIndex)}, ${point.date})`;
+    const where = point.week === null || point.dayIndex === null
+        ? point.date
+        : `${cellLabel(point.week, point.dayIndex)}, ${point.date}`;
+
+    return `${num(point.weightKg)} × ${point.reps} (${where})`;
 }
 
 /** `+5`, `-2.5`, `0` — a delta with its sign said. */
@@ -97,6 +148,8 @@ function changeText(points: readonly LiftPoint[]): string {
     const byDay = new Map<number, LiftPoint[]>();
 
     for (const point of points) {
+        if (point.dayIndex === null) continue;
+
         const run = byDay.get(point.dayIndex) ?? [];
 
         run.push(point);
@@ -200,6 +253,65 @@ function plannedByGroup(
 }
 
 /**
+ * The exercises a reader cannot look up: described ones with what they are,
+ * typed ones flagged as only a name. Nothing when every name is in the library.
+ */
+function ownExercisesSection(
+    used: ReadonlySet<string>,
+    custom: readonly CustomExercise[],
+    library: ExerciseLibrary | null,
+): string[] {
+    const described = custom.filter((exercise) => used.has(exercise.name));
+    const listed = new Set(library?.exercises.map((exercise) => exercise.name) ?? []);
+    const undescribed = [...used].filter((name) => !listed.has(name)).sort();
+
+    if (described.length === 0 && undescribed.length === 0) return [];
+
+    const lines = described.map((exercise) => {
+        const parts = [
+            exercise.equipment ?? 'equipment not given',
+            exercise.group ?? 'no group',
+            exercise.muscles?.length ? `trains ${exercise.muscles.join(', ')}` : null,
+            exercise.variationOf ? `a variation of ${exercise.variationOf}` : null,
+        ].filter((part): part is string => part !== null);
+
+        return `- ${exercise.name}: ${parts.join('; ')}`;
+    });
+
+    for (const name of undescribed) {
+        lines.push(`- ${name}: a name typed by the lifter, with no description`);
+    }
+
+    return ['## Exercises not in the standard library', lines.join('\n')];
+}
+
+/** The closing section, from the lifter's profile or as a prompt to fill it in. */
+function goalsSection(profile: LifterProfile): string[] {
+    const out = ['## Goals and context'];
+    const about: string[] = [];
+
+    if (profile.experience) about.push(`- Experience: ${profile.experience}`);
+    if (profile.bodyweightKg !== undefined) about.push(`- Bodyweight: ${num(profile.bodyweightKg)} kg`);
+    if (profile.goal) about.push(`- Goal: ${oneLine(profile.goal)}`);
+    if (profile.injuries) about.push(`- Injuries and limits: ${oneLine(profile.injuries)}`);
+
+    if (about.length === 0) {
+        out.push(
+            '_Not recorded in the app. Add goals, injuries, schedule, sleep or anything else the reader '
+            + 'should weigh before sending._',
+        );
+    } else {
+        out.push(about.join('\n'));
+        out.push(
+            '_From the lifter’s profile in gymbro. Add schedule, sleep, how the week went or anything '
+            + 'else the reader should weigh before sending._',
+        );
+    }
+
+    return out;
+}
+
+/**
  * The selected block, written for a coaching conversation with a person or an
  * AI model: everything a reader needs to interpret it is in the document.
  *
@@ -230,7 +342,7 @@ function plannedByGroup(
  * week and day as well as its date, because two sessions can share a date and
  * a date alone cannot tell D1 from D2.
  */
-export function coachingExport({ block, sessions, library, custom, profile, exportedOn }: CoachingInput): string {
+function blockExport({ block, sessions, library, custom, profile, exportedOn }: BlockCoaching): string {
     const ordered = [...sessions].sort((a, b) => a.id.localeCompare(b.id));
     const submitted = ordered.filter((session) => session.status === 'submitted');
     const drafts = ordered.length - submitted.length;
@@ -244,15 +356,11 @@ export function coachingExport({ block, sessions, library, custom, profile, expo
 
     out.push('## How to read this');
     out.push([
-        '- Weights are kilograms. A set is written `weight × reps @ RPE`, e.g. `62.5 × 8 @ 8`.',
-        `- **Barbell weights include the bar** (a standard ${BAR_KG} kg bar): \`60 × 5\` on a bench press `
-            + 'is 60 kg total on the bar, not 60 kg of plates. Nothing is logged per side.',
-        '- **Dumbbell weights are per hand**: `30 × 10` on a dumbbell press is two 30 kg dumbbells. '
-            + 'Each exercise carries its equipment in brackets, so a reader can tell which rule applies.',
-        '- RPE is rated on a 5–10 scale in halves: 10 is nothing left, 9 one rep left, 8 about two, '
-            + '7 about three, 6 four or more. A set without `@` was not rated and is still a working set.',
-        '- Sets at RPE 5 or 5.5 are warm-ups and are marked `(warm-up)`. They are recorded but do '
-            + 'not count as working sets or toward a plan’s set target.',
+        READING.units,
+        READING.bar,
+        READING.dumbbell,
+        READING.rpe,
+        `${READING.warmUp} or toward a plan’s set target.`,
         '- The plan prescribes **sets only** — never a weight or a rep count. The lifter picks the '
             + 'weight in the session; the week’s intensity target says how close to failure to go.',
         '- Intensity is a reps-in-reserve target per week that tightens as the block goes on. The '
@@ -262,20 +370,15 @@ export function coachingExport({ block, sessions, library, custom, profile, expo
             + 'regression.',
         '- Sessions and top sets are labelled `Wk2 D1`: week 2 of the block, the first plan day. '
             + 'Two sessions can share a date, so the label is what tells them apart.',
-        '- “Top set” is the heaviest set logged for an exercise in a session (more reps break a '
-            + 'tie). It is what was lifted, not an estimated one-rep max.',
+        READING.topSet,
         '- “Change” in the progress table compares the top set of **the same exercise on the same '
             + 'plan day** — D1’s bench against D1’s bench — in the first and the latest week it was '
             + 'logged. It is the **weight difference** of those two top sets, with the reps of both '
             + 'beside it; it does not fold reps into the number. An exercise on two plan days gets a '
             + 'line per day, and D1 is never compared with D2.',
-        '- “Total volume” is weight × reps summed over every set in the session, warm-ups included, '
-            + `with a dumbbell set counted for both hands (× ${DUMBBELL_HANDS}). The app’s own screens `
-            + 'count a dumbbell once, so their volume reads lower for dumbbell work.',
-        '- “Swapped in for X” means the exercise replaced X in that session — usually because the '
-            + 'equipment was taken.',
-        '- Muscle groups are the seven the planner counts: '
-            + `${GROUPS.join(', ')}. “No group” means the exercise is not described with one.`,
+        READING.volume,
+        READING.swapped,
+        READING.groups,
     ].join('\n'));
 
     // ------------------------------------------------------------------ block
@@ -552,66 +655,214 @@ export function coachingExport({ block, sessions, library, custom, profile, expo
         for (const planned of day.plan) used.add(planned.exerciseName);
     }
 
-    const described = custom.filter((exercise) => used.has(exercise.name));
-    const listed = new Set(library?.exercises.map((exercise) => exercise.name) ?? []);
-    const undescribed = [...used].filter((name) => !listed.has(name)).sort();
-
-    if (described.length > 0 || undescribed.length > 0) {
-        out.push('## Exercises not in the standard library');
-
-        const lines = described.map((exercise) => {
-            const parts = [
-                exercise.equipment ?? 'equipment not given',
-                exercise.group ?? 'no group',
-                exercise.muscles?.length ? `trains ${exercise.muscles.join(', ')}` : null,
-                exercise.variationOf ? `a variation of ${exercise.variationOf}` : null,
-            ].filter((part): part is string => part !== null);
-
-            return `- ${exercise.name}: ${parts.join('; ')}`;
-        });
-
-        for (const name of undescribed) {
-            lines.push(`- ${name}: a name typed by the lifter, with no description`);
-        }
-
-        out.push(lines.join('\n'));
-    }
-
-    // ----------------------------------------------------- goals and context
-
-    out.push('## Goals and context');
-
-    const about: string[] = [];
-
-    if (profile.experience) about.push(`- Experience: ${profile.experience}`);
-    if (profile.bodyweightKg !== undefined) about.push(`- Bodyweight: ${num(profile.bodyweightKg)} kg`);
-    if (profile.goal) about.push(`- Goal: ${oneLine(profile.goal)}`);
-    if (profile.injuries) about.push(`- Injuries and limits: ${oneLine(profile.injuries)}`);
-
-    if (about.length === 0) {
-        out.push(
-            '_Not recorded in the app. Add goals, injuries, schedule, sleep or anything else the reader '
-            + 'should weigh before sending._',
-        );
-    } else {
-        out.push(about.join('\n'));
-        out.push(
-            '_From the lifter’s profile in gymbro. Add schedule, sleep, how the week went or anything '
-            + 'else the reader should weigh before sending._',
-        );
-    }
+    out.push(...ownExercisesSection(used, custom, library));
+    out.push(...goalsSection(profile));
 
     return `${out.join('\n\n')}\n`;
 }
 
-/** A filename for the download: the block's name, made safe, and the date. */
-export function coachingFilename(block: MesocycleSummary, exportedOn: string): string {
-    const slug = block.name
+/**
+ * Workouts logged in no block, written for the same conversation as a block's
+ * export — and shaped like it wherever the two have the same thing to say, so a
+ * reader who has seen one can read the other.
+ *
+ * What is missing is missing on purpose, and the document says so up front: no
+ * plan, so no prescribed sets and no "x of y planned"; no weeks of a block, so
+ * no intensity target and no deload; the calendar week is the only week there
+ * is. A reader told none of that would look for the plan these sessions were
+ * falling short of, and there is none.
+ *
+ * Change is the first top set in the range against the latest, whichever days
+ * they fell on. That is a looser comparison than the block's same-plan-day rule
+ * and the document says that too, because there is no plan day to hold equal.
+ */
+function freeExport({ sessions, from, to, library, custom, profile, exportedOn }: FreeCoaching): string {
+    const ordered = [...sessions].sort((a, b) => a.id.localeCompare(b.id));
+    const submitted = ordered.filter((session) => session.status === 'submitted');
+    const drafts = ordered.length - submitted.length;
+    const out: string[] = [];
+
+    out.push('# Training log: workouts outside a block');
+    out.push(
+        `Exported from gymbro on ${exportedOn}. Every workout logged on the phone outside a training `
+        + `block from ${from} to ${to}, set by set. Everything needed to read it is below.`,
+    );
+
+    out.push('## How to read this');
+    out.push([
+        READING.units,
+        READING.bar,
+        READING.dumbbell,
+        READING.rpe,
+        `${READING.warmUp}.`,
+        '- **There is no plan.** These workouts were logged as they came, not against a programme: '
+            + 'nothing prescribes the sets, no week has an intensity target, and there is no deload '
+            + 'week. A light session is a light session, not a scheduled one.',
+        '- Weeks are **calendar weeks, Monday to Sunday** — there is no block week to count in.',
+        READING.topSet,
+        '- “Change” in the progress table is the latest top set’s weight against the first in the '
+            + 'range, with the reps of both beside it. With no plan day to hold equal, the two may '
+            + 'be from different kinds of session — read it as a direction, not a like-for-like.',
+        READING.volume,
+        READING.swapped,
+        READING.groups,
+    ].join('\n'));
+
+    // --------------------------------------------------------------- overview
+
+    const weeks = calendarWeeks(submitted, library);
+    const first = submitted[0];
+    const latest = submitted[submitted.length - 1];
+
+    out.push('## Overview');
+    out.push(table(['Training', ''], [
+        ['Range read', `${from} to ${to}`],
+        [
+            'Workouts logged',
+            `${submitted.length} finished${drafts > 0 ? `, ${drafts} in progress` : ''}`,
+        ],
+        ['First and latest', first && latest ? `${dateOf(first.id)} and ${dateOf(latest.id)}` : '—'],
+        [
+            'Weeks with training',
+            weeks.length === 0
+                ? '—'
+                : `${weeks.length}, averaging ${(submitted.length / weeks.length).toFixed(1)} workouts in each`,
+        ],
+    ]));
+
+    // --------------------------------------------------------------- progress
+
+    const series = seriesOf(submitted, dateOf);
+
+    out.push('## Progress by exercise (finished workouts)');
+
+    if (series.length === 0) {
+        out.push('Nothing finished yet.');
+    } else {
+        out.push(table(
+            ['Exercise', 'Group', 'Sessions', 'First top set', 'Latest top set', 'Best top set', 'Change'],
+            series.map((lift) => {
+                const start = lift.points[0];
+                const end = lift.points[lift.points.length - 1];
+                const best = lift.points.reduce((top, point) => (
+                    point.weightKg > top.weightKg
+                    || (point.weightKg === top.weightKg && point.reps > top.reps)
+                        ? point
+                        : top
+                ));
+                const change = start && end && lift.points.length > 1
+                    ? `${signed(end.weightKg - start.weightKg)} kg, `
+                        + (start.reps === end.reps ? `same reps (${start.reps})` : `reps ${start.reps} → ${end.reps}`)
+                    : '—';
+
+                return [
+                    lift.name,
+                    groupName(groupOf(lift.name, library)),
+                    String(lift.points.length),
+                    start ? pointText(start) : '—',
+                    end ? pointText(end) : '—',
+                    pointText(best),
+                    change,
+                ];
+            }),
+        ));
+    }
+
+    // ----------------------------------------------------------------- volume
+
+    if (weeks.length > 0) {
+        const ungrouped = weeks.some((week) => (week.workingByGroup.get(NO_GROUP) ?? 0) > 0);
+        const columns = ungrouped ? [...GROUPS, NO_GROUP] : GROUPS;
+
+        out.push('## Working sets per muscle group, by calendar week');
+        out.push(
+            'Working sets finished each week, warm-ups excluded. Weeks with nothing logged are left out. '
+            + `The planner’s guide is ${SETS_LOW}–${SETS_HIGH} working sets a week per group; with no plan `
+            + 'behind these, that guide is the only yardstick.',
+        );
+        out.push(table(
+            ['Week of', 'Workouts', ...columns.map(groupName)],
+            [...weeks].reverse().map((week) => [
+                week.start,
+                String(week.sessions.length),
+                ...columns.map((group) => String(week.workingByGroup.get(group) ?? 0)),
+            ]),
+        ));
+    }
+
+    // --------------------------------------------------------------- sessions
+
+    out.push('## Workouts, oldest first');
+
+    if (ordered.length === 0) out.push('No workouts logged outside a block in this range.');
+
+    for (const session of ordered) {
+        const ordinal = sessionOrdinal(session.id);
+        const entries = session.entries ?? [];
+        const logged = entries.reduce((total, entry) => total + entry.sets.length, 0);
+
+        out.push(`### ${dateOf(session.id)}${ordinal > 1 ? ` (workout ${ordinal} that day)` : ''}`);
+
+        if (session.status !== 'submitted' && logged === 0) {
+            out.push('In progress — nothing logged yet.');
+
+            continue;
+        }
+
+        const status = session.status === 'submitted' ? 'Finished' : 'In progress — not finished yet';
+        const working = entries.reduce(
+            (total, entry) => total + entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length,
+            0,
+        );
+        const rpe = session.avgRpe === null ? '' : ` · average RPE ${session.avgRpe.toFixed(1)}`;
+
+        out.push(
+            `${status}. ${logged} sets (${working} working) · `
+            + `${Math.round(volumeOf(entries, library))} kg total volume${rpe}.`,
+        );
+
+        const lines = entries.map((entry) => {
+            const detail = [equipmentFor(library, entry.exerciseName), groupName(groupOf(entry.exerciseName, library))]
+                .join(' · ')
+                .toLowerCase();
+            const swap = entry.swappedFrom && entry.swappedFrom !== entry.exerciseName
+                ? `, swapped in for ${entry.swappedFrom}`
+                : '';
+            const done = entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length;
+            const sets = entry.sets.length === 0 ? 'nothing logged' : entry.sets.map(setText).join('; ');
+
+            return `- **${entry.exerciseName}** (${detail}${swap}) — ${workingSets(done)}: ${sets}`;
+        });
+
+        if (lines.length > 0) out.push(lines.join('\n'));
+    }
+
+    const used = new Set(ordered.flatMap((session) => (session.entries ?? []).map((entry) => entry.exerciseName)));
+
+    out.push(...ownExercisesSection(used, custom, library));
+    out.push(...goalsSection(profile));
+
+    return `${out.join('\n\n')}\n`;
+}
+
+/**
+ * The training on screen, written for a coaching conversation: a block with
+ * its plan, or the workouts logged in no block. See `blockExport` and
+ * `freeExport` for what each holds and why.
+ */
+export function coachingExport(input: CoachingInput): string {
+    return input.kind === 'block' ? blockExport(input) : freeExport(input);
+}
+
+/** A filename for the download: what was exported, made safe, and the date. */
+export function coachingFilename(input: CoachingInput): string {
+    const name = input.kind === 'block' ? input.block.name : 'freestanding';
+    const slug = name
         .normalize('NFKD')
         .replace(/[^\w\s-]/g, '')
         .trim()
         .replace(/\s+/g, '-')
         .toLowerCase();
 
-    return `gymbro-${slug || 'block'}-${exportedOn}.md`;
+    return `gymbro-${slug || 'block'}-${input.exportedOn}.md`;
 }

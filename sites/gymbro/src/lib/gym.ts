@@ -84,6 +84,7 @@ export type {
     BlockList,
     CustomExercise,
     CustomExerciseInput,
+    DatedSession,
     DayInput,
     DayTemplate,
     Experience,
@@ -93,6 +94,7 @@ export type {
     PlannedExercise,
     SessionDetail,
     SessionEntry,
+    SessionStatus,
     SessionSummary,
     WorkSet,
 } from '@gym/lib/types';

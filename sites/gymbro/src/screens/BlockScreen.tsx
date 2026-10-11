@@ -19,6 +19,9 @@ import {
 } from '../lib/gym';
 import {
     DEFAULT_DAY_LABELS,
+    GROUP_FULL_SCALE,
+    GROUP_HIGH,
+    GROUP_LOW,
     MAX_DAYS,
     MAX_NAME,
     MAX_PLANNED_PER_DAY,
@@ -83,20 +86,6 @@ export function isSaveable(draft: Draft): boolean {
     return draft.name.trim().length > 0
         && draft.days.every((day) => day.label.trim().length > 0);
 }
-
-/**
- * The volume a week of this plan asks of one muscle group, and where that sits
- * against the range worth aiming at.
- *
- * Ten to twenty working sets a week is the range most of the evidence lands in,
- * and it is a range rather than a number — so the bar reads three ways rather
- * than red/green. Below ten is muted: not wrong, just light. Above twenty is
- * accent: not wrong either, but it is the number to have decided on rather than
- * arrived at.
- */
-const GROUP_FULL_SCALE = 24;
-const GROUP_LOW = 10;
-const GROUP_HIGH = 20;
 
 interface BlockScreenProps {
     block: MesocycleSummary;

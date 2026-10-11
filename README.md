@@ -16,7 +16,7 @@ produces those files.
 | [nygdev.dev](https://nygdev.dev) | `sites/nygdev/` | One-page personal site: profile links, a link to my LikeC4 architecture diagram, and a live status button for my self-hosted Foundry VTT server that can start the server when it's down |
 | [run.nygard.dev](https://run.nygard.dev) | `sites/run/` | Marathon prep dashboard: reads a precomputed JSON feed from public blob storage and charts training load, weekly volume, pace by run type and the easy/hard intensity split |
 | [gym.nygard.dev](https://gym.nygard.dev) | `sites/gym/` | GymLog: a training logger, in mesocycle blocks or one freestanding workout at a time. React + Vite + TypeScript. Signs in with MSAL against Entra ID and logs sets one tap at a time against `func-nygdev-api` |
-| [gymbro.nygard.dev](https://gymbro.nygard.dev) | `sites/gymbro/` | The desktop planner for the same training log. Same API, same account, same block — a screen with room to write the plan on, and to read what came back off it |
+| [gymbro.nygard.dev](https://gymbro.nygard.dev) | `sites/gymbro/` | The desktop planner for the same training log. Same API, same account, same block — a screen with room to write the plan on, and to read what came back off it, including the workouts logged outside any block |
 
 All four sites live in one repo because the deploy identity is federated to
 this repo — a second repo would need its own federated credential subjects. A
