@@ -1,5 +1,5 @@
 import { groupOf } from './groups';
-import { isWarmUpRpe, sessionDate, type DatedSession, type ExerciseLibrary } from './gym';
+import { sessionDate, workingSetCount, type DatedSession, type ExerciseLibrary } from './gym';
 
 /**
  * How far back the freestanding views read: a year, which is the longest range
@@ -65,7 +65,7 @@ export function calendarWeeks(
         week.volumeKg += session.volumeKg;
 
         for (const entry of session.entries ?? []) {
-            const working = entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length;
+            const working = workingSetCount(entry.sets);
 
             if (working === 0) continue;
 

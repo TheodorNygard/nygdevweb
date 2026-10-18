@@ -83,9 +83,15 @@ const GROUP_BY_NAME: Record<string, string> = {
  * to carry one.
  */
 export function groupOf(name: string, library: ExerciseLibrary | null): string {
-    const listed = library?.exercises.find((exercise) => exercise.name === name)?.group;
+    return groupOfListed(library?.exercises.find((exercise) => exercise.name === name) ?? { name });
+}
 
-    return listed ?? GROUP_BY_NAME[name] ?? NO_GROUP;
+/**
+ * The same, for an exercise already in hand — so a caller walking the library
+ * reads the entry it holds rather than searching the library for it again.
+ */
+function groupOfListed(exercise: { name: string; group?: string }): string {
+    return exercise.group ?? GROUP_BY_NAME[exercise.name] ?? NO_GROUP;
 }
 
 /**
@@ -121,7 +127,7 @@ export function catalogue(
     const listed: Exercise[] = (library?.exercises ?? []).map((exercise) => ({
         name: exercise.name,
         equipment: exercise.equipment,
-        group: groupOf(exercise.name, library),
+        group: groupOfListed(exercise),
         kind: yours.has(exercise.name) ? 'yours' : 'library',
     }));
 
@@ -132,7 +138,9 @@ export function catalogue(
         if (known.has(name)) continue;
 
         known.add(name);
-        typed.push({ name, equipment: 'Custom', group: groupOf(name, library), kind: 'typed' });
+        // Not in the library, which is what makes it typed — so there is no
+        // entry to read a group off, only the fallback map.
+        typed.push({ name, equipment: 'Custom', group: groupOfListed({ name }), kind: 'typed' });
     }
 
     // The user's own first, described then typed: they are the short list,
