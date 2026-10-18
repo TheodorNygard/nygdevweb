@@ -67,6 +67,7 @@ export {
     setsForWeek,
     swappedAway,
     targetsFor,
+    workingSetCount,
 } from '@gym/lib/block';
 
 export {

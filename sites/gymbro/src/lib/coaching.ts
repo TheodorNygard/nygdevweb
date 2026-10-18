@@ -15,6 +15,7 @@ import {
     setsForWeek,
     swappedAway,
     targetsFor,
+    workingSetCount,
     type CustomExercise,
     type DatedSession,
     type ExerciseLibrary,
@@ -22,6 +23,7 @@ import {
     type MesocycleSummary,
     type SessionDetail,
     type SessionEntry,
+    type SessionStatus,
     type WorkSet,
 } from './gym';
 
@@ -128,6 +130,19 @@ function pointText(point: LiftPoint): string {
     return `${num(point.weightKg)} × ${point.reps} (${where})`;
 }
 
+/**
+ * The heaviest of a lift's top sets, more reps breaking a tie — the rule each
+ * one was picked by. A series always has a point; see `seriesOf`.
+ */
+function bestOf(points: readonly LiftPoint[]): LiftPoint {
+    return points.reduce((top, point) => (
+        point.weightKg > top.weightKg
+        || (point.weightKg === top.weightKg && point.reps > top.reps)
+            ? point
+            : top
+    ));
+}
+
 /** `+5`, `-2.5`, `0` — a delta with its sign said. */
 function signed(delta: number): string {
     return `${delta > 0 ? '+' : ''}${num(delta)}`;
@@ -198,6 +213,13 @@ function groupName(group: string): string {
     return group === NO_GROUP ? 'No group' : group;
 }
 
+/** `bar · chest` — what the brackets after an exercise's name say. */
+function detailOf(exerciseName: string, library: ExerciseLibrary | null): string {
+    return [equipmentFor(library, exerciseName), groupName(groupOf(exerciseName, library))]
+        .join(' · ')
+        .toLowerCase();
+}
+
 /** How many hands a logged weight stands for: two on a dumbbell lift, one otherwise. */
 function handsFor(library: ExerciseLibrary | null, exerciseName: string): number {
     return equipmentFor(library, exerciseName) === DUMBBELL ? DUMBBELL_HANDS : 1;
@@ -219,6 +241,39 @@ function volumeOf(entries: readonly SessionEntry[], library: ExerciseLibrary | n
     }
 
     return total;
+}
+
+/**
+ * The line under a session's heading: finished or not, the sets and the
+ * volume. `target` is the block's intensity target, said between the two;
+ * a workout in no block has none.
+ */
+function sessionLine(
+    session: { status: SessionStatus; avgRpe: number | null },
+    entries: readonly SessionEntry[],
+    library: ExerciseLibrary | null,
+    target: string | null,
+): string {
+    const status = session.status === 'submitted' ? 'Finished' : 'In progress — not finished yet';
+    const logged = entries.reduce((total, entry) => total + entry.sets.length, 0);
+    const working = entries.reduce((total, entry) => total + workingSetCount(entry.sets), 0);
+    const rpe = session.avgRpe === null ? '' : ` · average RPE ${session.avgRpe.toFixed(1)}`;
+
+    return `${status}. ${target === null ? '' : `${target} `}${logged} sets (${working} working) · `
+        + `${Math.round(volumeOf(entries, library))} kg total volume${rpe}.`;
+}
+
+/**
+ * One exercise of a session, every set written out. `count` is how its working
+ * sets read against the plan, which only a block has to say.
+ */
+function entryLine(entry: SessionEntry, library: ExerciseLibrary | null, count: string): string {
+    const swap = entry.swappedFrom && entry.swappedFrom !== entry.exerciseName
+        ? `, swapped in for ${entry.swappedFrom}`
+        : '';
+    const sets = entry.sets.length === 0 ? 'nothing logged' : entry.sets.map(setText).join('; ');
+
+    return `- **${entry.exerciseName}** (${detailOf(entry.exerciseName, library)}${swap}) — ${count}: ${sets}`;
 }
 
 /** A profile's free text on one line, so it sits inside a list item. */
@@ -424,13 +479,9 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
 
         if (day.plan.length === 0) return `${heading}\n- (nothing planned)`;
 
-        const lines = day.plan.map((planned) => {
-            const detail = [equipmentFor(library, planned.exerciseName), groupName(groupOf(planned.exerciseName, library))]
-                .join(' · ')
-                .toLowerCase();
-
-            return `- ${planned.exerciseName} — ${planned.sets} sets (${detail})`;
-        });
+        const lines = day.plan.map((planned) => (
+            `- ${planned.exerciseName} — ${planned.sets} sets (${detailOf(planned.exerciseName, library)})`
+        ));
 
         return [heading, ...lines].join('\n');
     }).join('\n\n'));
@@ -453,12 +504,6 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
             series.map((lift) => {
                 const first = lift.points[0];
                 const last = lift.points[lift.points.length - 1];
-                const best = lift.points.reduce((top, point) => (
-                    point.weightKg > top.weightKg
-                    || (point.weightKg === top.weightKg && point.reps > top.reps)
-                        ? point
-                        : top
-                ));
 
                 return [
                     lift.name,
@@ -466,7 +511,7 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
                     String(lift.points.length),
                     first ? pointText(first) : '—',
                     last ? pointText(last) : '—',
-                    pointText(best),
+                    pointText(bestOf(lift.points)),
                     changeText(lift.points),
                 ];
             }),
@@ -486,7 +531,7 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
             const counts = loggedByWeek.get(session.week) ?? new Map<string, number>();
 
             for (const entry of session.entries) {
-                const working = entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length;
+                const working = workingSetCount(entry.sets);
                 const group = groupOf(entry.exerciseName, library);
 
                 if (group === NO_GROUP && working > 0) ungrouped = true;
@@ -609,26 +654,10 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
             continue;
         }
 
-        const status = session.status === 'submitted' ? 'Finished' : 'In progress — not finished yet';
-        const working = session.entries.reduce(
-            (total, entry) => total + entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length,
-            0,
-        );
-        const rpe = session.avgRpe === null ? '' : ` · average RPE ${session.avgRpe.toFixed(1)}`;
-
-        out.push(
-            `${status}. ${target} ${logged} sets (${working} working) · `
-            + `${Math.round(volumeOf(session.entries, library))} kg total volume${rpe}.`,
-        );
+        out.push(sessionLine(session, session.entries, library, target));
 
         const lines = session.entries.map((entry, index) => {
-            const detail = [equipmentFor(library, entry.exerciseName), groupName(groupOf(entry.exerciseName, library))]
-                .join(' · ')
-                .toLowerCase();
-            const swap = entry.swappedFrom && entry.swappedFrom !== entry.exerciseName
-                ? `, swapped in for ${entry.swappedFrom}`
-                : '';
-            const done = entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length;
+            const done = workingSetCount(entry.sets);
             const asked = targets[index];
 
             // `targetsFor` has no target for two different reasons, and a
@@ -639,9 +668,8 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
                 : asked === undefined
                     ? `${workingSets(done)}, not in the plan`
                     : `${done} of ${asked} planned working sets`;
-            const sets = entry.sets.length === 0 ? 'nothing logged' : entry.sets.map(setText).join('; ');
 
-            return `- **${entry.exerciseName}** (${detail}${swap}) — ${count}: ${sets}`;
+            return entryLine(entry, library, count);
         });
 
         if (lines.length > 0) out.push(lines.join('\n'));
@@ -744,12 +772,6 @@ function freeExport({ sessions, from, to, library, custom, profile, exportedOn }
             series.map((lift) => {
                 const start = lift.points[0];
                 const end = lift.points[lift.points.length - 1];
-                const best = lift.points.reduce((top, point) => (
-                    point.weightKg > top.weightKg
-                    || (point.weightKg === top.weightKg && point.reps > top.reps)
-                        ? point
-                        : top
-                ));
                 const change = start && end && lift.points.length > 1
                     ? `${signed(end.weightKg - start.weightKg)} kg, `
                         + (start.reps === end.reps ? `same reps (${start.reps})` : `reps ${start.reps} → ${end.reps}`)
@@ -761,7 +783,7 @@ function freeExport({ sessions, from, to, library, custom, profile, exportedOn }
                     String(lift.points.length),
                     start ? pointText(start) : '—',
                     end ? pointText(end) : '—',
-                    pointText(best),
+                    pointText(bestOf(lift.points)),
                     change,
                 ];
             }),
@@ -809,30 +831,9 @@ function freeExport({ sessions, from, to, library, custom, profile, exportedOn }
             continue;
         }
 
-        const status = session.status === 'submitted' ? 'Finished' : 'In progress — not finished yet';
-        const working = entries.reduce(
-            (total, entry) => total + entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length,
-            0,
-        );
-        const rpe = session.avgRpe === null ? '' : ` · average RPE ${session.avgRpe.toFixed(1)}`;
+        out.push(sessionLine(session, entries, library, null));
 
-        out.push(
-            `${status}. ${logged} sets (${working} working) · `
-            + `${Math.round(volumeOf(entries, library))} kg total volume${rpe}.`,
-        );
-
-        const lines = entries.map((entry) => {
-            const detail = [equipmentFor(library, entry.exerciseName), groupName(groupOf(entry.exerciseName, library))]
-                .join(' · ')
-                .toLowerCase();
-            const swap = entry.swappedFrom && entry.swappedFrom !== entry.exerciseName
-                ? `, swapped in for ${entry.swappedFrom}`
-                : '';
-            const done = entry.sets.filter((set) => !isWarmUpRpe(set.rpe)).length;
-            const sets = entry.sets.length === 0 ? 'nothing logged' : entry.sets.map(setText).join('; ');
-
-            return `- **${entry.exerciseName}** (${detail}${swap}) — ${workingSets(done)}: ${sets}`;
-        });
+        const lines = entries.map((entry) => entryLine(entry, library, workingSets(workingSetCount(entry.sets))));
 
         if (lines.length > 0) out.push(lines.join('\n'));
     }

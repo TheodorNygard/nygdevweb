@@ -144,16 +144,17 @@ export function App() {
     // what pays for it, and the second gets it for nothing.
     const blocks = useBlocks(opened.plan || opened.history ? api : null);
 
-    // The saved and built-in day plans the Plan tab drops into a day. Its own
-    // errors stay inside its sheet rather than joining the banner chain below:
-    // nothing else in the app reads this, and a day can still be planned by
-    // hand while it is failing.
     // The start sheet for a workout in no block, and which freestanding
     // session's sheet is open. Declared here because both decide what gets
     // read: the start sheet offers the templates, and either needs the recent
     // workouts below.
     const [startingFree, setStartingFree] = useState(false);
     const [openFreeId, setOpenFreeId] = useState<string | null>(null);
+
+    // The saved and built-in day plans the Plan tab drops into a day. Its own
+    // errors stay inside its sheet rather than joining the banner chain below:
+    // nothing else in the app reads this, and a day can still be planned by
+    // hand while it is failing.
     const [wantTemplates, setWantTemplates] = useState(false);
 
     if (!wantTemplates && (opened.plan || startingFree)) {
