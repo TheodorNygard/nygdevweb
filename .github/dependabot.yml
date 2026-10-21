@@ -1,0 +1,32 @@
+# Weekly dependency updates. Minor and patch bumps arrive as one grouped PR per
+# folder and are merged by pr-build.yml once the build passes; major bumps get a
+# PR of their own and wait for a human.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /sites/gym
+      - /sites/gymbro
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+      major:
+        update-types: [major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+      major:
+        update-types: [major]

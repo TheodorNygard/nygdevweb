@@ -1,0 +1,99 @@
+name: PR build
+
+# Builds every site on each PR into master, so a PR shows whether it breaks the
+# build before merging it deploys. The deploy workflows only run after merge.
+#
+# Dependabot PRs for minor and patch updates are then merged here, once both
+# builds pass. Majors are left for a human.
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  # Same steps as deploy-gym.yml up to the deploy.
+  gym:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sites/gym/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sites/gym
+        run: npm ci
+
+      - name: Build
+        working-directory: sites/gym
+        run: npm run build
+
+  # Same steps as deploy-gymbro.yml up to the deploy, including the logger's
+  # install: the `@gym` alias compiles sites/gym/src into this bundle, and those
+  # files resolve their imports from sites/gym/node_modules.
+  gymbro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            sites/gym/package-lock.json
+            sites/gymbro/package-lock.json
+
+      - name: Install the logger's dependencies
+        working-directory: sites/gym
+        run: npm ci
+
+      - name: Install dependencies
+        working-directory: sites/gymbro
+        run: npm ci
+
+      - name: Build
+        working-directory: sites/gymbro
+        run: npm run build
+
+  automerge:
+    needs: [gym, gymbro]
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v2
+
+      # --match-head-commit: merge only the commit that was just built. If
+      # Dependabot rebased in the meantime, that push starts a new run.
+      #
+      # A merge made with GITHUB_TOKEN does not fire the push-triggered deploys,
+      # so the ones whose paths the PR touched are dispatched on master
+      # explicitly. A change to sites/gym ships gymbro too, which builds from it.
+      - name: Merge and deploy
+        if: >-
+          steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch'
+        run: |
+          files=$(gh pr diff "$PR_URL" --name-only)
+          gh pr merge "$PR_URL" --merge --match-head-commit "${{ github.event.pull_request.head.sha }}"
+
+          if grep -q '^sites/gym/' <<<"$files"; then
+            gh workflow run deploy-gym.yml --ref master
+          fi
+          if grep -qE '^sites/(gym|gymbro)/' <<<"$files"; then
+            gh workflow run deploy-gymbro.yml --ref master
+          fi
