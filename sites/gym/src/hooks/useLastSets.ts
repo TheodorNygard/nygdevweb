@@ -51,8 +51,9 @@ function lastSetsOf(previous: Workout): LastSets {
 }
 
 /**
- * The same, for a workout in no block: each exercise's last set in the most
- * recent submitted session that lifted it, other than the one being logged.
+ * The same, for a workout in no block — and, in a block, for whatever the same
+ * day's last session did not lift: each exercise's last set in the most recent
+ * submitted session that lifted it, other than the one being logged.
  *
  * Searched across sessions rather than read off one, because there is no "same
  * day" to read: a freestanding lifter's Monday is not a cell anything points
@@ -81,16 +82,22 @@ function lastSetsAcross(sessions: DatedSession[], excludeId: string): LastSets {
 /**
  * What each exercise was last done with, so the logger opens on it.
  *
- * The lookup is the previous submitted session on the *same day of the block*,
- * and that is one read rather than a search: the plan hangs off the day, so
- * last week's "Upper A" holds this week's exercises almost by definition. An
- * exercise that is not in it — one added to the plan since, or added ad-hoc on
- * a different day — is simply not found, and the logger opens on nothing for
- * it, which is the honest answer to "what did I lift last time".
+ * The lookup is the previous submitted session on the *same day of the block*
+ * first: the plan hangs off the day, so last week's "Upper A" holds this week's
+ * exercises almost by definition, and the same day is the like-for-like answer
+ * when an exercise is trained lighter on one day than another.
  *
- * Scanning further back would find more of them and cost a session document
- * per week to do it. The sets are the expensive half of a session, and this
- * runs on Start, so it is deliberately one.
+ * "Almost" turned out to be most weeks. An exercise swapped out last week — the
+ * cable fly that became a pec deck because the cables were taken — is not in
+ * last week's session under its own name, and neither is one skipped or added
+ * to the plan since; in practice about a third of workouts opened at least one
+ * exercise on nothing. So whatever that one session does not have is read off
+ * `dated` instead: the last few months of workouts with their sets, the list
+ * the app reads for History and freestanding sessions, newest first. The first
+ * session there to have lifted an exercise is its last time — another day of
+ * this block, an earlier block, or a workout in none. That costs no read of its
+ * own; App asks for the list when a day sheet opens (see `wantRecent`), so it
+ * is normally in hand by the first set.
  *
  * The read is started early when it can be — see `prefetch` — and what it
  * brings back is held until the session it was for closes. Read during render
@@ -183,11 +190,14 @@ export function useLastSets(
         if (freeId) return lastSetsAcross(dated, freeId);
 
         const previous = previousId ? held.current.get(previousId) : undefined;
+        const sameDay = previous ? lastSetsOf(previous) : {};
 
-        return previous ? lastSetsOf(previous) : {};
+        // The same day wins where it has the exercise; the recent list fills
+        // in everything it does not.
+        return workoutId ? { ...lastSetsAcross(dated, workoutId), ...sameDay } : sameDay;
 
     // `landed` is what tells this that `held` has something new.
-    }, [previousId, landed, freeId, dated]);
+    }, [previousId, landed, freeId, workoutId, dated]);
 
     return { sets, prefetch };
 }

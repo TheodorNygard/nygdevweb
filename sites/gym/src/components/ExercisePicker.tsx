@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Sheet } from './Sheet';
 import { useFavoritesContext } from '../hooks/useFavorites';
-import { alternativesFor } from '../lib/library';
+import { alternativesFor, foldName, searchMatch } from '../lib/library';
 import type { ExerciseLibrary, LibraryExercise } from '../lib/types';
 
 /**
@@ -144,12 +144,19 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
     const shownTiers = tiers.filter((tier) => tier.items.length > 0);
     const suggested = new Set(shownTiers.flatMap((tier) => tier.items.map((item) => item.exercise.name)));
 
-    const results = (library?.exercises ?? []).filter((exercise) => (
+    const candidates = (library?.exercises ?? []).filter((exercise) => (
         fitsFilter(exercise)
         && exercise.name !== swapping?.exerciseName
         && !suggested.has(exercise.name)
-        && (!needle || exercise.name.toLowerCase().includes(needle))
     ));
+
+    // Every word typed, in any order — see `searchMatch`. All but one of them
+    // is a near miss, listed after the real matches and ahead of the button
+    // that would file the typed name as something new.
+    const results = candidates.filter((exercise) => searchMatch(exercise.name, needle) === 'full');
+    const close = needle
+        ? candidates.filter((exercise) => searchMatch(exercise.name, needle) === 'close')
+        : [];
 
     // A search has no sections, so the starred matches go first instead.
     // Stable, so the library's own order holds within each half.
@@ -158,9 +165,11 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
     }
 
     // Offered once the query is long enough to be a name rather than a
-    // half-typed search, and only when it is not already in the library.
+    // half-typed search, and only when no spelling of it is listed already —
+    // the library's, a described one, or one typed on an earlier workout.
+    const folded = foldName(query);
     const showCustom = needle.length > 1
-        && !(library?.exercises ?? []).some((exercise) => exercise.name.toLowerCase() === needle);
+        && !(library?.exercises ?? []).some((exercise) => foldName(exercise.name) === folded);
 
     const title = swapping ? `Swap ${swapping.exerciseName}` : 'Add exercise';
     const carry = swapping?.carry;
@@ -263,17 +272,6 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
             </div>
 
             <div className="picker__list">
-                {showCustom ? (
-                    <button
-                        type="button"
-                        className="picker__custom"
-                        disabled={busy}
-                        onClick={() => onPick(query.trim())}
-                    >
-                        + {swapping ? 'Swap to' : 'Add'} “{query.trim()}” as a custom exercise
-                    </button>
-                ) : null}
-
                 {shownTiers.map((tier) => (
                     <section key={tier.label} aria-label={tier.label.toLowerCase()}>
                         <span className="picker__section">{tier.label}</span>
@@ -287,7 +285,28 @@ export function ExercisePicker({ library, busy, swapping, onPick, onClose }: Exe
 
                 {results.map((exercise) => item(exercise))}
 
-                {results.length === 0 && shownTiers.length === 0 && !showCustom ? (
+                {close.length > 0 ? (
+                    <section aria-label="close matches">
+                        <span className="picker__section">CLOSE MATCHES</span>
+                        {close.map((exercise) => item(exercise))}
+                    </section>
+                ) : null}
+
+                {/* Under what the library already has rather than over it: the
+                    exercise with a history is the better pick, and a new name
+                    is the answer only when nothing above is it. */}
+                {showCustom ? (
+                    <button
+                        type="button"
+                        className="picker__custom"
+                        disabled={busy}
+                        onClick={() => onPick(query.trim())}
+                    >
+                        + {swapping ? 'Swap to' : 'Add'} “{query.trim()}” as a custom exercise
+                    </button>
+                ) : null}
+
+                {results.length === 0 && close.length === 0 && shownTiers.length === 0 && !showCustom ? (
                     <p className="picker__empty">
                         Nothing in the library matches. Type a name to add it as a custom exercise.
                     </p>

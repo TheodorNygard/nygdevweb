@@ -27,7 +27,7 @@ export { GymApi, messageOf } from '@gym/lib/api';
 
 export { type AuthErrorDetail } from '@gym/lib/errors';
 
-export { equipmentFor, withCustom } from '@gym/lib/library';
+export { equipmentFor, foldName, searchMatch, withCustom } from '@gym/lib/library';
 
 export { useAuth } from '@gym/hooks/useAuth';
 

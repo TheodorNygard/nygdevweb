@@ -1,7 +1,13 @@
 import { useRef, useState } from 'react';
 
 import { NO_GROUP, type Exercise } from '../lib/groups';
-import { useDialog, type ExerciseLibrary, type FavoritesState } from '../lib/gym';
+import {
+    foldName,
+    searchMatch,
+    useDialog,
+    type ExerciseLibrary,
+    type FavoritesState,
+} from '../lib/gym';
 
 /** How many recently used exercises the picker shows above the list. */
 const RECENT_SHOWN = 8;
@@ -86,10 +92,12 @@ export function ExercisePicker({
 
     const shown = new Set(sections.flatMap((section) => section.items.map((exercise) => exercise.name)));
 
+    // Every word typed, in any order, as the phone's picker searches — so
+    // "reverse curl" finds Reverse-Grip Curl. See `searchMatch`.
     const results = catalogue.filter((exercise) => (
         fits(exercise)
         && !shown.has(exercise.name)
-        && (!needle || exercise.name.toLowerCase().includes(needle))
+        && searchMatch(exercise.name, needle) === 'full'
     ));
 
     // Stable, so the catalogue's own order holds within each half.
@@ -101,9 +109,10 @@ export function ExercisePicker({
     const visible = [...sections.flatMap((section) => section.items), ...results];
 
     // Offered once the query is long enough to be a name rather than a
-    // half-typed search, and only when it is not already in the catalogue.
+    // half-typed search, and only when no spelling of it is in the catalogue —
+    // case and spacing folded, as the API folds them into an exercise's id.
     const showCustom = needle.length > 1
-        && !catalogue.some((exercise) => exercise.name.toLowerCase() === needle);
+        && !catalogue.some((exercise) => foldName(exercise.name) === foldName(trimmed));
 
     function row(exercise: Exercise, index: number) {
         const starred = favorites.isFavorite(exercise.name);

@@ -168,12 +168,22 @@ export function loadLibrary(): Promise<ExerciseLibrary> {
  * Equipment the library has never heard of — a kettlebell, a landmine — is
  * added to the filter list after the shipped ones, so a custom exercise can be
  * found by its chip.
+ *
+ * `used` is the names this user has logged or planned that nothing describes:
+ * typed on a workout once and never written up. They go in as `Custom` with no
+ * group and no muscles, which is how every screen already reads a name it does
+ * not know — the difference is that a search finds them. Without that, typing
+ * the name again offered it as a new custom exercise, and a second spelling of
+ * one machine became a second exercise with half the history. Any spelling of
+ * one already listed — by the fold the API makes ids from — is left out, and
+ * among themselves the first spelling given wins.
  */
 export function withCustom(
     library: ExerciseLibrary | null,
     custom: readonly CustomExercise[],
+    used: readonly string[] = [],
 ): ExerciseLibrary | null {
-    if (!library || custom.length === 0) return library;
+    if (!library || (custom.length === 0 && used.length === 0)) return library;
 
     const shipped = new Set(library.exercises.map((exercise) => exercise.name));
     const added: LibraryExercise[] = [];
@@ -182,6 +192,17 @@ export function withCustom(
         if (shipped.has(exercise.name)) continue;
 
         added.push({ ...exercise, equipment: exercise.equipment ?? 'Custom' });
+    }
+
+    const listed = new Set([...library.exercises, ...added].map((exercise) => foldName(exercise.name)));
+
+    for (const name of used) {
+        const folded = foldName(name);
+
+        if (folded === '' || listed.has(folded)) continue;
+
+        listed.add(folded);
+        added.push({ name, equipment: 'Custom' });
     }
 
     const equipment = [...library.equipment];
@@ -193,6 +214,61 @@ export function withCustom(
     }
 
     return { ...library, equipment, exercises: [...library.exercises, ...added] };
+}
+
+/**
+ * A name as the API compares two of them: case and spacing folded, so "tricep
+ * machine" and "Tricep  Machine" are one exercise. A described exercise's id is
+ * made from exactly this, which makes it the test for "is this name already
+ * here" — a picker that offered the second spelling as a new custom exercise
+ * would be offering one exercise twice, each with half its history.
+ */
+export function foldName(name: string): string {
+    return name.trim().split(/\s+/).join(' ').toLowerCase();
+}
+
+/**
+ * The words of a search or a name, folded for matching: lowercase, split on
+ * anything that is not a letter or digit — so "Reverse-Grip" is two words — and
+ * a plural `s` dropped, so "triceps" finds "Tricep machine" and "curls" finds
+ * "Bicep Curl". A double `s` stays, or "press" would stop matching itself.
+ */
+function wordsOf(text: string): string[] {
+    return text
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((word) => word !== '')
+        .map((word) => (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')
+            ? word.slice(0, -1)
+            : word));
+}
+
+/**
+ * How a name answers a search: `full` when every word typed is in it, in any
+ * order; `close` when all but one are, for a search of three words or more.
+ *
+ * Words rather than one string, because people type an exercise the way they
+ * say it: "reverse curl" for Reverse-Grip Curl, "curl hammer" for Hammer Curl.
+ * Each word only has to appear inside one of the name's, so a half-typed "pull"
+ * still finds Lat Pulldown the way the old substring search did.
+ *
+ * `close` is for the name typed out in full and slightly wrong — "reverse bicep
+ * curl" is Reverse-Grip Curl with one word too many. Shown under the real
+ * matches, above the button that would add it as something new, it is the
+ * chance to pick the exercise that already has a history. Two-word searches do
+ * not get it: one word of two in common is half the library's curls.
+ */
+export function searchMatch(name: string, query: string): 'full' | 'close' | null {
+    const asked = wordsOf(query);
+
+    if (asked.length === 0) return 'full';
+
+    const words = wordsOf(name);
+    const found = asked.filter((word) => words.some((one) => one.includes(word))).length;
+
+    if (found === asked.length) return 'full';
+
+    return asked.length >= 3 && found >= asked.length - 1 ? 'close' : null;
 }
 
 /**

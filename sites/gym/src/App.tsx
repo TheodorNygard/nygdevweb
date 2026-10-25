@@ -151,6 +151,11 @@ export function App() {
     const [startingFree, setStartingFree] = useState(false);
     const [openFreeId, setOpenFreeId] = useState<string | null>(null);
 
+    // The cell whose day sheet is open. Up here for the same reason: a day
+    // sheet is the step before Start, and opening one is what asks for the
+    // recent workouts the logger reads last time from.
+    const [openDay, setOpenDay] = useState<OpenDay | null>(null);
+
     // The saved and built-in day plans the Plan tab drops into a day. Its own
     // errors stay inside its sheet rather than joining the banner chain below:
     // nothing else in the app reads this, and a day can still be planned by
@@ -166,15 +171,20 @@ export function App() {
     // The last few months of workouts, block or not, with their sets. Only a
     // lifter with no block needs them on arrival — they *are* that Today — so
     // anyone else reads them when something asks: History, the start sheet, or
-    // a freestanding workout being logged, which looks up last time in them.
-    // Sticky once wanted, as the custom exercises are.
+    // a workout about to be logged or being logged. The logger looks up last
+    // time in them — every exercise of a freestanding workout, and in a block
+    // whatever the same day's last session did not lift (see `useLastSets`) —
+    // and the pickers find names typed on them. Opening a day sheet asks, so
+    // the one read is under way while the sheet is looked at. Sticky once
+    // wanted, as the custom exercises are.
     const [wantRecent, setWantRecent] = useState(false);
 
     if (!wantRecent && block.block && !block.fromCache && (
         block.block.mesocycle === null
         || opened.history
         || startingFree
-        || session.workout?.freestanding
+        || openDay !== null
+        || session.workout !== null
     )) {
         setWantRecent(true);
     }
@@ -225,8 +235,6 @@ export function App() {
         setWeek(next);
     }, []);
 
-    const [openDay, setOpenDay] = useState<OpenDay | null>(null);
-
     // The exercises this user has described in gymbro, merged into the
     // library every screen reads — so a custom exercise gets its equipment
     // chip and its place in the swap sheet like a shipped one. Read the first
@@ -243,9 +251,23 @@ export function App() {
 
     const customExercises = useCustomExercises(wantCustom ? api : null);
 
+    // Every exercise name this user has reached for lately — starred, recently
+    // used, logged in the last few months, or planned in the block — so that a
+    // custom name typed once is one a picker's search finds again rather than
+    // one it offers to add a second time. `withCustom` keeps the ones nothing
+    // else lists. The block's own lists rather than `favorites.recent`, which
+    // is a fresh array every render.
+    const blockData = block.block;
+    const usedNames = useMemo(() => [
+        ...favorites.favorites,
+        ...(blockData?.recent ?? []),
+        ...recentSessions.flatMap((one) => (one.entries ?? []).map((entry) => entry.exerciseName)),
+        ...(blockData?.mesocycle?.days.flatMap((day) => day.plan.map((planned) => planned.exerciseName)) ?? []),
+    ], [favorites.favorites, blockData, recentSessions]);
+
     const library = useMemo(
-        () => withCustom(shippedLibrary, customExercises.exercises),
-        [shippedLibrary, customExercises.exercises],
+        () => withCustom(shippedLibrary, customExercises.exercises, usedNames),
+        [shippedLibrary, customExercises.exercises, usedNames],
     );
     const [daySessionId, setDaySessionId] = useState<string | null>(null);
     const [dayDetail, setDayDetail] = useState<Workout | null>(null);
