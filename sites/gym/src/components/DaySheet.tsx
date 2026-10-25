@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Sheet } from './Sheet';
-import { plannedFor, setsForWeek } from '../lib/block';
+import { isSkipped, plannedFor, setsForWeek } from '../lib/block';
 import { kg, num, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
 import type { PlannedExercise, SessionSummary, Workout } from '../lib/types';
 
@@ -38,6 +38,13 @@ interface DaySheetProps {
     busy: boolean;
     onSelect: (sessionId: string) => void;
     onStart: () => void;
+
+    /**
+     * Passes the day by without training it, so "up next" moves on. Offered
+     * only on a cell nothing has been filed against yet — a draft is resumed
+     * or discarded instead, and a day already logged or skipped needs neither.
+     */
+    onSkip: () => void;
     onResume: (sessionId: string) => void;
 
     /**
@@ -46,13 +53,43 @@ interface DaySheetProps {
      * nothing about which block the next workout goes into.
      */
     onEdit: (sessionId: string) => void;
+
+    /**
+     * Removes a session: deletes a logged one, discards a draft, or undoes a
+     * skip. One call for all three — they are the same delete — and the sheet
+     * decides how many taps each is worth.
+     */
     onDelete: (sessionId: string) => void;
     onClose: () => void;
 }
 
 /**
+ * What removing the selected session is called, and the label its second tap
+ * carries — null where there is nothing to lose and one tap is enough: a skip
+ * holds no sets, and neither does a draft nobody has lifted in yet.
+ */
+function removalOf(session: SessionSummary): { label: string; confirm: string | null } {
+    if (isSkipped(session)) return { label: 'Undo the skip', confirm: null };
+
+    if (session.status === 'draft') {
+        return {
+            label: 'Discard this draft',
+            confirm: session.setCount === 0
+                ? null
+                : `Discard the draft and its ${session.setCount} `
+                    + `${session.setCount === 1 ? 'set' : 'sets'} — tap again`,
+        };
+    }
+
+    return {
+        label: 'Delete this session',
+        confirm: `Delete ${sessionDateLabel(session.id)} for good — tap again`,
+    };
+}
+
+/**
  * The day card: what is in a cell of the block map, and the one place a workout
- * can be started, resumed or deleted.
+ * can be started, resumed, skipped or deleted.
  *
  * A cell can hold more than one session — the API stopped overwriting a
  * re-logged day, because losing a workout to a mistyped tap is worse than
@@ -79,6 +116,7 @@ export function DaySheet({
     busy,
     onSelect,
     onStart,
+    onSkip,
     onResume,
     onEdit,
     onDelete,
@@ -92,7 +130,15 @@ export function DaySheet({
     const draft = sessions.find((session) => session.status === 'draft');
     const others = sessions.filter((session) => session.id !== selected?.id);
 
-    const stats = selected
+    // A skipped day has no numbers worth a tile and no lines worth listing:
+    // its entries are the plan it was opened on, with nothing lifted against
+    // any of them.
+    const skippedSelected = selected !== undefined && isSkipped(selected);
+    const logged = sessions.some((session) => session.status === 'submitted' && !isSkipped(session));
+    const filed = sessions.some((session) => session.status === 'submitted');
+    const removal = selected ? removalOf(selected) : null;
+
+    const stats = skippedSelected ? [] : selected
         ? [
             { key: 'SETS', value: String(selected.setCount) },
             { key: 'VOLUME', value: kg(selected.volumeKg) },
@@ -110,7 +156,7 @@ export function DaySheet({
             },
         ];
 
-    const lines = detail?.id === selected?.id ? detail?.entries ?? [] : [];
+    const lines = !skippedSelected && detail?.id === selected?.id ? detail?.entries ?? [] : [];
 
     /**
      * What an exercise with nothing logged against it is asked for. Today that
@@ -134,17 +180,24 @@ export function DaySheet({
                         ? ` · session #${sessionOrdinal(selected.id)} that day`
                         : ''}
                     {selected.status === 'draft' ? ' · draft' : ''}
+                    {skippedSelected ? ' · skipped' : ''}
                 </p>
             ) : null}
 
-            <div className="tiles">
-                {stats.map((stat) => (
-                    <div className="tile" key={stat.key}>
-                        <div className="tile__key">{stat.key}</div>
-                        <div className="tile__value">{stat.value}</div>
-                    </div>
-                ))}
-            </div>
+            {skippedSelected ? (
+                <p className="empty">
+                    Skipped — nothing was logged on this day, and it does not count as a workout.
+                </p>
+            ) : (
+                <div className="tiles">
+                    {stats.map((stat) => (
+                        <div className="tile" key={stat.key}>
+                            <div className="tile__key">{stat.key}</div>
+                            <div className="tile__value">{stat.value}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {selected && lines.length > 0 ? (
                 <div className="lines">
@@ -181,7 +234,7 @@ export function DaySheet({
                 </p>
             ) : null}
 
-            {selected && loading && lines.length === 0 ? (
+            {selected && !skippedSelected && loading && lines.length === 0 ? (
                 <p className="empty">Loading the session…</p>
             ) : null}
 
@@ -206,8 +259,12 @@ export function DaySheet({
                                     </span>
                                 </span>
                                 <span className="row__right">
-                                    <span className="row__value">{kg(session.volumeKg)}</span>
-                                    <span className="row__unit">{session.setCount} sets</span>
+                                    <span className="row__value">
+                                        {isSkipped(session) ? '—' : kg(session.volumeKg)}
+                                    </span>
+                                    <span className="row__unit">
+                                        {isSkipped(session) ? 'skipped' : `${session.setCount} sets`}
+                                    </span>
                                 </span>
                             </button>
                         ))}
@@ -226,7 +283,7 @@ export function DaySheet({
                         ? 'Working…'
                         : draft
                             ? 'Resume the open draft'
-                            : sessions.length > 0
+                            : logged
                                 ? 'Log this day again'
                                 : 'Start this workout'}
                 </button>
@@ -236,7 +293,19 @@ export function DaySheet({
                 </p>
             )}
 
-            {selected && selected.status === 'submitted' ? (
+            {canLog && !draft && !filed ? (
+                <button
+                    type="button"
+                    className="add-exercise stack-8"
+                    style={{ width: '100%' }}
+                    disabled={busy}
+                    onClick={onSkip}
+                >
+                    Skip this day
+                </button>
+            ) : null}
+
+            {selected && selected.status === 'submitted' && !skippedSelected ? (
                 <button
                     type="button"
                     className="add-exercise stack-8"
@@ -248,8 +317,8 @@ export function DaySheet({
                 </button>
             ) : null}
 
-            {selected && selected.status === 'submitted' ? (
-                confirmingDelete === selected.id ? (
+            {selected && removal ? (
+                removal.confirm !== null && confirmingDelete === selected.id ? (
                     <button
                         type="button"
                         className="sheet__danger"
@@ -259,16 +328,18 @@ export function DaySheet({
                             onDelete(selected.id);
                         }}
                     >
-                        Delete {sessionDateLabel(selected.id)} for good — tap again
+                        {removal.confirm}
                     </button>
                 ) : (
                     <button
                         type="button"
                         className="sheet__danger"
                         disabled={busy}
-                        onClick={() => setConfirmingDelete(selected.id)}
+                        onClick={() => (removal.confirm === null
+                            ? onDelete(selected.id)
+                            : setConfirmingDelete(selected.id))}
                     >
-                        Delete this session
+                        {removal.label}
                     </button>
                 )
             ) : null}

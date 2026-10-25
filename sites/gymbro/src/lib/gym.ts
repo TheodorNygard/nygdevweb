@@ -61,6 +61,7 @@ export {
     dayLabel,
     daysForWeek,
     isRestWeek,
+    isSkipped,
     progressOf,
     repsInTank,
     rpeForTank,

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { FreeSessionRows } from '../components/FreeSessionRows';
 
-import { dayLabel } from '../lib/block';
+import { dayLabel, isSkipped } from '../lib/block';
 import { kg, rpeLabel, sessionDateLabel, sessionOrdinal } from '../lib/format';
 import type { CurrentBlock, DatedSession, MesocycleSummary, SessionSummary } from '../lib/types';
 
@@ -49,6 +49,18 @@ function volumeOf(sessions: SessionSummary[]): number {
     return sessions.reduce((total, session) => (
         session.status === 'submitted' ? total + session.volumeKg : total
     ), 0);
+}
+
+/**
+ * How many workouts a block holds, once its sessions are in hand: submitted,
+ * skips left out. Until then the API's own count stands in, and it cannot leave
+ * them out — it is stored on the block when a session is submitted, and a skip
+ * is told apart by its sets, which can still be logged into it afterwards.
+ */
+function loggedIn(mesocycle: MesocycleSummary, held: SessionSummary[] | undefined): number {
+    return held
+        ? held.filter((session) => session.status === 'submitted' && !isSkipped(session)).length
+        : mesocycle.submittedCount;
 }
 
 /**
@@ -179,7 +191,7 @@ export function HistoryScreen({
                                             {' · '}
                                             {mesocycle.days.length} days
                                             {' · '}
-                                            {mesocycle.submittedCount} logged
+                                            {loggedIn(mesocycle, held)} logged
                                         </span>
                                     </span>
                                     <span className="row__right">
@@ -227,6 +239,11 @@ export function HistoryScreen({
                                                     {group.rows.map((session) => {
                                                         const ordinal = sessionOrdinal(session.id);
 
+                                                        // Listed rather than hidden, so
+                                                        // the skip can be opened and
+                                                        // undone from here as well.
+                                                        const skipped = isSkipped(session);
+
                                                         return (
                                                             <button
                                                                 key={session.id}
@@ -250,8 +267,9 @@ export function HistoryScreen({
                                                                         )}
                                                                         {' · '}
                                                                         D{session.dayIndex + 1}
-                                                                        {' · RPE '}
-                                                                        {rpeLabel(session.avgRpe)}
+                                                                        {skipped
+                                                                            ? ''
+                                                                            : ` · RPE ${rpeLabel(session.avgRpe)}`}
                                                                         {ordinal > 1
                                                                             ? ` · #${ordinal} that day`
                                                                             : ''}
@@ -259,10 +277,12 @@ export function HistoryScreen({
                                                                 </span>
                                                                 <span className="row__right">
                                                                     <span className="row__value">
-                                                                        {kg(session.volumeKg)}
+                                                                        {skipped ? '—' : kg(session.volumeKg)}
                                                                     </span>
                                                                     <span className="row__unit">
-                                                                        {session.setCount} sets
+                                                                        {skipped
+                                                                            ? 'skipped'
+                                                                            : `${session.setCount} sets`}
                                                                     </span>
                                                                 </span>
                                                             </button>

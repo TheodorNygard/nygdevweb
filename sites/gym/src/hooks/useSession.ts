@@ -93,6 +93,22 @@ export interface SessionActions {
      * between is not part of what was filed.
      */
     submit: () => Promise<Workout | null>;
+
+    /**
+     * Passes a day of the block by without training it: Start and an empty
+     * Submit, with no logging screen between them — see `isSkipped` in
+     * `lib/block`. True once the day is skipped. Refused, with a notice, when
+     * Start hands back a draft already open on the cell with sets in it,
+     * because that is a workout under way rather than a day to skip.
+     */
+    skip: (week: number, dayIndex: number) => Promise<boolean>;
+
+    /**
+     * Throws the open draft away and closes it — the way out of a session
+     * started on the wrong day, which used to be Submit, filing an empty
+     * workout. True once it is gone, including when it already was.
+     */
+    discard: () => Promise<boolean>;
     dismiss: () => void;
 }
 
@@ -731,6 +747,73 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         }
     }, [api, put, settled]);
 
+    const skip = useCallback(async (week: number, dayIndex: number): Promise<boolean> => {
+        if (!api) return false;
+
+        setBusy(true);
+        setError(null);
+        setNotice(null);
+
+        try {
+            const started = await api.startWorkout(localDate(), week, dayIndex);
+
+            // Start resumes a draft already open on this cell today rather than
+            // opening another, and a draft with sets in it is a workout someone
+            // is in the middle of. Submitting it here would file it as finished.
+            if (started.workout.totals.setCount > 0) {
+                setNotice(
+                    'This day already has a workout open with sets in it. Resume it, or discard it, '
+                    + 'rather than skipping the day.',
+                );
+
+                return false;
+            }
+
+            await api.submit(started.workout.id);
+
+            return true;
+        } catch (cause) {
+            setError(messageOf(cause));
+
+            return false;
+        } finally {
+            setBusy(false);
+        }
+    }, [api]);
+
+    const discard = useCallback(async (): Promise<boolean> => {
+        const session = current.current;
+
+        if (!api || !session) return false;
+
+        setBusy(true);
+        setError(null);
+
+        // Anything still on its way would land on a session that is gone and
+        // come back as a failure in the banner. What is in flight is let finish;
+        // what is being retried is dropped, since it was for this session.
+        await settled();
+        drop(generation.current);
+
+        try {
+            await api.deleteWorkout(session.id);
+        } catch (cause) {
+            // Already gone — a retry after a lost answer, or another device —
+            // is the same outcome as deleting it now.
+            if (!(cause instanceof ApiError && cause.status === 404)) {
+                setError(messageOf(cause));
+                setBusy(false);
+
+                return false;
+            }
+        }
+
+        close();
+        setBusy(false);
+
+        return true;
+    }, [api, close, drop, settled]);
+
     const dismiss = useCallback(() => {
         setError(null);
         setNotice(null);
@@ -755,6 +838,8 @@ export function useSession(api: GymApi | null): SessionState & SessionActions {
         removeEntry,
         reorderEntry,
         submit,
+        skip,
+        discard,
         dismiss,
     };
 }

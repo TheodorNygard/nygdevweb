@@ -3,6 +3,7 @@ import {
     daysForWeek,
     draftIn,
     isRestWeek,
+    isSkipped,
     progressOf,
     repsInTank,
     sessionsFor,
@@ -63,13 +64,19 @@ export function TodayScreen({
         .map((day) => {
             const cell = sessionsFor(sessions, week, day.dayIndex);
             const submitted = cell.filter((session) => session.status === 'submitted');
+            const logged = submitted.filter((session) => !isSkipped(session));
 
             return {
                 day,
                 draft: draftIn(cell),
-                latest: submitted[0],
+                latest: logged[0],
+
+                // Behind you either way, so "up next" moves past it — but only a
+                // day with something logged is a workout, and only that one
+                // gets the tick.
                 done: submitted.length > 0,
-                extra: submitted.length - 1,
+                skipped: submitted.length > 0 && logged.length === 0,
+                extra: logged.length - 1,
                 sessions: cell.length,
             };
         })
@@ -107,7 +114,10 @@ export function TodayScreen({
                     <div className="block__fill" style={{ width: `${progress.percent}%` }} />
                 </div>
                 <div className="block__meta">
-                    <span>{progress.doneCount} of {progress.totalCount} workouts logged</span>
+                    <span>
+                        {progress.doneCount} of {progress.totalCount} workouts logged
+                        {progress.skippedCount > 0 ? ` · ${progress.skippedCount} skipped` : ''}
+                    </span>
                     <span>{days.length}×/week</span>
                 </div>
             </section>
@@ -151,7 +161,7 @@ export function TodayScreen({
                     const isNext = index === nextIndex;
                     const classes = ['day'];
 
-                    if (row.done) classes.push('day--done');
+                    if (row.done) classes.push(row.skipped ? 'day--skipped' : 'day--done');
                     if (isNext) classes.push('day--next');
 
                     const sub = row.draft
@@ -160,11 +170,21 @@ export function TodayScreen({
                             ? `${row.latest.setCount} sets · ${kg(row.latest.volumeKg)}`
                                 + ` · RPE ${rpeLabel(row.latest.avgRpe)}`
                                 + (row.extra > 0 ? ` · +${row.extra} more` : '')
-                            : isNext
-                                ? 'up next · nothing logged'
-                                : 'planned';
+                            : row.skipped
+                                ? 'skipped · not a workout'
+                                : isNext
+                                    ? 'up next · nothing logged'
+                                    : 'planned';
 
-                    const action = row.draft ? 'Resume' : row.done ? '✓' : isNext ? 'Start' : '';
+                    const action = row.draft
+                        ? 'Resume'
+                        : row.skipped
+                            ? 'Skipped'
+                            : row.done
+                                ? '✓'
+                                : isNext
+                                    ? 'Start'
+                                    : '';
 
                     return (
                         <button
@@ -194,7 +214,8 @@ export function TodayScreen({
 
             {weekDone && !canNext ? (
                 <button type="button" className="weekdone" onClick={onPlan}>
-                    Block complete — {progress.doneCount} of {progress.totalCount} workouts. Plan
+                    Block complete — {progress.doneCount} of {progress.totalCount} workouts
+                    {progress.skippedCount > 0 ? `, ${progress.skippedCount} skipped` : ''}. Plan
                     the next one.
                 </button>
             ) : null}

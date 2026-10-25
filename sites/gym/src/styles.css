@@ -592,6 +592,17 @@ button {
     color: var(--accent-ink);
 }
 
+/* Behind you like a logged day, but not a workout: no tick and no accent, the
+   word in the tick's place, and the label as quiet as a finished one. */
+.day--skipped .day__label {
+    color: var(--fg-50);
+}
+
+.day--skipped .day__action {
+    font-weight: 500;
+    color: var(--fg-40);
+}
+
 .day__body {
     flex: 1;
     min-width: 0;

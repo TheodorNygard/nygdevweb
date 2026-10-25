@@ -5,6 +5,7 @@ import type {
     Mesocycle,
     PlannedExercise,
     SessionEntry,
+    SessionStatus,
     SessionSummary,
     WorkSet,
 } from './types';
@@ -30,20 +31,50 @@ export function draftIn(sessions: SessionSummary[]): SessionSummary | undefined 
     return sessions.find((session) => session.status === 'draft');
 }
 
+/**
+ * Whether a session is a skipped day rather than a workout: submitted, with
+ * nothing logged in it.
+ *
+ * Derived rather than stored, like every other total here. Skipping a day is
+ * starting it and submitting it empty — what "Skip this day" does in one tap,
+ * and what finishing an empty session always did — so every day skipped before
+ * the button existed already reads as one, with nothing to backfill. The API
+ * agrees without being told: an empty submit plans no day and adds nothing to
+ * recently used.
+ *
+ * It moves "up next" past the day, the way a workout does, and counts as no
+ * workout anywhere a workout is counted. A set logged into it afterwards, from
+ * History, makes it a workout again — which is what it then is.
+ */
+export function isSkipped(session: { status: SessionStatus; setCount: number }): boolean {
+    return session.status === 'submitted' && session.setCount === 0;
+}
+
 export interface BlockProgress {
-    /** Cells with at least one submitted session. */
+    /** Cells with a workout in them: a submitted session that logged something. */
     doneCount: number;
+
+    /** Cells passed by without one — skipped, and never logged since. */
+    skippedCount: number;
     totalCount: number;
+
+    /**
+     * How far through the block, skipped days included: a day skipped is a day
+     * behind you, and a bar that could never fill would read as a block never
+     * finished. The counts beside it are what say how much of it was trained.
+     */
     percent: number;
 }
 
 /**
- * "12 of 20 workouts logged". Counted in cells rather than in sessions: a day
- * logged twice is one cell of progress, and counting sessions would let a block
- * read 21 of 20.
+ * "12 of 20 workouts logged · 2 skipped". Counted in cells rather than in
+ * sessions: a day logged twice is one cell of progress, and counting sessions
+ * would let a block read 21 of 20. A cell that was skipped and then logged
+ * anyway is a workout, not both.
  */
 export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): BlockProgress {
     const cells = new Set<string>();
+    const skipped = new Set<string>();
 
     for (const session of sessions) {
         if (session.status !== 'submitted') continue;
@@ -59,8 +90,10 @@ export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): Bl
             continue;
         }
 
-        cells.add(`${session.week}:${session.dayIndex}`);
+        (isSkipped(session) ? skipped : cells).add(`${session.week}:${session.dayIndex}`);
     }
+
+    for (const cell of cells) skipped.delete(cell);
 
     let totalCount = 0;
 
@@ -68,10 +101,13 @@ export function progressOf(mesocycle: Mesocycle, sessions: SessionSummary[]): Bl
         totalCount += daysForWeek(mesocycle.days.length, week, mesocycle.weeks);
     }
 
+    const passed = cells.size + skipped.size;
+
     return {
         doneCount: cells.size,
+        skippedCount: skipped.size,
         totalCount,
-        percent: totalCount === 0 ? 0 : Math.round((cells.size / totalCount) * 100),
+        percent: totalCount === 0 ? 0 : Math.round((passed / totalCount) * 100),
     };
 }
 

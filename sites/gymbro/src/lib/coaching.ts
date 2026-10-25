@@ -6,6 +6,7 @@ import {
     daysForWeek,
     equipmentFor,
     isRestWeek,
+    isSkipped,
     isWarmUpRpe,
     num,
     repsInTank,
@@ -401,6 +402,12 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
     const ordered = [...sessions].sort((a, b) => a.id.localeCompare(b.id));
     const submitted = ordered.filter((session) => session.status === 'submitted');
     const drafts = ordered.length - submitted.length;
+
+    // A skip is submitted with nothing in it — a day moved past, not trained —
+    // so it is no finished workout. It still has a week, and a week of nothing
+    // but skips is worth a row of zeroes in the volume table below.
+    const skipped = submitted.filter(isSkipped).length;
+    const finished = submitted.filter((session) => !isSkipped(session));
     const out: string[] = [];
 
     out.push(`# Training log: ${block.name}`);
@@ -425,6 +432,8 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
             + 'regression.',
         '- Sessions and top sets are labelled `Wk2 D1`: week 2 of the block, the first plan day. '
             + 'Two sessions can share a date, so the label is what tells them apart.',
+        '- A **skipped** day is a plan day the lifter moved past without training it — closed on '
+            + 'the phone with nothing logged. It is not a workout and is counted as none.',
         READING.topSet,
         '- “Change” in the progress table compares the top set of **the same exercise on the same '
             + 'plan day** — D1’s bench against D1’s bench — in the first and the latest week it was '
@@ -449,7 +458,9 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
         ['Being trained now', block.isCurrent ? 'Yes' : 'No'],
         [
             'Sessions logged',
-            `${submitted.length} finished${drafts > 0 ? `, ${drafts} in progress` : ''}`
+            `${finished.length} finished`
+                + (skipped > 0 ? `, ${skipped} ${skipped === 1 ? 'day' : 'days'} skipped` : '')
+                + (drafts > 0 ? `, ${drafts} in progress` : '')
                 + (lastWeek > 0 ? ` — latest in week ${lastWeek}` : ''),
         ],
     ]));
@@ -488,7 +499,7 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
 
     // --------------------------------------------------------------- progress
 
-    const series = seriesOf(submitted, dateOf);
+    const series = seriesOf(finished, dateOf);
 
     out.push('## Progress by exercise (finished sessions)');
 
@@ -650,6 +661,15 @@ function blockExport({ block, sessions, library, custom, profile, exportedOn }: 
                     ? 'No exercises on it.'
                     : `${count} exercise${count === 1 ? '' : 's'} on it from the plan, none lifted.`),
             );
+
+            continue;
+        }
+
+        // The same in its finished form, and one line for the same reason: the
+        // plan read back with "0 of 3" after every exercise would look like a
+        // workout abandoned, and the day was never meant to be trained.
+        if (isSkipped(session)) {
+            out.push('Skipped — moved past without training; nothing logged.');
 
             continue;
         }

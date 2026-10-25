@@ -390,6 +390,15 @@ export function App() {
         setScreen('session');
     }
 
+    // Passes a day by without a workout, from its sheet: nothing opens, and
+    // Today's "up next" moves on once the block has been read again.
+    async function skipDay(dayIndex: number) {
+        if (!(await session.skip(activeWeek, dayIndex))) return;
+
+        closeDay();
+        block.reload();
+    }
+
     async function resume(sessionId: string) {
         const opened = await session.open(sessionId);
 
@@ -467,6 +476,20 @@ export function App() {
 
         if (!workout) return;
 
+        // Submitted empty is a day skipped rather than a workout logged, so
+        // there is nothing for the Done screen to celebrate. Straight back to
+        // the week, where the day now reads as skipped. The finish sheet only
+        // offers this in a block; a freestanding session has no day to skip.
+        if (!workout.freestanding && workout.totals.setCount === 0) {
+            setFinishing(false);
+            session.close();
+            setScreen('tabs');
+            pickTab('today');
+            block.reload();
+
+            return;
+        }
+
         setCompleted(workout.freestanding
             ? { dayLabel: freeLabel(workout), week: null, totals: workout.totals }
             : {
@@ -481,6 +504,25 @@ export function App() {
         // Recently used and last time are read off this list, so a finished
         // freestanding workout has to be in it before the next one starts.
         if (wantRecent) recent.reload();
+    }
+
+    // The open draft thrown away, from the finish sheet. A draft is only ever
+    // in the block being trained or in none — a session from another block is
+    // opened submitted, to be corrected — so one of the two lists holds it.
+    async function discardWorkout() {
+        const wasFree = session.workout?.freestanding === true;
+
+        if (!(await session.discard())) return;
+
+        setFinishing(false);
+        setScreen('tabs');
+        setSessionBlock(null);
+
+        if (wasFree) {
+            recent.reload();
+        } else {
+            block.reload();
+        }
     }
 
     // Every Plan-tab write is the same shape: one call, both block reads
@@ -859,6 +901,7 @@ export function App() {
                         busy={session.busy}
                         onSelect={setDaySessionId}
                         onStart={() => { void startOn(openDay.dayIndex); }}
+                        onSkip={() => { void skipDay(openDay.dayIndex); }}
                         onResume={(sessionId) => { void resume(sessionId); }}
                         onEdit={(sessionId) => { void editSession(sessionId); }}
                         onDelete={(sessionId) => { void removeSession(sessionId); }}
@@ -916,8 +959,10 @@ export function App() {
                             ? 'this workout'
                             : dayLabel(meso, session.workout.dayIndex)}
                         totals={session.workout.totals}
+                        inBlock={!session.workout.freestanding}
                         busy={session.busy}
                         onSubmit={() => { void submitWorkout(); }}
+                        onDiscard={() => { void discardWorkout(); }}
                         onClose={() => setFinishing(false)}
                     />
                 ) : null}

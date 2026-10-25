@@ -2,6 +2,7 @@ import { groupOf } from '../lib/groups';
 import {
     daysForWeek,
     isRestWeek,
+    isSkipped,
     kg,
     progressOf,
     repsInTank,
@@ -57,16 +58,19 @@ export function DashboardScreen({
     // rest week keeps.
     const runs = daysForWeek(block.days.length, week, block.weeks);
 
-    // A day is "done" for the map when something was submitted against it; a
+    // A day is "done" for the map when a workout was submitted against it; a
     // draft is its own state, because an open session is neither nothing nor a
-    // week's work finished.
+    // week's work finished. So is a skip — the day is behind the lifter, but
+    // nothing was lifted on it (see `isSkipped`).
     function cellFor(w: number, dayIndex: number) {
         const cell = sessions.filter(
             (session) => session.week === w && session.dayIndex === dayIndex,
         );
+        const done = cell.some((session) => session.status === 'submitted' && !isSkipped(session));
 
         return {
-            done: cell.some((session) => session.status === 'submitted'),
+            done,
+            skipped: !done && cell.some(isSkipped),
             draft: cell.some((session) => session.status === 'draft'),
         };
     }
@@ -113,14 +117,19 @@ export function DashboardScreen({
                     <div className="meter__fill" style={{ width: `${progress.percent}%` }} />
                 </div>
                 <div className="meter__legend">
-                    <span>{`${progress.doneCount} of ${progress.totalCount} workouts logged`}</span>
+                    <span>
+                        {`${progress.doneCount} of ${progress.totalCount} workouts logged`}
+                        {progress.skippedCount > 0 ? ` · ${progress.skippedCount} skipped` : ''}
+                    </span>
                     <span>{`${block.days.length}×/week`}</span>
                 </div>
 
                 <div className="tiles">
                     <div className="tile">
                         <div className="tile__key">LOGGED</div>
-                        <div className="tile__value">{submitted.length}</div>
+                        <div className="tile__value">
+                            {submitted.filter((session) => !isSkipped(session)).length}
+                        </div>
                     </div>
                     <div className="tile">
                         <div className="tile__key">VOLUME</div>
@@ -141,7 +150,7 @@ export function DashboardScreen({
                 <div className="panel__head" style={{ marginTop: 22 }}>
                     <span className="panel__label">BLOCK MAP</span>
                     <span className="map__key">
-                        ■ logged &nbsp;▨ in progress &nbsp;□ planned &nbsp;▫ not this week
+                        ■ logged &nbsp;▨ in progress &nbsp;╱ skipped &nbsp;□ planned &nbsp;▫ not this week
                     </span>
                 </div>
 
@@ -185,15 +194,18 @@ export function DashboardScreen({
                                         // is a workout and reads as one.
                                         const off = dayIndex >= weekRuns
                                             && !state.done
+                                            && !state.skipped
                                             && !state.draft;
 
                                         const className = state.done
                                             ? 'map__cell map__cell--done'
                                             : state.draft
                                                 ? 'map__cell map__cell--draft'
-                                                : off
-                                                    ? 'map__cell map__cell--off'
-                                                    : 'map__cell';
+                                                : state.skipped
+                                                    ? 'map__cell map__cell--skipped'
+                                                    : off
+                                                        ? 'map__cell map__cell--off'
+                                                        : 'map__cell';
 
                                         return (
                                             <span
@@ -201,7 +213,9 @@ export function DashboardScreen({
                                                 className={className}
                                                 title={off
                                                     ? `W${w} · ${day.label} — not in the rest week`
-                                                    : `W${w} · ${day.label}`}
+                                                    : state.skipped && !state.draft
+                                                        ? `W${w} · ${day.label} — skipped`
+                                                        : `W${w} · ${day.label}`}
                                             />
                                         );
                                     })}
@@ -330,14 +344,16 @@ export function DashboardScreen({
                                         </span>
                                         <span className="row__sub">
                                             {`W${session.week} · ${sessionDateLabel(session.id)}`}
-                                            {` · ${session.setCount} sets`}
+                                            {isSkipped(session) ? ' · skipped' : ` · ${session.setCount} sets`}
                                             {session.status === 'draft' ? ' · in progress' : ''}
                                         </span>
                                     </span>
                                     <span className="row__right">
-                                        <span className="row__strong">{kg(session.volumeKg)}</span>
+                                        <span className="row__strong">
+                                            {isSkipped(session) ? '—' : kg(session.volumeKg)}
+                                        </span>
                                         <span className="row__sub">
-                                            {`RPE ${rpeLabel(session.avgRpe)}`}
+                                            {isSkipped(session) ? '' : `RPE ${rpeLabel(session.avgRpe)}`}
                                         </span>
                                     </span>
                                 </div>
